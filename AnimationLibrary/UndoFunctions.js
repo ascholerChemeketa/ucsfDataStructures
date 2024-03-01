@@ -27,7 +27,7 @@
 
 // Base "class": UndoBlock
 
-function UndoBlock()
+export function UndoBlock()
 {
 	
 }
@@ -46,7 +46,7 @@ UndoBlock.prototype.undoInitialStep = function(world)
 // UndoMove
 ////////////////////////////////////////////////////////////
 
-function UndoMove(id, fmX, fmy, tx, ty)
+export function UndoMove(id, fmX, fmy, tx, ty)
 {
 	this.objectID = id;
 	this.fromX = fmX;
@@ -70,7 +70,7 @@ UndoMove.prototype.addUndoAnimation = function (animationList)
 // UndoCreate
 ////////////////////////////////////////////////////////////
 
-function UndoCreate(id)
+export function UndoCreate(id)
 {
 	this.objectID = id;
 }
@@ -88,7 +88,7 @@ UndoCreate.prototype.undoInitialStep = function(world)
 // UndoHighlight
 ////////////////////////////////////////////////////////////
 
-function UndoHighlight(id, val)
+export function UndoHighlight(id, val)
 {
 	this.objectID = id;
 	this.highlightValue = val;
@@ -107,7 +107,7 @@ UndoHighlight.prototype.undoInitialStep = function(world)
 // UndoSetHeight
 ////////////////////////////////////////////////////////////
 
-function UndoSetHeight(id, val)
+export function UndoSetHeight(id, val)
 {
 	this.objectID = id;
 	this.height = val;
@@ -125,7 +125,7 @@ UndoSetHeight.prototype.undoInitialStep = function(world)
 // UndoSetWidth
 ////////////////////////////////////////////////////////////
 
-function UndoSetWidth(id, val)
+export function UndoSetWidth(id, val)
 {
 	this.objectID = id;
 	this.width = val;
@@ -143,7 +143,7 @@ UndoSetWidth.prototype.undoInitialStep = function(world)
 ////////////////////////////////////////////////////////////
 // UndoSetNumElements
 ////////////////////////////////////////////////////////////
-function UndoSetNumElements(obj, newNumElems)
+export function UndoSetNumElements(obj, newNumElems)
 {
 	this.objectID = obj.objectID;
 	this.sizeBeforeChange = obj.getNumElements();
@@ -183,7 +183,7 @@ UndoSetNumElements.prototype.undoInitialStep = function(world)
 // UndoSetAlpha
 ////////////////////////////////////////////////////////////
 
-function UndoSetAlpha(id, alph)
+export function UndoSetAlpha(id, alph)
 {
 	this.objectID = id;
 	this.alphaVal = alph;
@@ -201,7 +201,7 @@ UndoSetAlpha.prototype.undoInitialStep = function(world)
 // UndoSetNull
 ////////////////////////////////////////////////////////////
 
-function UndoSetNull(id, nv)
+export function UndoSetNull(id, nv)
 {
 	this.objectID = id;
 	this.nullVal = nv;
@@ -219,7 +219,7 @@ UndoSetNull.prototype.undoInitialStep = function(world)
 // UndoSetForegroundColor
 ////////////////////////////////////////////////////////////
 
-function UndoSetForegroundColor(id, color)
+export function UndoSetForegroundColor(id, color)
 {
 	this.objectID = id;
 	this.color = color;
@@ -237,7 +237,7 @@ UndoSetForegroundColor.prototype.undoInitialStep =  function (world)
 // UndoSetBackgroundColor
 ////////////////////////////////////////////////////////////
 
-function UndoSetBackgroundColor(id, color)
+export function UndoSetBackgroundColor(id, color)
 {
 	this.objectID = id;
 	this.color = color;
@@ -257,7 +257,7 @@ UndoSetBackgroundColor.prototype.undoInitialStep =  function (world)
 // UndoSetHighlightIndex
 ////////////////////////////////////////////////////////////
 
-function UndoSetHighlightIndex(id, index)
+export function UndoSetHighlightIndex(id, index)
 {
 	this.objectID = id;
 	this.index = index;
@@ -279,7 +279,7 @@ UndoSetHighlightIndex.prototype.undoInitialStep =  function (world)
 
 
 
-function UndoSetText(id, str, index)
+export function UndoSetText(id, str, index)
 {
 	this.objectID = id;
 	this.newText = str;
@@ -299,7 +299,7 @@ UndoSetText.prototype.undoInitialStep = function(world)
 
 
 
-function UndoSetTextColor(id, color, index)
+export function UndoSetTextColor(id, color, index)
 {
 	this.objectID = id;
 	this.color = color;
@@ -320,7 +320,7 @@ UndoSetTextColor.prototype.undoInitialStep = function(world)
 // UndoHighlightEdge
 ////////////////////////////////////////////////////////////
 
-function UndoHighlightEdge(from, to, val)
+export function UndoHighlightEdge(from, to, val)
 {
 	this.fromID = from;
 	this.toID = to;
@@ -340,7 +340,7 @@ UndoHighlightEdge.prototype.undoInitialStep = function(world)
 // UndoSetEdgeColor
 ////////////////////////////////////////////////////////////
 
-function UndoSetEdgeColor(from, to, oldColor)
+export function UndoSetEdgeColor(from, to, oldColor)
 {
 	this.fromID = from;
 	this.toID = to;
@@ -360,7 +360,7 @@ UndoSetEdgeColor.prototype.undoInitialStep = function(world)
 // UndoSetEdgeAlpha
 ////////////////////////////////////////////////////////////
 
-function UndoSetEdgeAlpha(from, to, oldAplha)
+export function UndoSetEdgeAlpha(from, to, oldAplha)
 {
 	this.fromID = from;
 	this.toID = to;
@@ -379,7 +379,7 @@ UndoSetEdgeAlpha.prototype.undoInitialStep = function(world)
 // UndoSetPosition
 ////////////////////////////////////////////////////////////
 
-function UndoSetPosition(id, x, y)
+export function UndoSetPosition(id, x, y)
 {
 	this.objectID = id;
 	this.x = x; 
@@ -394,5 +394,3 @@ UndoSetPosition.prototype.undoInitialStep = function(world)
 {
 	world.setNodePosition(this.objectID, this.x, this.y);
 }
-
-

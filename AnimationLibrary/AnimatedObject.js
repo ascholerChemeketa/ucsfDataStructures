@@ -341,3 +341,5 @@ AnimatedObject.prototype.getHighlightIndex = function()
 {
    return this.highlightIndex;
 }
+
+export {AnimatedObject};

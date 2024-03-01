@@ -29,6 +29,8 @@
 var timer;
 var swapped = false;
 
+import { EventListener } from "./CustomEvents.js"
+
 
 function reorderSibling(node1, node2) 
 {

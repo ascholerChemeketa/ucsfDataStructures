@@ -39,7 +39,7 @@ Function.prototype.bind = function() {
 	}
 }
 
-function EventListener()
+export function EventListener()
 {
 	this.events = [];
 }

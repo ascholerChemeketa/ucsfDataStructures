@@ -24,6 +24,8 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { AnimatedObject } from "./AnimatedObject.js"
+import { UndoBlock } from "./UndoFunctions";
 function AnimatedLabel(id, val, center, initialWidth)
 {
 	this.centering = center;
