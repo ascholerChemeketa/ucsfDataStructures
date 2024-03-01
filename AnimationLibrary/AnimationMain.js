@@ -350,19 +350,14 @@ function initCanvas()
 	{
 		speed = parseInt(speed);
 	}
-	
-	$(element).slider({
-					  animate: true,
-					  value: speed,
-					  change: function(e, ui)
-					  {
-						setCookie("VisualizationSpeed", String(ui.value), 30);
-					  },
-					  slide : function(e, ui){
-					  animationManager.SetSpeed(ui.value); 
-					  }
 
-					  }); 
+	element.innerHTML = '<input type="range" id="animationSpeed" name="animationSpeed" min="10" max="100" value="40" step="10" />';
+	element.addEventListener('change', (e) => {
+		console.log(e);
+		setCookie("DSVisualizationSpeed", String(e.target.value));
+		animationManager.SetSpeed(e.target.value); 
+	}
+	);
 	
 	animationManager.SetSpeed(speed);
 	
