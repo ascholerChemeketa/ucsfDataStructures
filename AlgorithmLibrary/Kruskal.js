@@ -33,7 +33,7 @@ import {
 } from "../AlgorithmLibrary/Graph.js";
 
 export function Kruskal(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -527,6 +527,6 @@ Kruskal.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new Kruskal(animManag, canvas.width, canvas.height);
 }

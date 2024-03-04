@@ -45,7 +45,7 @@ RadixTree.PRINT_VERTICAL_GAP = 20;
 RadixTree.PRINT_HORIZONTAL_GAP = 50;
 
 function RadixTree(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -871,6 +871,6 @@ RadixTree.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new RadixTree(animManag, canvas.width, canvas.height);
 }

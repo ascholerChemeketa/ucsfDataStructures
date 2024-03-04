@@ -49,7 +49,7 @@ var BACKGROUND_COLOR = "#EEFFEE";
 var PRINT_COLOR = FOREGROUND_COLOR;
 
 export function DisjointSet(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.array_start_y = canvas.height - 2 * ARRAY_HEIGHT;
   this.tree_start_y = this.array_start_y - 50;
   this.init(am, canvas.width, canvas.height);
@@ -640,6 +640,6 @@ DisjointSet.prototype.animateNewPositions = function () {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new DisjointSet(animManag, canvas.width, canvas.height);
 }

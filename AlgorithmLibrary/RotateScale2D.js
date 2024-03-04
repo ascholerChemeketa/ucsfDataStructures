@@ -25,7 +25,7 @@
 // or implied, of the University of San Francisco
 
 export function RotateScale2D(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -1293,7 +1293,7 @@ RotateScale2D.prototype.createMatrix = function (contents, x, y) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new RotateScale2D(animManag, canvas.width, canvas.height);
 }
 

@@ -60,7 +60,7 @@ FibonacciHeap.INDEGREE_ARRAY_START_Y = 50;
 FibonacciHeap.TMP_PTR_Y = 60;
 
 export function FibonacciHeap(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -1029,7 +1029,7 @@ FibonacciHeap.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new FibonacciHeap(animManag, canvas.width, canvas.height);
 }
 

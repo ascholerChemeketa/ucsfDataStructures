@@ -52,7 +52,7 @@ var PUSH_ELEMENT_Y = 30;
 var SIZE = 32;
 
 function StackLL(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -300,6 +300,6 @@ StackLL.prototype.clearAll = function () {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new StackLL(animManag, canvas.width, canvas.height);
 }

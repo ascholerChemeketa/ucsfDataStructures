@@ -49,13 +49,13 @@ import { AnimatedBTreeNode } from "./AnimatedBTreeNode.js";
 import { HighlightCircle } from "./HighlightCircle.js";
 import { Line } from "./Line.js";
 
-export function ObjectManager() {
+export function ObjectManager(canvas) {
   this.Nodes = [];
   this.Edges = [];
   this.BackEdges = [];
   this.activeLayers = [];
   this.activeLayers[0] = true;
-  this.ctx = document.getElementById("canvas").getContext("2d");
+  this.ctx = canvas.getContext("2d");
   this.framenum = 0;
   this.width = 0;
   this.height = 0;

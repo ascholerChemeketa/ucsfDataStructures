@@ -52,7 +52,7 @@ var INSERT_X = 30;
 var INSERT_Y = 25;
 
 export function BinomialQueue(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -707,7 +707,7 @@ BinomialQueue.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new BinomialQueue(animManag, canvas.width, canvas.height);
 }
 

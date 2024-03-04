@@ -32,7 +32,7 @@ import {
 } from "../AlgorithmLibrary/Algorithm.js";
 
 export function LeftistHeap(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -595,7 +595,7 @@ LeftistHeap.prototype.animateNewPositions = function (tree) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new LeftistHeap(animManag, canvas.width, canvas.height);
 }
 

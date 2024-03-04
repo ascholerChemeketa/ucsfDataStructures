@@ -946,6 +946,6 @@ Search.prototype.linearSearch = function (searchVal) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new Search(animManag, canvas.width, canvas.height);
 }

@@ -32,7 +32,7 @@ import {
 } from "../AlgorithmLibrary/Algorithm.js";
 
 export function DPLCS(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -1162,6 +1162,6 @@ DPLCS.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new DPLCS(animManag, canvas.width, canvas.height);
 }

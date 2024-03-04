@@ -46,7 +46,7 @@ Ternary.PRINT_VERTICAL_GAP = 20;
 Ternary.PRINT_HORIZONTAL_GAP = 50;
 
 function Ternary(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -442,6 +442,6 @@ Ternary.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new Ternary(animManag, canvas.width, canvas.height);
 }

@@ -25,7 +25,7 @@
 // or implied, of the University of San Francisco
 
 export function RedBlack(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -1466,6 +1466,6 @@ RedBlackNode.prototype.isLeftChild = function () {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new RedBlack(animManag, canvas.width, canvas.height);
 }

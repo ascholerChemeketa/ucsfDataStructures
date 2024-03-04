@@ -46,7 +46,7 @@ BST.PRINT_VERTICAL_GAP = 20;
 BST.PRINT_HORIZONTAL_GAP = 50;
 
 export function BST(canvas, data = []) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 
   for (let d of data) {
@@ -721,6 +721,6 @@ BST.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new BST(animManag, canvas.width, canvas.height);
 }

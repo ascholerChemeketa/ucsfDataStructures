@@ -58,7 +58,7 @@ var INDEX_COLOR = "#0000FF";
 var SIZE = 15;
 
 export function QueueArray(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -350,6 +350,6 @@ QueueArray.prototype.clearAll = function () {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new QueueArray(animManag, canvas.width, canvas.height);
 }

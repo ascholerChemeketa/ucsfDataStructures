@@ -41,7 +41,7 @@ SPLAYTREE.PRINT_VERTICAL_GAP = 20;
 SPLAYTREE.PRINT_HORIZONTAL_GAP = 50;
 
 function SPLAYTREE(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -997,6 +997,6 @@ SPLAYTREE.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new SPLAYTREE(animManag, canvas.width, canvas.height);
 }

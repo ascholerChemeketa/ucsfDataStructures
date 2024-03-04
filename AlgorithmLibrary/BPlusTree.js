@@ -55,7 +55,7 @@ var BACKGROUND_COLOR = "#EEFFEE";
 var PRINT_COLOR = FOREGROUND_COLOR;
 
 export function BPlusTree(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -1530,6 +1530,6 @@ function BTreeNode(id, initialX, initialY) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new BPlusTree(animManag, canvas.width, canvas.height);
 }

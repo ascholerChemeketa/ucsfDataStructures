@@ -61,7 +61,7 @@ var PUSH_ELEMENT_Y = 30;
 var SIZE = 32;
 
 export function QueueLL(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -341,6 +341,6 @@ QueueLL.prototype.clearAll = function () {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new QueueLL(animManag, canvas.width, canvas.height);
 }

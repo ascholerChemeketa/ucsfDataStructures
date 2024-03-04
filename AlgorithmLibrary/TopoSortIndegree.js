@@ -25,7 +25,7 @@
 // or implied, of the University of San Francisco
 
 export function TopoSortIndegree(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -699,6 +699,6 @@ TopoSortIndegree.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new TopoSortIndegree(animManag, canvas.width, canvas.height);
 }

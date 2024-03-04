@@ -34,7 +34,7 @@ import {
 } from "../AlgorithmLibrary/Algorithm.js";
 
 export function ChangeCoordinate2D(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -2180,7 +2180,7 @@ ChangeCoordinate2D.prototype.createMatrix = function (contents, x, y) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new ChangeCoordinate2D(animManag, canvas.width, canvas.height);
 }
 

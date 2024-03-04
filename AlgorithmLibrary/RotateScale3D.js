@@ -25,7 +25,7 @@
 // or implied, of the University of San Francisco
 
 export function RotateScale3D(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -1508,7 +1508,7 @@ RotateScale3D.prototype.createMatrix = function (contents, x, y) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new RotateScale3D(animManag, canvas.width, canvas.height);
 }
 

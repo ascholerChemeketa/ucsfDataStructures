@@ -25,7 +25,7 @@
 // or implied, of the University of San Francisco
 
 export function RecFact(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -295,6 +295,6 @@ RecFact.prototype.factorial = function (value) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new RecFact(animManag, canvas.width, canvas.height);
 }

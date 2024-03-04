@@ -1,6 +1,6 @@
 function AVL(canvas)
 {
-	let am = initCanvas();
+	let am = initCanvas(canvas);
 	this.init(am, canvas.width, canvas.height);
 }
 
@@ -1176,6 +1176,6 @@ var currentAlg;
 
 function init()
 {
-	var animManag = initCanvas();
+	var animManag = initCanvas(canvas);
 	currentAlg = new AVL(animManag);
 }

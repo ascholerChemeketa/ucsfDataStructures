@@ -1046,6 +1046,6 @@ Graph.prototype.enableUI = function (event) {
 /* no init, this is only a base class! */
 var currentAlg;
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new Graph(animManag, canvas.width, canvas.height);
 }

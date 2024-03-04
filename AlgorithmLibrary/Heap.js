@@ -28,7 +28,7 @@ import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
 import { Algorithm, addControlToAlgorithmBar } from "./Algorithm.js";
 
 export function Heap(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -448,6 +448,6 @@ Heap.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new Heap(animManag, canvas.width, canvas.height);
 }

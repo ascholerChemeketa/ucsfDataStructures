@@ -47,7 +47,7 @@ var QUEUE_START_Y = 50;
 var QUEUE_SPACING = 30;
 
 export function DFS(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -344,6 +344,6 @@ DFS.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new DFS(animManag, canvas.width, canvas.height);
 }

@@ -31,7 +31,7 @@ import {
 } from "../AlgorithmLibrary/Algorithm.js";
 
 export function DPFib(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -691,6 +691,6 @@ DPFib.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new DPFib(animManag, canvas.width, canvas.height);
 }

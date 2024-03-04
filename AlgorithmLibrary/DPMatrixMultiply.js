@@ -34,7 +34,7 @@ import {
 } from "../AlgorithmLibrary/Algorithm.js";
 
 export function DPMatrixMultiply(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -1120,6 +1120,6 @@ DPMatrixMultiply.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new DPMatrixMultiply(animManag, canvas.width, canvas.height);
 }

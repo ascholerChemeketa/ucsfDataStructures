@@ -186,7 +186,7 @@
           <pre>
 function MyAlgorithm(canvas)
 {
-	let am = initCanvas();
+	let am = initCanvas(canvas);
 	this.init(am, canvas.width, canvas.height);
 }
 
@@ -439,7 +439,7 @@ var currentAlg;
 
 function init()
 {
-	var animManag = initCanvas();
+	var animManag = initCanvas(canvas);
 	currentAlg = new MyAlgorithm(animManag, canvas.width, canvas.height);
 	
 }
@@ -1113,7 +1113,7 @@ function init()
           <pre>
 function SimpleStack(canvas)
 {
-	let am = initCanvas();
+	let am = initCanvas(canvas);
 	this.init(am, canvas.width, canvas.height);
 }
 
@@ -1389,7 +1389,7 @@ var currentAlg;
 
 function init()
 {
-	var animManag = initCanvas();
+	var animManag = initCanvas(canvas);
 	currentAlg = new SimpleStack(animManag, canvas.width, canvas.height);
 	
 }

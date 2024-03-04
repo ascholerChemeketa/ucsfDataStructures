@@ -34,12 +34,12 @@ import {
 
 // function init()
 // {
-// 	var animManag = initCanvas();
+// 	var animManag = initCanvas(canvas);
 // 	currentAlg = new AVL(animManag, canvas.width, canvas.height);
 // }
 
 export function AVL(canvas, data = []) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 
   for (let d of data) {

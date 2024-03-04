@@ -29,7 +29,7 @@ import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
 import { Hash } from "./Hash.js";
 
 export function ClosedHashBucket(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -349,6 +349,6 @@ ClosedHashBucket.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new ClosedHashBucket(animManag, canvas.width, canvas.height);
 }

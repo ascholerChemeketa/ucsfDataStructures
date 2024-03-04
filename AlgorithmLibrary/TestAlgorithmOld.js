@@ -25,7 +25,7 @@
 // or implied, of the University of San Francisco
 
 export function TestAlgorithm(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -89,6 +89,6 @@ TestAlgorithm.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new TestAlgorithm(animManag);
 }

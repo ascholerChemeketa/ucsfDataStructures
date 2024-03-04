@@ -29,7 +29,7 @@ import { addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 import { Graph, SMALL_SIZE, LARGE_SIZE } from "../AlgorithmLibrary/Graph.js";
 
 export function Floyd(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -494,6 +494,6 @@ Floyd.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new Floyd(animManag, canvas.width, canvas.height);
 }

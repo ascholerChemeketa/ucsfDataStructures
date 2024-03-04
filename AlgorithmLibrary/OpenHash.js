@@ -29,7 +29,7 @@ import { Algorithm, addRadioButtonGroupToAlgorithmBar } from "./Algorithm.js";
 import { Hash } from "./Hash.js";
 
 export function OpenHash(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -328,6 +328,6 @@ function LinkedListNode(val, id, initialX, initialY) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new OpenHash(animManag, canvas.width, canvas.height);
 }

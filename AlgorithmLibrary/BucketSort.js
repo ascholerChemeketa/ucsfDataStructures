@@ -33,7 +33,7 @@ import {
 } from "../AlgorithmLibrary/Algorithm.js";
 
 export function BucketSort(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -377,6 +377,6 @@ function LinkedListNode(label, id, x, y) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new BucketSort(animManag, canvas.width, canvas.height);
 }

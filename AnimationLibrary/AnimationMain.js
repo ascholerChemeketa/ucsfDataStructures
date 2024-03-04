@@ -40,18 +40,18 @@ function reorderSibling(node1, node2) {
   node1.parentNode.insertBefore(node2, node1);
 }
 
-function swapControlDiv() {
+function swapControlDiv(canvas) {
   swapped = !swapped;
   if (swapped) {
     reorderSibling(
-      document.getElementById("canvas"),
+      canvas,
       document.getElementById("generalAnimationControlSection"),
     );
     setCookie("VisualizationControlSwapped", "true", 30);
   } else {
     reorderSibling(
       document.getElementById("generalAnimationControlSection"),
-      document.getElementById("canvas"),
+      canvas,
     );
     setCookie("VisualizationControlSwapped", "false", 30);
   }
@@ -86,7 +86,6 @@ var ANIMATION_SPEED_DEFAULT = 75;
 // TODO:  Move these out of global space into animation manager?
 var objectManager;
 var animationManager;
-var canvas;
 
 var paused = false;
 var playPauseBackButton;
@@ -240,10 +239,9 @@ function addControlToAnimationBar(type, name, containerType) {
   return element;
 }
 
-export function initCanvas() {
-  canvas = document.getElementById("canvas");
-  objectManager = new ObjectManager();
-  animationManager = new AnimationManager(objectManager);
+export function initCanvas(canvas) {
+  objectManager = new ObjectManager(canvas);
+  animationManager = new AnimationManager(objectManager, canvas);
 
   skipBackButton = addControlToAnimationBar("Button", "Skip Back");
   skipBackButton.onclick = animationManager.skipBack.bind(animationManager);
@@ -323,7 +321,7 @@ export function initCanvas() {
   swapped = swappedControls == "true";
   if (swapped) {
     reorderSibling(
-      document.getElementById("canvas"),
+      canvas,
       document.getElementById("generalAnimationControlSection"),
     );
   }
@@ -364,7 +362,9 @@ export function initCanvas() {
   sizeButton.onclick = animationManager.changeSize.bind(animationManager);
 
   let swapButton = addControlToAnimationBar("Button", "Move Controls");
-  swapButton.onclick = swapControlDiv;
+  swapButton.onclick = () => {
+    swapControlDiv(canvas);
+  };
 
   animationManager.addListener("AnimationStarted", this, animStarted);
   animationManager.addListener("AnimationEnded", this, animEnded);
@@ -379,11 +379,12 @@ export function initCanvas() {
   return animationManager;
 }
 
-function AnimationManager(objectManager) {
+function AnimationManager(objectManager, canvas) {
   // Holder for all animated objects.
   // All animation is done by manipulating objects in\
   // this container
   this.animatedObjects = objectManager;
+  this.canvas = canvas;
 
   // Control variables for stopping / starting animation
 
@@ -466,22 +467,22 @@ function AnimationManager(objectManager) {
     var height = parseInt(heightEntry.value);
 
     if (width > 100) {
-      canvas.width = width;
+      this.canvas.width = width;
       this.animatedObjects.width = width;
       setCookie("VisualizationWidth", String(width), 30);
     }
     if (height > 100) {
-      canvas.height = height;
+      this.canvas.height = height;
       this.animatedObjects.height = height;
       setCookie("VisualizationHeight", String(height), 30);
     }
-    widthEntry.value = canvas.width;
-    heightEntry.value = canvas.height;
+    widthEntry.value = this.canvas.width;
+    heightEntry.value = this.canvas.height;
 
     this.animatedObjects.draw();
     this.fireEvent("CanvasSizeChanged", {
-      width: canvas.width,
-      height: canvas.height,
+      width: this.canvas.width,
+      height: this.canvas.height,
     });
   };
 

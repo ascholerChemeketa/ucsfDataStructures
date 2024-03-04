@@ -45,7 +45,7 @@ var PUSH_ELEMENT_Y = 30;
 var SIZE = 30;
 
 function StackArray(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -317,6 +317,6 @@ StackArray.prototype.clearAll = function () {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new StackArray(animManag, canvas.width, canvas.height);
 }

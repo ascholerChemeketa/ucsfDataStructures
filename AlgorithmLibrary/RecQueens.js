@@ -25,7 +25,7 @@
 // or implied, of the University of San Francisco
 
 export function Queens(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -706,6 +706,6 @@ Queens.prototype.legal = function (board, current) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new Queens(animManag, canvas.width, canvas.height);
 }

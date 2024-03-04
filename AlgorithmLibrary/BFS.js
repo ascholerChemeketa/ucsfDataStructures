@@ -48,7 +48,7 @@ var QUEUE_START_Y = 50;
 var QUEUE_SPACING = 30;
 
 export function BFS(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -319,6 +319,6 @@ BFS.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new BFS(animManag, canvas.width, canvas.height);
 }

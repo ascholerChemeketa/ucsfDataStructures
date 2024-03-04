@@ -46,7 +46,7 @@ Trie.PRINT_VERTICAL_GAP = 20;
 Trie.PRINT_HORIZONTAL_GAP = 50;
 
 function Trie(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -625,6 +625,6 @@ Trie.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new Trie(animManag, canvas.width, canvas.height);
 }

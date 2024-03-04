@@ -1,5 +1,5 @@
 function ClosedHash(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -347,6 +347,6 @@ ClosedHash.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new ClosedHash(animManag, canvas.width, canvas.height);
 }

@@ -65,7 +65,7 @@ var HIGHLIGHT_CIRCLE_COLOR = "#000000";
 var DFS_TREE_COLOR = "#0000FF";
 
 export function ConnectedComponent(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -568,6 +568,6 @@ ConnectedComponent.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new ConnectedComponent(animManag, canvas.width, canvas.height);
 }

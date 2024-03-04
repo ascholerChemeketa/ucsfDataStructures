@@ -32,7 +32,7 @@ import {
 } from "../AlgorithmLibrary/Algorithm.js";
 
 export function DPChange(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -1311,6 +1311,6 @@ DPChange.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new DPChange(animManag, canvas.width, canvas.height);
 }

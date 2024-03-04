@@ -929,6 +929,6 @@ Ternary.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new Ternary(animManag, canvas.width, canvas.height);
 }

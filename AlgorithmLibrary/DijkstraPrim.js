@@ -42,7 +42,7 @@ var MESSAGE_LABEL_1_Y = 10;
 var HIGHLIGHT_CIRCLE_COLOR = "#000000";
 
 export function DijkstraPrim(canvas, runningDijkstra) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, runningDijkstra, canvas.width, canvas.height);
 }
 
@@ -500,7 +500,7 @@ DijkstraPrim.prototype.disableUI = function (event) {
 var currentAlg;
 
 function init(runDijkstra) {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new DijkstraPrim(
     animManag,
     runDijkstra,

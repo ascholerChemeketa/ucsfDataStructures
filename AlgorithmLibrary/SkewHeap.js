@@ -25,7 +25,7 @@
 // or implied, of the University of San Francisco
 
 export function SkewHeap(canvas) {
-  let am = initCanvas();
+  let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
 
@@ -514,7 +514,7 @@ SkewHeap.prototype.animateNewPositions = function (tree) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas();
+  var animManag = initCanvas(canvas);
   currentAlg = new SkewHeap(animManag, canvas.width, canvas.height);
 }
 
