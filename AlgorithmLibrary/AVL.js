@@ -35,10 +35,16 @@ import { Algorithm, addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorit
 // 	currentAlg = new AVL(animManag, canvas.width, canvas.height);
 // }
 
-export function AVL(canvas)
+export function AVL(canvas, data = [])
 {
 	let am = initCanvas();
 	this.init(am, canvas.width, canvas.height);
+	
+	for(let d of data) {
+		this.implementAction(this.insertElement.bind(this), d);
+		am.skipForward();
+	}
+	am.clearHistory();
 }
 
 AVL.prototype = new Algorithm();

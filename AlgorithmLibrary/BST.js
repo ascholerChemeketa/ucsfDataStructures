@@ -47,10 +47,16 @@ BST.PRINT_HORIZONTAL_GAP = 50;
 
 
 
-export function BST(canvas)
+export function BST(canvas, data = [])
 {
 	let am = initCanvas();
 	this.init(am, canvas.width, canvas.height);
+
+	for(let d of data) {
+		this.implementAction(this.insertElement.bind(this), d);
+		am.skipForward();
+	}
+	am.clearHistory();
 }
 
 BST.prototype = new Algorithm();
