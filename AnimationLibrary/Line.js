@@ -35,7 +35,7 @@ var LINE_range= LINE_maxHeightDiff - LINE_minHeightDiff + 1;
 var LINE_highlightDiff = 3;
 
 	
-function Line(n1, n2, color, cv, d, weight, anchorIndex)
+export function Line(n1, n2, color, cv, d, weight, anchorIndex)
 {
 	this.arrowHeight = 8;
 	this. arrowWidth = 4;
@@ -61,7 +61,7 @@ function Line(n1, n2, color, cv, d, weight, anchorIndex)
 	this.setColor = function(newColor)
 	{
 		this.edgeColor = newColor;
-		Dirty = true;
+		this.Dirty = true;
 	}
 	   
 	this.setHighlight = function(highlightVal)
@@ -76,7 +76,7 @@ function Line(n1, n2, color, cv, d, weight, anchorIndex)
 		   var frameMod = frameNum / 14.0;
 		   var delta  = Math.abs((frameMod) % (2 * LINE_range  - 2) - LINE_range + 1)
 		   this.highlightDiff =  delta + LINE_minHeightDiff;
-		   Dirty = true;			   
+		   this.Dirty = true;			   
 	   }
 	}
 	   
@@ -197,7 +197,7 @@ function Line(n1, n2, color, cv, d, weight, anchorIndex)
 	
 
 
-function UndoConnect(from, to, createConnection, edgeColor, isDirected, cv, lab, anch)
+export function UndoConnect(from, to, createConnection, edgeColor, isDirected, cv, lab, anch)
 {
 	this.fromID = from;
 	this.toID = to;

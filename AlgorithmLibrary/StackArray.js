@@ -45,10 +45,10 @@ var PUSH_ELEMENT_Y = 30;
 
 var SIZE = 30;
 
-function StackArray(am, w, h)
+function StackArray(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 StackArray.prototype = new Algorithm();

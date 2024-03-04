@@ -25,12 +25,14 @@
 // or implied, of the University of San Francisco
 
 
-function RadixSort(am, w, h)
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar} from "../AlgorithmLibrary/Algorithm.js";
+
+export function RadixSort(canvas)
 {
-	this.init(am, w, h);
-
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
-
 
 var ARRAY_ELEM_WIDTH = 30;
 var ARRAY_ELEM_HEIGHT = 30;
@@ -319,7 +321,7 @@ RadixSort.prototype.radixSortCallback = function(event)
 			this.cmd("SetAlpha", this.counterIndices[i], 1);
 		}
 	}
-	animationManager.StartNewAnimation(this.commands);
+	this.animationManager.StartNewAnimation(this.commands);
 	
 }
 

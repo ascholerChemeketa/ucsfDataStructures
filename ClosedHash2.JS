@@ -1,7 +1,7 @@
-function ClosedHash(am, w, h)
+function ClosedHash(canvas)
 {
-	this.init(am, w, h);
-
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 var ARRAY_ELEM_WIDTH = 90;

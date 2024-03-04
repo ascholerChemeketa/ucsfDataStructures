@@ -25,10 +25,11 @@
 // or implied, of the University of San Francisco
 
 
-function TestAlgorithm(am)
-{
-	this.init(am);
 
+export function TestAlgorithm(canvas)
+{
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 TestAlgorithm.prototype = new Algorithm();

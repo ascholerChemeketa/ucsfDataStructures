@@ -24,6 +24,8 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addCheckboxToAlgorithmBar, addRadioButtonGroupToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
 var ARRAY_START_X = 50;
 var ARRAY_WIDTH = 30;
@@ -41,13 +43,14 @@ var FOREGROUND_COLOR = "#007700";
 var BACKGROUND_COLOR = "#EEFFEE";
 var PRINT_COLOR = FOREGROUND_COLOR;
 
-function DisjointSet(am, w, h)
+export function DisjointSet(canvas)
 {
-	this.array_start_y = h - 2 * ARRAY_HEIGHT;
+	let am = initCanvas();
+	this.array_start_y = canvas.height - 2 * ARRAY_HEIGHT;
 	this.tree_start_y = this.array_start_y - 50;
-	this.init(am);
-	
+	this.init(am, canvas.width, canvas.height);
 }
+
 
 DisjointSet.prototype = new Algorithm();
 DisjointSet.prototype.constructor = DisjointSet;
@@ -168,9 +171,9 @@ DisjointSet.prototype.setup = function()
 	}
 	
 	
-	animationManager.StartNewAnimation(this.commands);
-	animationManager.skipForward();
-	animationManager.clearHistory();		
+	this.animationManager.StartNewAnimation(this.commands);
+	this.animationManager.skipForward();
+	this.animationManager.clearHistory();		
 	
 }
 
@@ -301,7 +304,7 @@ DisjointSet.prototype.findCallback = function(event)
 	findValue = this.findField.value;
 	if (findValue != "" && parseInt(findValue) < SIZE)
 	{
-		this.findField.value.value = "";
+		this.findField.value = "";
 		this.implementAction(this.findElement.bind(this), findValue);
 	}
 }

@@ -24,6 +24,10 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+import { Graph } from "../AlgorithmLibrary/Graph.js";
+
 
 var AUX_ARRAY_WIDTH = 25;
 var AUX_ARRAY_HEIGHT = 25;
@@ -55,7 +59,7 @@ var F_X_POS_LARGE = [560, 660, 760, 860,
 
 
 
-var D_Y_POS_LARGE = [037, 037, 037, 037,
+var D_Y_POS_LARGE = [37, 37, 37, 37,
 									137, 137, 137,
 									237, 237, 237, 237, 
 									337, 337, 337, 
@@ -72,10 +76,10 @@ var HIGHLIGHT_CIRCLE_COLOR = "#000000";
 var DFS_TREE_COLOR = "#0000FF";
 
 
-function ConnectedComponent(am, w, h)
+export function ConnectedComponent(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 ConnectedComponent.prototype = new Graph();

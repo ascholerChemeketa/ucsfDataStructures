@@ -24,6 +24,8 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addRadioButtonGroupToAlgorithmBar, addCheckboxToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
 
 var FIRST_PRINT_POS_X = 50;
@@ -51,10 +53,10 @@ var PRINT_COLOR = FOREGROUND_COLOR;
 
 
 
-function BTree(am, w, h)
+export function BTree(canvas)
 {
-	this.init(am, w, h);
-
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 BTree.prototype = new Algorithm();
@@ -92,9 +94,9 @@ BTree.prototype.init = function(am, w, h)
 	this.moveLabel1ID = this.nextIndex++;
 	this.moveLabel2ID = this.nextIndex++;
 	
-	animationManager.StartNewAnimation(this.commands);
-	animationManager.skipForward();
-	animationManager.clearHistory();
+	this.animationManager.StartNewAnimation(this.commands);
+	this.animationManager.skipForward();
+	this.animationManager.clearHistory();
 	this.commands = new Array();
 	
 	this.first_print_pos_y = h - 3 * PRINT_VERTICAL_GAP;
@@ -141,13 +143,13 @@ BTree.prototype.addControls =  function()
 	this.controls.push(this.clearButton);
 	
 	var i;
-	radioButtonNames = [];
+	this.radioButtonNames = [];
 	for (i = MIN_MAX_DEGREE; i <= MAX_MAX_DEGREE; i++)
 	{
-		radioButtonNames.push("Max. Degree = " + String(i));
+		this.radioButtonNames.push("Max. Degree = " + String(i));
 	}
 	
-	this.maxDegreeRadioButtons = addRadioButtonGroupToAlgorithmBar(radioButtonNames, "MaxDegree");
+	this.maxDegreeRadioButtons = addRadioButtonGroupToAlgorithmBar(this.radioButtonNames, "MaxDegree");
 	
 	this.maxDegreeRadioButtons[0].checked = true;
 	for(i = 0; i < this.maxDegreeRadioButtons.length; i++)
@@ -246,8 +248,8 @@ BTree.prototype.maxDegreeChangedHandler = function(newMaxDegree, event)
 	if (this.max_degree != newMaxDegree)
 	{
 		this.implementAction(this.changeDegree.bind(this), newMaxDegree);
-        	animationManager.skipForward();
-    	        animationManager.clearHistory();
+        	this.animationManager.skipForward();
+    	        this.animationManager.clearHistory();
 
 
 	}

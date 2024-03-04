@@ -24,12 +24,15 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+//This one does not appear to be finished... 
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addLabelToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
-function DPMatrixMultiply(am, w, h)
+export function DPMatrixMultiply(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 DPMatrixMultiply.prototype = new Algorithm();

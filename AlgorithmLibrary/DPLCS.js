@@ -25,11 +25,13 @@
 // or implied, of the University of San Francisco
 
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addLabelToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
-function DPLCS(am, w, h)
+export function DPLCS(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 DPLCS.prototype = new Algorithm();

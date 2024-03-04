@@ -49,9 +49,10 @@ Ternary.PRINT_HORIZONTAL_GAP = 50;
     
 
 
-function Ternary(am, w, h)
+function Ternary(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 Ternary.prototype = new Algorithm();

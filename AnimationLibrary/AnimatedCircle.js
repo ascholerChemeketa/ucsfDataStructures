@@ -25,9 +25,9 @@
 // or implied, of the University of San Francisco
 
 import { AnimatedObject } from "./AnimatedObject.js"
-import { UndoBlock } from "./UndoFunctions";
+import { UndoBlock } from "./UndoFunctions.js";
 
-var AnimatedCircle = function(objectID, objectLabel)
+export var AnimatedCircle = function(objectID, objectLabel)
 {
 	this.objectID = objectID;
 	this.label = objectLabel;

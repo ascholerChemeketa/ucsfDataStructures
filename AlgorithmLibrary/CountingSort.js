@@ -25,10 +25,14 @@
 // or implied, of the University of San Francisco
 
 
-function CountingSort(am, w, h)
-{
-	this.init(am, w, h);
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
+
+export function CountingSort(canvas)
+{
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 

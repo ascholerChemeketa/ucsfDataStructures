@@ -42,7 +42,17 @@
 //           an assert-like structure that can be turned off for production?)
 //       2.  Refactor this code so that it uses the same object syntax (with 
 //           prototypes) as te rest of the code.  (low priority)
-function ObjectManager()
+
+
+import { AnimatedLabel } from "./AnimatedLabel.js"
+import { AnimatedCircle } from "./AnimatedCircle.js"
+import { AnimatedRectangle } from "./AnimatedRectangle.js"
+import { AnimatedLinkedList } from "./AnimatedLinkedList.js"
+import { AnimatedBTreeNode } from "./AnimatedBTreeNode.js"
+import { HighlightCircle } from "./HighlightCircle.js"
+import { Line } from "./Line.js"
+
+export function ObjectManager()
 {
 	this.Nodes = [];
 	this.Edges = [];

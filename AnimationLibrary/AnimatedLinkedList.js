@@ -25,8 +25,9 @@
 // or implied, of the University of San Francisco
 
 import { AnimatedObject } from "./AnimatedObject.js"
-import { UndoBlock } from "./UndoFunctions";
-function AnimatedLinkedList(id, val, wth, hgt, linkPer, verticalOrientation, linkPosEnd, numLab, fillColor, edgeColor)
+import { UndoBlock } from "./UndoFunctions.js";
+
+export function AnimatedLinkedList(id, val, wth, hgt, linkPer, verticalOrientation, linkPosEnd, numLab, fillColor, edgeColor)
 {
 	this.init(id, val, wth, hgt, linkPer, verticalOrientation, linkPosEnd, numLab, fillColor, edgeColor);
 }

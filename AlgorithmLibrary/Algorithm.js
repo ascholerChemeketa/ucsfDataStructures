@@ -231,7 +231,7 @@ Algorithm.prototype.enableUI = function(event)
 
 
 
-function controlKey(keyASCII)
+export function controlKey(keyASCII)
 {
 		return keyASCII == 8 || keyASCII == 9 || keyASCII == 37 || keyASCII == 38 ||
 	keyASCII == 39 || keyASCII == 40 || keyASCII == 46;
@@ -388,7 +388,7 @@ Algorithm.prototype.cmd = function()
 	if (this.recordAnimation)
 	{
 		var command = arguments[0];
-		for(i = 1; i < arguments.length; i++)
+		for(let i = 1; i < arguments.length; i++)
 		{
 			command = command + "<;>" + String(arguments[i]);
 		}
@@ -396,3 +396,5 @@ Algorithm.prototype.cmd = function()
 	}
 	
 }
+
+export { Algorithm, addLabelToAlgorithmBar, addControlToAlgorithmBar, addCheckboxToAlgorithmBar, addRadioButtonGroupToAlgorithmBar };

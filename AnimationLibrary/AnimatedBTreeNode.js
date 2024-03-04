@@ -25,9 +25,9 @@
 // or implied, of the University of San Francisco
 
 import { AnimatedObject } from "./AnimatedObject.js"
-import { UndoBlock } from "./UndoFunctions";
+import { UndoBlock } from "./UndoFunctions.js";
 
-function AnimatedBTreeNode(id, widthPerElem, h, numElems,  fillColor, edgeColor)
+export function AnimatedBTreeNode(id, widthPerElem, h, numElems,  fillColor, edgeColor)
 {
 	fillColor = (fillColor == undefined)? "#FFFFFF" : fillColor;
 	edgeColor = (edgeColor == undefined)? "#000000" : edgeColor;

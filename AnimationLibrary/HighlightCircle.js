@@ -26,9 +26,10 @@
 
 // "Class" animatedCircle
 
-import { AnimatedObject } from "./AnimatedObject";
-import { UndoBlock } from "./UndoFunctions";
-var HighlightCircle = function(objectID, color, radius)
+import { AnimatedObject } from "./AnimatedObject.js";
+import { UndoBlock } from "./UndoFunctions.js";
+
+export var HighlightCircle = function(objectID, color, radius)
 {
 	this.objectID = objectID;
 	this.radius = radius;

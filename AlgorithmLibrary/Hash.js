@@ -24,8 +24,10 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addRadioButtonGroupToAlgorithmBar, addControlToAlgorithmBar } from "./Algorithm.js";
 
-function Hash(am, w, h)
+export function Hash(am, w, h)
 {
 	if (am == undefined)
 	{

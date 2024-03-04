@@ -24,6 +24,9 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+
 
 var ARRAY_START_X = 100;
 var ARRAY_START_Y = 200;
@@ -52,10 +55,10 @@ var INDEX_COLOR = "#0000FF"
 
 var SIZE = 15;
 
-function QueueArray(am, w, h)
+export function QueueArray(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 QueueArray.prototype = new Algorithm();
@@ -128,9 +131,9 @@ QueueArray.prototype.setup = function()
 		this.arrayLabelID[i]= this.nextIndex++;
 	}
 	this.headID = this.nextIndex++;
-	headLabelID = this.nextIndex++;
+	this.headLabelID = this.nextIndex++;
 	this.tailID = this.nextIndex++;
-	tailLabelID = this.nextIndex++;
+	this.tailLabelID = this.nextIndex++;
 	
 	this.arrayData = new Array(SIZE);
 	this.head = 0;
@@ -147,10 +150,10 @@ QueueArray.prototype.setup = function()
 		this.cmd("SetForegroundColor", this.arrayLabelID[i], INDEX_COLOR);
 		
 	}
-	this.cmd("CreateLabel", headLabelID, "Head", HEAD_LABEL_X, HEAD_LABEL_Y);
+	this.cmd("CreateLabel", this.headLabelID, "Head", HEAD_LABEL_X, HEAD_LABEL_Y);
 	this.cmd("CreateRectangle", this.headID, 0, ARRAY_ELEM_WIDTH, ARRAY_ELEM_HEIGHT, HEAD_POS_X, HEAD_POS_Y);
 	
-	this.cmd("CreateLabel", tailLabelID, "Tail", TAIL_LABEL_X, TAIL_LABEL_Y);
+	this.cmd("CreateLabel", this.tailLabelID, "Tail", TAIL_LABEL_X, TAIL_LABEL_Y);
 	this.cmd("CreateRectangle", this.tailID, 0, ARRAY_ELEM_WIDTH, ARRAY_ELEM_HEIGHT, TAIL_POS_X, TAIL_POS_Y);
 	
 	

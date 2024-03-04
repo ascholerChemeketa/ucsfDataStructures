@@ -44,9 +44,10 @@ SPLAYTREE.PRINT_HORIZONTAL_GAP = 50;
 
 
 
-function SPLAYTREE(am, w, h)
+function SPLAYTREE(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 SPLAYTREE.prototype = new Algorithm();

@@ -26,9 +26,10 @@
 
 
 
-function MyAlgorithm(am, w, h)
+export function MyAlgorithm(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 MyAlgorithm.prototype = new Algorithm();

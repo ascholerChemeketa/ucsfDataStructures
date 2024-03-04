@@ -26,9 +26,10 @@
 
 
 
-function RotateScale3D(am, w, h)
+export function RotateScale3D(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 

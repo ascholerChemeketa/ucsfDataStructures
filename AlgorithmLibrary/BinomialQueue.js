@@ -24,6 +24,9 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addRadioButtonGroupToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+
 
 var LINK_COLOR = "#007700";
 var HIGHLIGHT_CIRCLE_COLOR = "#007700";
@@ -47,10 +50,10 @@ var INSERT_X = 30;
 var INSERT_Y = 25
 
 
-function BinomialQueue(am, w, h)
+export function BinomialQueue(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 BinomialQueue.prototype = new Algorithm();

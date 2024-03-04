@@ -26,10 +26,10 @@
 
 
 
-function SkewHeap(am, w, h)
+export function SkewHeap(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 SkewHeap.prototype = new Algorithm();

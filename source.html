@@ -136,9 +136,10 @@ Yes, this is a bit of a hack.)
 
 <div class = "code">
 <pre>
-function MyAlgorithm(am, w, h)
+function MyAlgorithm(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 MyAlgorithm.prototype = new Algorithm();
@@ -807,9 +808,10 @@ SimpleStack replaced by whatever function you are writing
 
 <div class = "code">
 <pre>
-function SimpleStack(am, w, h)
+function SimpleStack(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 SimpleStack.prototype = new Algorithm();
@@ -1136,7 +1138,7 @@ The template file is reproduced below, with the changes you need to make highlig
             
      &lt;/head&gt; 
     
-    &lt;body onload="init();" class="VisualizationMainPage"&gt;
+    &lt;body class="VisualizationMainPage"&gt;
         
         &lt;div id = "container"&gt;
             

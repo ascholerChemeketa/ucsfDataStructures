@@ -24,6 +24,9 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { addControlToAlgorithmBar, addLabelToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+import { Graph, VERTEX_INDEX_COLOR } from "./Graph.js"
 
 var AUX_ARRAY_WIDTH = 25;
 var AUX_ARRAY_HEIGHT = 25;
@@ -42,10 +45,10 @@ var QUEUE_START_Y = 50;
 var QUEUE_SPACING = 30;
 
 
-function DFS(am)
+export function DFS(canvas)
 {
-	this.init(am);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 DFS.prototype = new Graph();
@@ -65,7 +68,7 @@ DFS.prototype.addControls =  function()
 
 DFS.prototype.init = function(am, w, h)
 {
-	showEdgeCosts = false;
+	this.showEdgeCosts = false;
 	DFS.superclass.init.call(this, am, w, h); // TODO:  add no edge label flag to this?
 	// Setup called in base class constructor
 }
@@ -107,7 +110,7 @@ DFS.prototype.setup = function()
 
 DFS.prototype.startCallback = function(event)
 {
-	var startValue;
+	var startvalue;
 	
 	if (this.startField.value != "")
 	{

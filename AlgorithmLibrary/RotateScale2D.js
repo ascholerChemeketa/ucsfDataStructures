@@ -26,9 +26,10 @@
 
 
 
-function RotateScale2D(am, w, h)
+export function RotateScale2D(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 

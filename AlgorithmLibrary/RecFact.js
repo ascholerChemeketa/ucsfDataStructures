@@ -26,10 +26,10 @@
 
 
 
-function RecFact(am, w, h)
+export function RecFact(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 RecFact.prototype = new Recursive();

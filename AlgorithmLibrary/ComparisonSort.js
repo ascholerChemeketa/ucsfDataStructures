@@ -24,11 +24,15 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
-function ComparisonSort(am, w, h)
+
+
+export function ComparisonSort(canvas)
 {
-	this.init(am, w, h);
-
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 

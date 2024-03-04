@@ -24,12 +24,16 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
 
-function ClosedHashBucket(am, w, h)
+import { Hash } from "./Hash.js";
+
+export function ClosedHashBucket(canvas) 
 {
-	this.init(am, w, h);
-
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
+
 
 var ARRAY_ELEM_WIDTH = 90;
 var ARRAY_ELEM_HEIGHT = 30;

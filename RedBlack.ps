@@ -1,7 +1,7 @@
-function AVL(am)
+function AVL(canvas)
 {
-	this.init(am);
-
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 AVL.prototype = new Algorithm();

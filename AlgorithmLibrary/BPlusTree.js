@@ -24,6 +24,9 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addRadioButtonGroupToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+
 var FIRST_PRINT_POS_X = 50;
 var PRINT_VERTICAL_GAP = 20;
 var PRINT_MAX = 990;
@@ -49,19 +52,15 @@ var PRINT_COLOR = FOREGROUND_COLOR;
 
 
 
-function BPlusTree(am, w, h)
+export function BPlusTree(canvas)
 {
-	this.init(am, w, h);
-
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 BPlusTree.prototype = new Algorithm();
-BPlusTree.prototype.varructor = BPlusTree;
+BPlusTree.prototype.constructor = BPlusTree;
 BPlusTree.superclass = Algorithm.prototype;
-
-
-
-
 
 BPlusTree.prototype.init = function(am, w, h)
 {
@@ -89,9 +88,9 @@ BPlusTree.prototype.init = function(am, w, h)
 	this.moveLabel1ID = this.nextIndex++;
 	this.moveLabel2ID = this.nextIndex++;
 	
-	animationManager.StartNewAnimation(this.commands);
-	animationManager.skipForward();
-	animationManager.clearHistory();
+	this.animationManager.StartNewAnimation(this.commands);
+	this.animationManager.skipForward();
+	this.animationManager.clearHistory();
 	this.commands = new Array();
 	
 	this.first_print_pos_y = h - 3 * PRINT_VERTICAL_GAP;
@@ -138,7 +137,7 @@ BPlusTree.prototype.addControls =  function()
 	this.controls.push(this.clearButton);
 	
 	var i;
-	radioButtonNames = [];
+	let radioButtonNames = [];
 	for (i = MIN_MAX_DEGREE; i <= MAX_MAX_DEGREE; i++)
 	{
 		radioButtonNames.push("Max. Degree = " + String(i));

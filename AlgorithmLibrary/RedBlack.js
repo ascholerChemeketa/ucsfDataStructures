@@ -24,10 +24,12 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-function RedBlack(am, w, h)
-{
-	this.init(am, w, h);
 
+
+export function RedBlack(canvas)
+{
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 RedBlack.prototype = new Algorithm();

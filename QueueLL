@@ -26,10 +26,10 @@ var PUSH_ELEMENT_Y = 30;
 
 var SIZE = 32;
 
-function StackLL(am, w, h)
+function StackLL(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 StackLL.prototype = new Algorithm();

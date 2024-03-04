@@ -24,6 +24,9 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { addControlToAlgorithmBar, addLabelToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+import { Graph, VERTEX_INDEX_COLOR } from "../AlgorithmLibrary/Graph.js";
 
 var TABLE_ENTRY_WIDTH = 50;
 var TABLE_ENTRY_HEIGHT = 25;
@@ -33,16 +36,14 @@ var TABLE_START_Y = 80;
 var MESSAGE_LABEL_1_X = 20;
 var MESSAGE_LABEL_1_Y = 10;
 
-
-
 var HIGHLIGHT_CIRCLE_COLOR = "#000000";
 
 
 
-function DijkstraPrim(am, runningDijkstra, w, h)
+export function DijkstraPrim(canvas, runningDijkstra)
 {
-	this.init(am, runningDijkstra, w, h);
-	
+	let am = initCanvas();
+	this.init(am, runningDijkstra, canvas.width, canvas.height);
 }
 
 DijkstraPrim.prototype = new Graph();
@@ -393,7 +394,7 @@ DijkstraPrim.prototype.reset = function()
 
 DijkstraPrim.prototype.startCallback = function(event)
 {
-	var startValue;
+	var startvalue;
 	
 	if (this.startField.value != "")
 	{

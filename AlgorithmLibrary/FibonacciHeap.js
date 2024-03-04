@@ -24,6 +24,8 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addRadioButtonGroupToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
 FibonacciHeap.LINK_COLOR = "#007700";
 FibonacciHeap.FOREGROUND_COLOR = "#007700";
@@ -53,10 +55,10 @@ FibonacciHeap.INDEGREE_ARRAY_START_Y = 50;
 
 FibonacciHeap.TMP_PTR_Y = 60;
 
-function FibonacciHeap(am, w, h)
+export function FibonacciHeap(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 FibonacciHeap.prototype = new Algorithm();

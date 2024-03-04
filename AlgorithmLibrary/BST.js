@@ -26,6 +26,9 @@
 
 
 // Constants.
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+
 
 BST.LINK_COLOR = "#007700";
 BST.HIGHLIGHT_CIRCLE_COLOR = "#007700";
@@ -44,9 +47,10 @@ BST.PRINT_HORIZONTAL_GAP = 50;
 
 
 
-function BST(am, w, h)
+export function BST(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 BST.prototype = new Algorithm();

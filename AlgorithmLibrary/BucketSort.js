@@ -24,14 +24,15 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addRadioButtonGroupToAlgorithmBar, addCheckboxToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
 
-function BucketSort(am, w, h)
+export function BucketSort(canvas)
 {
-	this.init(am,w,h);
-
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
-
 
 var ARRAY_ELEM_WIDTH_SMALL = 30;
 var ARRAY_ELEM_HEIGHT_SMALL = 30;
@@ -127,7 +128,7 @@ BucketSort.prototype.bucketSortCallback = function(event)
 {
 	var savedIndex = this.nextIndex;
 	this.commands = new Array();
-	linkedListData = new Array(ARRAY_SIZE_SMALL);
+	this.linkedListData = new Array(ARRAY_SIZE_SMALL);
 	var i;
 	for (i= 0; i < ARRAY_SIZE_SMALL; i++)
 	{
@@ -170,9 +171,9 @@ BucketSort.prototype.bucketSortCallback = function(event)
 		
 		
 		
-		if (linkedListData[index] == null)
+		if (this.linkedListData[index] == null)
 		{
-			linkedListData[index] = node;
+			this.linkedListData[index] = node;
 			this.cmd("Connect", this.linkedListRects[index], node.graphicID);
 			this.cmd("SetNull",this.linkedListRects[index], 0);
 			
@@ -182,7 +183,7 @@ BucketSort.prototype.bucketSortCallback = function(event)
 		}
 		else
 		{
-			var tmp = linkedListData[index];
+			var tmp = this.linkedListData[index];
 			this.cmd("SetHighlight", tmp.graphicID, 1);
 			this.cmd("SetHighlight", node.graphicID, 1);
 			this.cmd("Step");
@@ -191,12 +192,12 @@ BucketSort.prototype.bucketSortCallback = function(event)
 			
 			if (Number(tmp.data) >= Number(node.data))
 			{
-				this.cmd("Disconnect", this.linkedListRects[index], linkedListData[index].graphicID);
+				this.cmd("Disconnect", this.linkedListRects[index], this.linkedListData[index].graphicID);
 				node.next = tmp;
 				this.cmd("Connect", this.linkedListRects[index], node.graphicID);
 				this.cmd("Connect", node.graphicID, tmp.graphicID);
 				this.cmd("SetNull",node.graphicID, 0);
-				linkedListData[index] = node;
+				this.linkedListData[index] = node;
 				this.cmd("Connect", this.linkedListRects[index], node.graphicID);
 				
 			}					
@@ -237,7 +238,7 @@ BucketSort.prototype.bucketSortCallback = function(event)
 				tmp.next = node;
 				this.cmd("Connect", tmp.graphicID, node.graphicID);						
 			}
-			tmp = linkedListData[index];
+			tmp = this.linkedListData[index];
 			var startX = POINTER_ARRAY_ELEM_START_X_SMALL + index *POINTER_ARRAY_ELEM_WIDTH_SMALL;
 			var startY =  this.pointer_array_elem_y_small - LINKED_ITEM_Y_DELTA_SMALL;
 			while (tmp != null)
@@ -254,7 +255,7 @@ BucketSort.prototype.bucketSortCallback = function(event)
 	var insertIndex = 0;
 	for (i = 0; i < ARRAY_SIZE_SMALL; i++)
 	{
-		for (tmp = linkedListData[i]; tmp != null; tmp = tmp.next)
+		for (let tmp = this.linkedListData[i]; tmp != null; tmp = tmp.next)
 		{
 			var moveLabelID = this.nextIndex++;
 			this.cmd("SetText", tmp.graphicID, "");

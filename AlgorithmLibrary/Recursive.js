@@ -26,7 +26,7 @@
 
 
 
-function Recursive(am, w, h)
+export function Recursive(am, w, h)
 {
 	if (am != undefined)
 		this.init(am, w, h);

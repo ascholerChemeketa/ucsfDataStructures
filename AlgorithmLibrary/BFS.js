@@ -24,6 +24,11 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Graph, VERTEX_INDEX_COLOR } from "./Graph.js"
+
+import { addControlToAlgorithmBar, addLabelToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+
 var AUX_ARRAY_WIDTH = 25;
 var AUX_ARRAY_HEIGHT = 25;
 var AUX_ARRAY_START_Y = 50;
@@ -41,10 +46,10 @@ var QUEUE_START_Y = 50;
 var QUEUE_SPACING = 30;
 
 
-function BFS(am)
+export function BFS(canvas)
 {
-	this.init(am);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 BFS.prototype = new Graph();
@@ -65,7 +70,7 @@ BFS.prototype.addControls =  function()
 
 BFS.prototype.init = function(am, w, h)
 {
-	showEdgeCosts = false;
+	this.showEdgeCosts = false;
 	BFS.superclass.init.call(this, am, w, h); // TODO:  add no edge label flag to this?
 	// Setup called in base class constructor
 }
@@ -98,10 +103,10 @@ BFS.prototype.setup = function()
 	this.cmd("CreateLabel", this.nextIndex++, "Parent", PARENT_START_X - AUX_ARRAY_WIDTH, AUX_ARRAY_START_Y - AUX_ARRAY_HEIGHT * 1.5, 0);
 	this.cmd("CreateLabel", this.nextIndex++, "Visited", VISITED_START_X - AUX_ARRAY_WIDTH, AUX_ARRAY_START_Y - AUX_ARRAY_HEIGHT * 1.5, 0);
 	this.cmd("CreateLabel", this.nextIndex++, "BFS Queue", QUEUE_START_X, QUEUE_START_Y - 30, 0);
-	animationManager.setAllLayers([0, this.currentLayer]);
-	animationManager.StartNewAnimation(this.commands);
-	animationManager.skipForward();
-	animationManager.clearHistory();
+	this.animationManager.setAllLayers([0, this.currentLayer]);
+	this.animationManager.StartNewAnimation(this.commands);
+	this.animationManager.skipForward();
+	this.animationManager.clearHistory();
 	this.highlightCircleL = this.nextIndex++;
 	this.highlightCircleAL = this.nextIndex++;
 	this.highlightCircleAM= this.nextIndex++
@@ -109,7 +114,7 @@ BFS.prototype.setup = function()
 
 BFS.prototype.startCallback = function(event)
 {
-	var startValue;
+	var startvalue;
 	
 	if (this.startField.value != "")
 	{

@@ -24,9 +24,12 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-function TopoSortIndegree(am, w, h)
+
+
+export function TopoSortIndegree(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 

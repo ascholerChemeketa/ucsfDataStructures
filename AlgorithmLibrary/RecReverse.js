@@ -26,10 +26,10 @@
 
 
 
-function Reverse(am, w, h)
+export function Reverse(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 Reverse.prototype = new Recursive();

@@ -26,9 +26,10 @@
 
 
 
-function RotateTranslate2D(am, w, h)
+export function RotateTranslate2D(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 

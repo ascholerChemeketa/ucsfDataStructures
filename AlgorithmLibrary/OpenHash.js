@@ -25,11 +25,15 @@
 // or implied, of the University of San Francisco
 
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addRadioButtonGroupToAlgorithmBar } from "./Algorithm.js";
+import { Hash } from "./Hash.js";
 
-function OpenHash(am, w, h)
+
+export function OpenHash(canvas) 
 {
-	this.init(am, w, h);
-
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 

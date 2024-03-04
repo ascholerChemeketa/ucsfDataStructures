@@ -26,9 +26,10 @@
 
 
 
-function SimpleStack(am, w, h)
+export function SimpleStack(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 SimpleStack.prototype = new Algorithm();

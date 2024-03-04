@@ -24,10 +24,21 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-function AVL(am, w, h)
-{
-	this.init(am, w, h);
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
+// var currentAlg;
+
+// function init()
+// {
+// 	var animManag = initCanvas();
+// 	currentAlg = new AVL(animManag, canvas.width, canvas.height);
+// }
+
+export function AVL(canvas)
+{
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 AVL.prototype = new Algorithm();
@@ -1208,15 +1219,4 @@ AVLNode.prototype.isLeftChild = function()
 		return true;
 	}
 	return this.parent.left == this;	
-}
-
-
-
-
-var currentAlg;
-
-function init()
-{
-	var animManag = initCanvas();
-	currentAlg = new AVL(animManag, canvas.width, canvas.height);
 }

@@ -24,11 +24,14 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+import { Graph, SMALL_SIZE, LARGE_SIZE } from "../AlgorithmLibrary/Graph.js";
 
-
-function Floyd(am, w, h)
+export function Floyd(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 

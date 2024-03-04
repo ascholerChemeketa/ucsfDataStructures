@@ -26,10 +26,15 @@
 
 
 
-function LeftistHeap(am, w, h)
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addCheckboxToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+
+
+
+export function LeftistHeap(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 LeftistHeap.prototype = new Algorithm();
@@ -459,7 +464,7 @@ LeftistHeap.prototype.resizeTrees = function()
 
 	if (this.treeRoot != null)
 	{	
-		startingPoint = this.treeRoot.leftWidth;
+		var startingPoint = this.treeRoot.leftWidth;
 		this.setNewPositions(this.treeRoot, startingPoint, LeftistHeap.STARTING_Y, 0);
 		this.animateNewPositions(this.treeRoot);
 		if (this.secondaryRoot != null)
@@ -473,7 +478,7 @@ LeftistHeap.prototype.resizeTrees = function()
 	}
 	else if (this.secondaryRoot != null)
 	{
-		startingPoint = this.secondaryRoot.leftWidth;
+		var startingPoint = this.secondaryRoot.leftWidth;
 		this.setNewPositions(this.secondaryRoot, startingPoint, LeftistHeap.STARTING_Y, 0);
 		this.animateNewPositions(this.secondaryRoot);
 	}

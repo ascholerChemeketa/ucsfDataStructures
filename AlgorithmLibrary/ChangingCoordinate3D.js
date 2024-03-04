@@ -24,11 +24,14 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addLabelToAlgorithmBar, addRadioButtonGroupToAlgorithmBar, addCheckboxToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
 
-function ChangeCoordinate3D(am, w, h)
+export function ChangeCoordinate3D(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 
@@ -885,6 +888,7 @@ ChangeCoordinate3D.prototype.rotatePoint = function(point, matrix, xPos, yPos, f
 	}
 	var equalLabel1 = this.nextIndex++;
 	this.oldIDs.push(equalLabel1);
+	let opX, opY;
 	if (this.rowMajor)
 	{
 		opX = xPos + 3 * ChangeCoordinate3D.MATRIX_ELEM_WIDTH + ChangeCoordinate3D.EQUALS_SPACING / 2;
@@ -921,7 +925,7 @@ ChangeCoordinate3D.prototype.rotatePoint = function(point, matrix, xPos, yPos, f
 	{
 		logicalPoint =  [inertialPositionMatrix.data[0][0], inertialPositionMatrix.data[1][0], inertialPositionMatrix.data[2][0]];		
 	}
-	screenPoint = this.worldToScreenSpace(logicalPoint, fromSpace);
+	let screenPoint = this.worldToScreenSpace(logicalPoint, fromSpace);
 	
 
 	this.cmd("CreateCircle", inertialPositionID, "", screenPoint[0], screenPoint[1]);
@@ -967,6 +971,7 @@ ChangeCoordinate3D.prototype.translatePoint = function(point, transVector, xPos,
 	this.oldIDs.push(addLabel1);
 	this.oldIDs.push(equalLabel3);
 	var op2X, op2Y;
+	let opX, opY;
 	if (this.rowMajor)
 	{
 		opX = xPos + 3*ChangeCoordinate3D.MATRIX_ELEM_WIDTH + ChangeCoordinate3D.EQUALS_SPACING / 2;
@@ -1126,7 +1131,7 @@ ChangeCoordinate3D.prototype.multiplyAdd = function(position, rotMatrix, transVe
 	this.cmd("Delete", inertialPositionID);
 	origin = this.worldToScreenSpace([0,0, 0], toSpace);
 	this.cmd("Move", movingOriginID, origin[0], origin[1]);
-	screenPoint = this.worldToScreenSpace(logicalPoint, toSpace);
+	let screenPoint = this.worldToScreenSpace(logicalPoint, toSpace);
 	this.cmd("Move", robotPositionID, screenPoint[0], screenPoint[1]);
 	
 	this.cmd("Step");
@@ -1467,7 +1472,7 @@ ChangeCoordinate3D.prototype.addMatrix = function(mat1, mat2, mat3, numDigits)
 	{
 		for (j = 0; j < mat1.data[i].length; j++)
 		{
-			explainText = "";
+			let explainText = "";
 			var value = 0;
 			this.cmd("SetHighlight", mat1.dataID[i][j], 1);	
 			this.cmd("SetHighlight", mat2.dataID[i][j], 1);	
@@ -1495,7 +1500,7 @@ ChangeCoordinate3D.prototype.multiplyMatrix = function(mat1, mat2, mat3, explain
 		{
 			var explainText = "";
 			var value = 0;
-			for (k = 0; k < mat2.data.length; k++)
+			for (let k = 0; k < mat2.data.length; k++)
 			{
 				this.cmd("SetHighlight", mat1.dataID[i][k], 1);	
 				this.cmd("SetHighlight", mat2.dataID[k][j], 1);	

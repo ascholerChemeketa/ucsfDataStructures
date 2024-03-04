@@ -27,8 +27,10 @@
 // Values for xJust / yJust:  "center", "left", "right", "top", "bottom"
 
 import { AnimatedObject } from "./AnimatedObject.js"
-import { UndoBlock } from "./UndoFunctions";
-AnimatedRectangle = function(id, val, wth, hgt,  xJust, yJust, fillColor, edgeColor)
+import { UndoBlock } from "./UndoFunctions.js";
+
+
+export var AnimatedRectangle = function(id, val, wth, hgt,  xJust, yJust, fillColor, edgeColor)
 {
 	this.w = wth;
 	this.h = hgt;

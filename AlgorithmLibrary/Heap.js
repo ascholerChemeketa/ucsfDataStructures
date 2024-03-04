@@ -25,10 +25,13 @@
 // or implied, of the University of San Francisco
 
 
-function Heap(am)
-{
-	this.init(am);
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar } from "./Algorithm.js";
 
+export function Heap(canvas)
+{
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 Heap.prototype = new Algorithm();
@@ -54,7 +57,7 @@ Heap.prototype.init = function(am)
 	this.addControls();
 	this.nextIndex = 0;
 	this.HeapXPositions = [0, 450, 250, 650, 150, 350, 550, 750, 100, 200, 300, 400, 500, 600,
-					  700, 800, 075, 125, 175, 225, 275, 325, 375, 425, 475, 525, 575, 
+					  700, 800, 75, 125, 175, 225, 275, 325, 375, 425, 475, 525, 575, 
 					  625, 675, 725, 775, 825];
 	this.HeapYPositions = [0, 100, 170, 170, 240, 240, 240, 240, 310, 310, 310, 310, 310, 310,
 					  310, 310, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 

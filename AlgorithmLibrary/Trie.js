@@ -49,9 +49,10 @@ Trie.PRINT_HORIZONTAL_GAP = 50;
     
 
 
-function Trie(am, w, h)
+function Trie(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 Trie.prototype = new Algorithm();

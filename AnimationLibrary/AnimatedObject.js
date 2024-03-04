@@ -24,7 +24,7 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-function AnimatedObject()
+export function AnimatedObject()
 {
 	this.init();
 }
@@ -341,5 +341,3 @@ AnimatedObject.prototype.getHighlightIndex = function()
 {
    return this.highlightIndex;
 }
-
-export {AnimatedObject};

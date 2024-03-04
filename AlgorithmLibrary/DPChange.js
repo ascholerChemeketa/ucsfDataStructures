@@ -24,12 +24,13 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar, addRadioButtonGroupToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
-
-function DPChange(am, w, h)
+export function DPChange(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 DPChange.prototype = new Algorithm();
@@ -657,7 +658,7 @@ DPChange.prototype.tableChange = function(value)
 	}
 	
 	this.buildTable(value);
-	coins = DPChange.COINS[this.coinIndex];
+	let coins = DPChange.COINS[this.coinIndex];
 	var i;
 	for (i = 0; i <= value && i <= 0; i++)
 	{

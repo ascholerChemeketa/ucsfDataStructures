@@ -24,6 +24,8 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 
 var LINKED_LIST_START_X = 100;
 var LINKED_LIST_START_Y = 200;
@@ -56,10 +58,10 @@ var PUSH_ELEMENT_Y = 30;
 
 var SIZE = 32;
 
-function QueueLL(am, w, h)
+export function QueueLL(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 QueueLL.prototype = new Algorithm();

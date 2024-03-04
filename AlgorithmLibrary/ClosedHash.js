@@ -25,10 +25,15 @@
 // or implied, of the University of San Francisco
 
 
-function ClosedHash(am, w, h)
-{
-	this.init(am, w, h);
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { addRadioButtonGroupToAlgorithmBar } from "./Algorithm.js";
+import { Hash } from "./Hash.js";
 
+
+export function ClosedHash(canvas) 
+{
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 var ARRAY_ELEM_WIDTH = 90;
@@ -342,9 +347,9 @@ ClosedHash.prototype.setup = function()
 		this.cmd("SetForegroundColor", nextID, INDEX_COLOR);
 	}
 	this.cmd("CreateLabel", this.ExplainLabel, "", 10, 25, 0);
-	animationManager.StartNewAnimation(this.commands);
-	animationManager.skipForward();
-	animationManager.clearHistory();
+	this.animationManager.StartNewAnimation(this.commands);
+	this.animationManager.skipForward();
+	this.animationManager.clearHistory();
 	this.resetIndex  = this.nextIndex;
 }
 

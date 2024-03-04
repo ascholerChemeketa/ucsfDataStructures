@@ -25,12 +25,16 @@
 // or implied, of the University of San Francisco
 
 
+import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+import { Graph, VERTEX_INDEX_COLOR, EDGE_COLOR } from "../AlgorithmLibrary/Graph.js";
 
-function Kruskal(am, w, h)
+
+export function Kruskal(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
-
 
 Kruskal.HIGHLIGHT_CIRCLE_COLOR = "#000000";
 

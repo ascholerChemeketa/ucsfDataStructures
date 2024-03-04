@@ -48,9 +48,10 @@ RadixTree.PRINT_HORIZONTAL_GAP = 50;
     
 
 
-function RadixTree(am, w, h)
+function RadixTree(canvas)
 {
-	this.init(am, w, h);
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 RadixTree.prototype = new Algorithm();

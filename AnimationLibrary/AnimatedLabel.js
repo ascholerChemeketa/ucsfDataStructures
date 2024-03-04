@@ -25,8 +25,9 @@
 // or implied, of the University of San Francisco
 
 import { AnimatedObject } from "./AnimatedObject.js"
-import { UndoBlock } from "./UndoFunctions";
-function AnimatedLabel(id, val, center, initialWidth)
+import { UndoBlock } from "./UndoFunctions.js";
+
+export function AnimatedLabel(id, val, center, initialWidth)
 {
 	this.centering = center;
 	this.label = val;
@@ -111,7 +112,7 @@ AnimatedLabel.prototype.draw = function(ctx)
 	ctx.strokeStyle = this.labelColor;
 	ctx.fillStyle = this.labelColor;
 	ctx.lineWidth = 1;
-	strList = this.label.split("\n");
+	let strList = this.label.split("\n");
 	if (strList.length == 1)
 	{
                 if (this.highlightIndex == -1)

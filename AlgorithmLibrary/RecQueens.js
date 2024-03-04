@@ -26,10 +26,10 @@
 
 
 
-function Queens(am, w, h)
+export function Queens(canvas)
 {
-	this.init(am, w, h);
-	
+	let am = initCanvas();
+	this.init(am, canvas.width, canvas.height);
 }
 
 Queens.prototype = new Recursive();

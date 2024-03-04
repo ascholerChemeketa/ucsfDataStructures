@@ -26,8 +26,11 @@
 
 // TODO:  UNDO (all the way) is BROKEN.  Redo reset ...
 
+import { Algorithm } from "../AlgorithmLibrary/Algorithm.js";
 
-function Graph(am, w, h, dir, dag)
+import { addControlToAlgorithmBar, addRadioButtonGroupToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+
+export function Graph(am, w, h, dir, dag)
 {
 	if (am == undefined)
 	{
@@ -151,11 +154,11 @@ var LARGE_ADJ_LIST_SPACING = 10;
 
 
 
-var VERTEX_INDEX_COLOR ="#0000FF";
-var EDGE_COLOR = "#000000";
+export var VERTEX_INDEX_COLOR ="#0000FF";
+export var EDGE_COLOR = "#000000";
 
-var SMALL_SIZE = 8;
-var LARGE_SIZE = 18;
+export var SMALL_SIZE = 8;
+export var LARGE_SIZE = 18;
 
 var HIGHLIGHT_COLOR = "#0000FF";
 
