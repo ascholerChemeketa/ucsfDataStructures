@@ -1,57 +1,48 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-	<head>
-		
-		<title>
-			AVL Tree Visualzation
-		</title>
-		
-		<!-- css sheet for how the page is laid out -->
-		
-		<link rel="stylesheet" href="visualizationPageStyle.css">
-			
-			
+  <head>
+    <title>AVL Tree Visualzation</title>
 
-				
-		</head> 
-	
-	<body onload="" class="VisualizationMainPage">
-		
-		<div id = "container">
-			
-			<div id="header">  
-				<h1>AVL Tree</h1>
-			</div>
-			
-			<div id = "mainContent"> 
-				
-				<div id = "algoControlSection">
-					<!-- Table for buttons to control specific animation (insert/find/etc) -->
-					<!-- (filled in by javascript code specific to the animtion) -->
-					<table id="AlgorithmSpecificControls"> </table> 
-				</div>
-				
-					<!-- Drawing canvas where all animation is done.  Note:  can be resized in code -->
-						
-				<canvas id="canvas" width="1000" height="500"></canvas>
+    <!-- css sheet for how the page is laid out -->
 
-				<div id = "generalAnimationControlSection">
-					<!-- Table for buttons to control general animation (play/pause/undo/etc) ->
+    <link rel="stylesheet" href="visualizationPageStyle.css" />
+  </head>
+
+  <body onload="" class="VisualizationMainPage">
+    <div id="container">
+      <div id="header">
+        <h1>AVL Tree</h1>
+      </div>
+
+      <div id="mainContent">
+        <div id="algoControlSection">
+          <!-- Table for buttons to control specific animation (insert/find/etc) -->
+          <!-- (filled in by javascript code specific to the animtion) -->
+          <table id="AlgorithmSpecificControls"></table>
+        </div>
+
+        <!-- Drawing canvas where all animation is done.  Note:  can be resized in code -->
+
+        <canvas id="canvas" width="1000" height="500"></canvas>
+
+        <div id="generalAnimationControlSection">
+          <!-- Table for buttons to control general animation (play/pause/undo/etc) ->
 					<!-- (filled in by javascript code, specifically AnimationMain.js)  -->
 
-					<table id="GeneralAnimationControls">  </table>		
-				</div>
-				
-			</div> <!-- mainContent -->
-			
-			<div id="footer">  
-				<p><a href="Algorithms.html">Algorithm Visualizations</a></p>
-			</div>
+          <table id="GeneralAnimationControls"></table>
+        </div>
+      </div>
+      <!-- mainContent -->
 
-			<script type="module">
-				import {AVL} from "./dist/entry.js";
-				new AVL(canvas, [1,34,15,6]);
-			</script>
-		</div><!-- container -->
-	</body>
+      <div id="footer">
+        <p><a href="Algorithms.html">Algorithm Visualizations</a></p>
+      </div>
+
+      <script type="module">
+        import { AVL } from "./dist/entry.js";
+        new AVL(canvas, [1, 34, 15, 6]);
+      </script>
+    </div>
+    <!-- container -->
+  </body>
 </html>

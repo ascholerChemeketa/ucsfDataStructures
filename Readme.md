@@ -1,6 +1,4 @@
-
 https://www.cs.usfca.edu/~galles/visualization/source.html
-
 
 ```text
 // Copyright 2011 David Galles, University of San Francisco. All rights reserved.

@@ -8,9 +8,12 @@
   },
   "dependencies": {
     "esbuild": "^0.20.1",
-    "glob": "^10.3.10"
-  },  
+    "glob": "^10.3.10",
+    "prettier": "^3.2.5"
+  },
   "nodemonConfig": {
-    "ignore": ["dist/**"]
+    "ignore": [
+      "dist/**"
+    ]
   }
 }
