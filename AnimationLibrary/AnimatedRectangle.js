@@ -236,7 +236,8 @@ AnimatedRectangle.prototype.draw = function (context) {
   context.fillStyle = this.labelColor;
 
   context.textAlign = "center";
-  context.font = "10px sans-serif";
+  let cssStyle = window.getComputedStyle(context.canvas);
+  context.font = cssStyle.font;
   context.textBaseline = "middle";
   context.lineWidth = 1;
   context.fillText(this.label, this.x, this.y);

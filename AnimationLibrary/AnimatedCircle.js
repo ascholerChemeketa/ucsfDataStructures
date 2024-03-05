@@ -106,7 +106,9 @@ AnimatedCircle.prototype.draw = function (ctx) {
   ctx.fill();
   ctx.stroke();
   ctx.textAlign = "center";
-  ctx.font = "10px sans-serif";
+
+  let cssStyle = window.getComputedStyle(ctx.canvas);
+  ctx.font = cssStyle.font;
   ctx.textBaseline = "middle";
   ctx.lineWidth = 1;
   ctx.fillStyle = this.foregroundColor;
@@ -150,7 +152,7 @@ AnimatedCircle.prototype.draw = function (ctx) {
         this.y,
       );
     } else {
-      ctx.fillText(this.label, this.x, this.y);
+      ctx.fillText(this.label, this.x, this.y + 1);
     }
   } else if (strList.length % 2 == 0) {
     var i;

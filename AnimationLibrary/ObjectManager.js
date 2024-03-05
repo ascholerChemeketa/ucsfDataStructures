@@ -59,15 +59,16 @@ export function ObjectManager(canvas) {
   this.framenum = 0;
   this.width = 0;
   this.height = 0;
-  this.statusReport = new AnimatedLabel(-1, "XXX", false, 30);
-  this.statusReport.x = 30;
+  this.statusReport = new AnimatedLabel(-1, "XXX", true, 30);
+  this.cssStyle = window.getComputedStyle(canvas);
 
   this.draw = function () {
     this.framenum++;
     if (this.framenum > 1000) this.framenum = 0;
 
     this.ctx.clearRect(0, 0, this.width, this.height); // clear canvas
-    this.statusReport.y = this.height - 15;
+    this.statusReport.y = 20;
+    this.statusReport.x = this.width / 2;
 
     var i;
     var j;
@@ -458,7 +459,8 @@ export function ObjectManager(canvas) {
 
   this.getTextWidth = function (text) {
     // TODO:  Need to make fonts more flexible, and less hardwired.
-    this.ctx.font = "10px sans-serif";
+    let cssStyle = window.getComputedStyle(this.ctx.canvas);
+    this.ctx.font = cssStyle.font;
     if (text == undefined) {
       w = 3;
     }

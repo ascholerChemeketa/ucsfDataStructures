@@ -143,7 +143,8 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
     }
 
     context.textAlign = "center";
-    context.font = "10px sans-serif";
+    let cssStyle = window.getComputedStyle(context.canvas);
+    context.font = cssStyle.font;
     context.textBaseline = "middle";
     context.fillText(this.edgeLabel, labelPosX, labelPosY);
 
