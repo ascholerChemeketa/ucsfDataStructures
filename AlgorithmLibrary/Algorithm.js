@@ -184,7 +184,7 @@ Algorithm.prototype.normalizeNumber = function (input, maxLen) {
   if (!this.isAllDigits(input) || input == "") {
     return input;
   } else {
-    return ("OOO0000" + input).substr(-maxLen, maxLen);
+    return input; //("OOO0000" + input).substr(-maxLen, maxLen);
   }
 };
 
