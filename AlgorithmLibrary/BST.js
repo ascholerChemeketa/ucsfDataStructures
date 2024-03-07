@@ -25,7 +25,7 @@
 // or implied, of the University of San Francisco
 
 // Constants.
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { initCanvas, doPlayPause } from "../AnimationLibrary/AnimationMain.js";
 import {
   Algorithm,
   addControlToAlgorithmBar,
@@ -45,15 +45,22 @@ BST.FIRST_PRINT_POS_X = 50;
 BST.PRINT_VERTICAL_GAP = 20;
 BST.PRINT_HORIZONTAL_GAP = 50;
 
-export function BST(canvas, data = []) {
+export function BST(canvas, startdata = [], animdata = []) {
   let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 
-  for (let d of data) {
+  for (let d of startdata) {
     this.implementAction(this.insertElement.bind(this), d);
     am.skipForward();
   }
   am.clearHistory();
+
+  am.animatedObjects.draw();
+  doPlayPause();
+  for (let d of animdata) {
+    this.implementAction(this.insertElement.bind(this), d);
+  }
+  //am.skipBack();
 }
 
 BST.prototype = new Algorithm();

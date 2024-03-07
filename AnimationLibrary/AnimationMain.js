@@ -157,7 +157,7 @@ function animEnded() {
   if (skipBackButton.disabled == false && paused) {
     stepBackButton.disabled = false;
   }
-  objectManager.statusReport.setText("Animation Completed");
+  objectManager.statusReport.setText("");
   objectManager.statusReport.setForegroundColor("#000000");
 }
 
@@ -189,7 +189,7 @@ function doSkipBack() {
 function doStepBack() {
   animationManager.stepBack();
 }
-function doPlayPause() {
+export function doPlayPause() {
   paused = !paused;
   if (paused) {
     playPauseBackButton.setAttribute("value", "play");
