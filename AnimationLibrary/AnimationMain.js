@@ -25,37 +25,15 @@
 // or implied, of the University of San Francisco
 
 // Global timer used for doing animation callbacks.
+
 //  TODO:  Make this an instance variable of Animation Manager.
 var timer;
-var swapped = false;
 
 import { EventListener } from "./CustomEvents.js";
 import { ObjectManager } from "./ObjectManager.js";
 import { UndoConnect } from "./Line.js";
 import { controlKey } from "../AlgorithmLibrary/Algorithm.js";
 import * as Undo from "./UndoFunctions.js";
-
-function reorderSibling(node1, node2) {
-  node1.parentNode.replaceChild(node1, node2);
-  node1.parentNode.insertBefore(node2, node1);
-}
-
-function swapControlDiv(canvas) {
-  swapped = !swapped;
-  if (swapped) {
-    reorderSibling(
-      canvas,
-      document.getElementById("generalAnimationControlSection"),
-    );
-    setCookie("VisualizationControlSwapped", "true", 30);
-  } else {
-    reorderSibling(
-      document.getElementById("generalAnimationControlSection"),
-      canvas,
-    );
-    setCookie("VisualizationControlSwapped", "false", 30);
-  }
-}
 
 // Utility funciton to read a cookie
 function getCookie(cookieName) {
@@ -81,11 +59,13 @@ function setCookie(cookieName, value, expireDays) {
   document.cookie = cookieName + "=" + value;
 }
 
-var ANIMATION_SPEED_DEFAULT = 75;
+var ANIMATION_SPEED_DEFAULT = 80;
 
 // TODO:  Move these out of global space into animation manager?
 var objectManager;
 var animationManager;
+
+var reporter;
 
 var paused = false;
 var playPauseBackButton;
@@ -138,8 +118,9 @@ function animWaiting() {
   if (skipBackButton.disabled == false) {
     stepBackButton.disabled = false;
   }
-  objectManager.statusReport.setText("Animation Paused");
-  objectManager.statusReport.setForegroundColor("#FF0000");
+  //reporter.innerHTML = "Animation Paused";
+  // objectManager.statusReport.setText("Animation Paused");
+  // objectManager.statusReport.setForegroundColor("#FF0000");
 }
 
 function animStarted() {
@@ -147,8 +128,9 @@ function animStarted() {
   skipBackButton.disabled = false;
   stepForwardButton.disabled = true;
   stepBackButton.disabled = true;
-  objectManager.statusReport.setText("Animation Running");
-  objectManager.statusReport.setForegroundColor("#009900");
+  //reporter.innerHTML = "Animation Running";
+  // objectManager.statusReport.setText("Animation Running");
+  // objectManager.statusReport.setForegroundColor("#009900");
 }
 
 function animEnded() {
@@ -157,8 +139,9 @@ function animEnded() {
   if (skipBackButton.disabled == false && paused) {
     stepBackButton.disabled = false;
   }
-  objectManager.statusReport.setText("");
-  objectManager.statusReport.setForegroundColor("#000000");
+  //reporter.innerHTML = "";
+  //objectManager.statusReport.setText("");
+  //objectManager.statusReport.setForegroundColor("#000000");
 }
 
 function anumUndoUnavailable() {
@@ -192,12 +175,12 @@ function doStepBack() {
 export function doPlayPause() {
   paused = !paused;
   if (paused) {
-    playPauseBackButton.setAttribute("value", "play");
+    playPauseBackButton.setAttribute("value", "Auto Play");
     if (skipBackButton.disabled == false) {
       stepBackButton.disabled = false;
     }
   } else {
-    playPauseBackButton.setAttribute("value", "pause");
+    playPauseBackButton.setAttribute("value", "Enable Stepping");
   }
   animationManager.SetPaused(paused);
 }
@@ -219,72 +202,28 @@ function addControl(type, name, location) {
   return element;
 }
 
-function addControlToAnimationBar(type, name, containerType) {
-  if (containerType == undefined) {
-    containerType = "input";
-  }
+function addControlToAnimationBar(type, name, containerType = "input") {
   var element = document.createElement(containerType);
-
   element.setAttribute("type", type);
   element.setAttribute("value", name);
 
-  var tableEntry = document.createElement("td");
-
-  tableEntry.appendChild(element);
-
-  var controlBar = document.getElementById("GeneralAnimationControls");
-
-  //Append the element in page (in span).
-  controlBar.appendChild(tableEntry);
+  var controlBar = document.getElementById("generalAnimationControls");
+  controlBar.appendChild(element);
   return element;
 }
 
-export function initCanvas(canvas) {
-  objectManager = new ObjectManager(canvas);
-  animationManager = new AnimationManager(objectManager, canvas);
+function addGeneralControls(canvas) {
+  var controlBar = document.getElementById("generalAnimationControls");
 
-  skipBackButton = addControlToAnimationBar("Button", "Skip Back");
-  skipBackButton.onclick = animationManager.skipBack.bind(animationManager);
-  stepBackButton = addControlToAnimationBar("Button", "Step Back");
-  stepBackButton.onclick = animationManager.stepBack.bind(animationManager);
+  skipBackButton = addControlToAnimationBar("Button", "<<");
+  stepBackButton = addControlToAnimationBar("Button", "<");
+  stepForwardButton = addControlToAnimationBar("Button", ">");
+  skipForwardButton = addControlToAnimationBar("Button", ">>");
   playPauseBackButton = addControlToAnimationBar("Button", "Pause");
   playPauseBackButton.onclick = doPlayPause;
-  stepForwardButton = addControlToAnimationBar("Button", "Step Forward");
-  stepForwardButton.onclick = animationManager.step.bind(animationManager);
-  skipForwardButton = addControlToAnimationBar("Button", "Skip Forward");
-  skipForwardButton.onclick =
-    animationManager.skipForward.bind(animationManager);
 
   var element = document.createElement("div");
   element.setAttribute("display", "inline-block");
-  element.setAttribute("float", "left");
-
-  var tableEntry = document.createElement("td");
-
-  var controlBar = document.getElementById("GeneralAnimationControls");
-
-  var newTable = document.createElement("table");
-
-  var midLevel = document.createElement("tr");
-  var bottomLevel = document.createElement("td");
-  midLevel.appendChild(bottomLevel);
-  bottomLevel.appendChild(element);
-  newTable.appendChild(midLevel);
-
-  midLevel = document.createElement("tr");
-  bottomLevel = document.createElement("td");
-  bottomLevel.align = "center";
-  var txtNode = document.createTextNode("Animation Speed");
-  midLevel.appendChild(bottomLevel);
-  bottomLevel.appendChild(txtNode);
-  newTable.appendChild(midLevel);
-
-  tableEntry.appendChild(newTable);
-
-  //Append the element in page (in span).
-  controlBar.appendChild(tableEntry);
-
-  //tableEntry.appendChild(element);
 
   var speed = getCookie("VisualizationSpeed");
   if (speed == null || speed == "") {
@@ -294,77 +233,34 @@ export function initCanvas(canvas) {
   }
 
   element.innerHTML =
-    '<input type="range" id="animationSpeed" name="animationSpeed" min="10" max="100" value="40" step="10" />';
+    '<input type="number" id="animationSpeed" name="animationSpeed" min="10" max="100" value="40" step="10" />';
+
+  element.innerHTML = `<select name="animationSpeed" id="animationSpeed">
+    <option value="20" ${speed == 20 ? "selected" : ""}>20</option>
+    <option value="40" ${speed == 40 ? "selected" : ""}>40</option>
+    <option value="50" ${speed == 60 ? "selected" : ""}>60</option>
+    <option value="80" ${speed == 80 ? "selected" : ""}>80</option>
+    <option value="100" ${speed == 100 ? "selected" : ""}>100</option>
+    </select>`;
+
   element.addEventListener("change", (e) => {
-    setCookie("DSVisualizationSpeed", String(e.target.value));
+    setCookie("VisualizationSpeed", String(e.target.value));
     animationManager.SetSpeed(e.target.value);
   });
 
-  animationManager.SetSpeed(speed);
+  controlBar.appendChild(element);
+}
 
-  element.setAttribute("style", "width:200px");
-
-  var width = getCookie("VisualizationWidth");
-  if (width == null || width == "") {
-    width = canvas.width;
-  } else {
-    width = parseInt(width);
-  }
-  var height = getCookie("VisualizationHeight");
-  if (height == null || height == "") {
-    height = canvas.height;
-  } else {
-    height = parseInt(height);
-  }
-
-  var swappedControls = getCookie("VisualizationControlSwapped");
-  swapped = swappedControls == "true";
-  if (swapped) {
-    reorderSibling(
-      canvas,
-      document.getElementById("generalAnimationControlSection"),
-    );
-  }
-
-  canvas.width = width;
-  canvas.height = height;
-
-  tableEntry = document.createElement("td");
-  txtNode = document.createTextNode(" w:");
-  tableEntry.appendChild(txtNode);
-  controlBar.appendChild(tableEntry);
-
-  widthEntry = addControlToAnimationBar("Text", canvas.width);
-  widthEntry.size = 4;
-  widthEntry.onkeydown = returnSubmit(
-    widthEntry,
-    animationManager.changeSize.bind(animationManager),
-    4,
-    true,
-  );
-
-  tableEntry = document.createElement("td");
-  txtNode = document.createTextNode("       h:");
-  tableEntry.appendChild(txtNode);
-  controlBar.appendChild(tableEntry);
-
-  heightEntry = addControlToAnimationBar("Text", canvas.height);
-  heightEntry.onkeydown = returnSubmit(
-    heightEntry,
-    animationManager.changeSize.bind(animationManager),
-    4,
-    true,
-  );
-
-  //	heightEntry.size = 4;
-  sizeButton = addControlToAnimationBar("Button", "Change Canvas Size");
-
-  sizeButton.onclick = animationManager.changeSize.bind(animationManager);
-
-  let swapButton = addControlToAnimationBar("Button", "Move Controls");
-  swapButton.onclick = () => {
-    swapControlDiv(canvas);
-  };
+export function initCanvas(canvas) {
+  addGeneralControls(canvas);
+  canvas.style.width = canvas.clientWidth + "px";
+  canvas.style.height = canvas.clientHeight + "px";
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+  console.log(canvas.width);
+  console.log(canvas.height);
+  objectManager = new ObjectManager(canvas);
+  animationManager = new AnimationManager(objectManager, canvas);
 
   animationManager.addListener("AnimationStarted", this, animStarted);
   animationManager.addListener("AnimationEnded", this, animEnded);
@@ -374,8 +270,28 @@ export function initCanvas(canvas) {
     this,
     anumUndoUnavailable,
   );
-  objectManager.width = canvas.width;
-  objectManager.height = canvas.height;
+
+  skipBackButton.onclick = animationManager.skipBack.bind(animationManager);
+  stepBackButton.onclick = animationManager.stepBack.bind(animationManager);
+  stepForwardButton.onclick = animationManager.step.bind(animationManager);
+  skipForwardButton.onclick =
+    animationManager.skipForward.bind(animationManager);
+
+  var speed = getCookie("VisualizationSpeed");
+  if (speed == null || speed == "") {
+    speed = ANIMATION_SPEED_DEFAULT;
+  } else {
+    speed = parseInt(speed);
+  }
+  animationManager.SetSpeed(speed);
+
+  // reporter = document.createElement("div");
+  // reporter.setAttribute("id", "reporter");
+  // reporter.innerHTML = "";
+  //canvas.parentNode.insertBefore(reporter, canvas);
+
+  // objectManager.width = canvas.width;
+  // objectManager.height = canvas.height;
   return animationManager;
 }
 
@@ -463,27 +379,25 @@ function AnimationManager(objectManager, canvas) {
   };
 
   this.changeSize = function () {
-    var width = parseInt(widthEntry.value);
-    var height = parseInt(heightEntry.value);
-
-    if (width > 100) {
-      this.canvas.width = width;
-      this.animatedObjects.width = width;
-      setCookie("VisualizationWidth", String(width), 30);
-    }
-    if (height > 100) {
-      this.canvas.height = height;
-      this.animatedObjects.height = height;
-      setCookie("VisualizationHeight", String(height), 30);
-    }
-    widthEntry.value = this.canvas.width;
-    heightEntry.value = this.canvas.height;
-
-    this.animatedObjects.draw();
-    this.fireEvent("CanvasSizeChanged", {
-      width: this.canvas.width,
-      height: this.canvas.height,
-    });
+    // var width = parseInt(widthEntry.value);
+    // var height = parseInt(heightEntry.value);
+    // if (width > 100) {
+    //   this.canvas.width = width;
+    //   this.animatedObjects.width = width;
+    //   setCookie("VisualizationWidth", String(width), 30);
+    // }
+    // if (height > 100) {
+    //   this.canvas.height = height;
+    //   this.animatedObjects.height = height;
+    //   setCookie("VisualizationHeight", String(height), 30);
+    // }
+    // widthEntry.value = this.canvas.width;
+    // heightEntry.value = this.canvas.height;
+    // this.animatedObjects.draw();
+    // this.fireEvent("CanvasSizeChanged", {
+    //   width: this.canvas.width,
+    //   height: this.canvas.height,
+    // });
   };
 
   this.startNextBlock = function () {

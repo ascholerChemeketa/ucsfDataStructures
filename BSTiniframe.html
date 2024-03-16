@@ -1,0 +1,229 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Binary Search Tree Visualization</title>
+
+    <!-- css sheet for how the page is laid out -->
+
+    <link rel="stylesheet" href="visualizationPageStyle.css" />
+    <style></style>
+  </head>
+
+  <body class="VisualizationMainPage">
+    <div id="mainContent" style="overflow: hidden">
+      <!-- Drawing canvas where all animation is done.  Note:  can be resized in code -->
+      <canvas id="canvas1" tabindex="0"></canvas>
+      <div id="algoControlSection">
+        <!-- Table for buttons to control specific animation (insert/find/etc) -->
+        <!-- (filled in by javascript code specific to the animtion) -->
+        <div id="generalAnimationControls"></div>
+        <table id="AlgorithmSpecificControls"></table>
+      </div>
+    </div>
+
+    <!-- mainContent -->
+
+    <script type="module">
+      let canvas1 = document.getElementById("canvas1");
+      console.log(document.documentElement.clientHeight);
+      let mainContent = document.getElementById("mainContent");
+      console.log(mainContent);
+      mainContent.style.height = document.documentElement.clientHeight + "px";
+      console.log(mainContent);
+      // let c2 = document.createElement("canvas");
+      // c2.width = 1000;
+      // c2.height = 600;
+      import { BST } from "./dist/entry.js";
+      let anim = new BST(canvas1, [200, 100, 50], 25);
+
+      let ctx = canvas1.getContext("2d");
+      var zoomIntensity = 0.2;
+
+      new ResizeObserver((e) => {
+        console.log("asdf");
+        anim.width = canvas1.clientWidth;
+        anim.height = canvas1.clientHeight;
+        draw();
+      }).observe(canvas1);
+
+      let cameraOffset = {
+        x: 0,
+        y: 0,
+      };
+      let cameraZoom = 1;
+      let MAX_ZOOM = 3;
+      let MIN_ZOOM = 0.5;
+      let ZOOM_STEP = 0.25;
+      let SCROLL_SENSITIVITY = 0.002;
+      function draw() {
+        // Restore to identity matrix
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        console.log(ctx.canvas.width, ctx.canvas.height);
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+        console.debug("Draw()");
+        //   canvas1.width = window.innerWidth;
+        //   canvas1.height = window.innerHeight;
+
+        //Translate to the canvas centre before zooming - so you'll always zoom on what you're looking directly at
+        console.log(cameraZoom);
+        let xTrans = Math.ceil(canvas1.width / 2);
+        let yTrans = 0;
+        ctx.translate(xTrans, yTrans);
+        ctx.scale(cameraZoom, cameraZoom);
+        ctx.translate(-xTrans + cameraOffset.x, -yTrans + cameraOffset.y);
+        anim.animationManager.animatedObjects.draw();
+
+        //ctx.translate(cameraOffset.x, cameraOffset.y);
+        //ctx.drawImage(c2, -c2.width / 2, -c2.height / 2);
+        //   ctx.fillStyle = "#991111";
+        //   drawRect(-50, -50, 100, 100);
+
+        //   ctx.fillStyle = "#eecc77";
+        //   drawRect(-35, -35, 20, 20);
+        //   drawRect(15, -35, 20, 20);
+        //   drawRect(-35, 15, 70, 20);
+
+        //   ctx.fillStyle = "#444";
+        //   drawText("Simple Pan and Zoom Canvas", -255, -100, 32, "courier");
+      }
+      draw();
+
+      // Gets the relevant location from a mouse or single touch event
+      function getEventLocation(e) {
+        if (e.touches && e.touches.length == 1) {
+          return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        } else if (e.clientX && e.clientY) {
+          return { x: e.clientX, y: e.clientY };
+        }
+      }
+
+      function drawRect(x, y, width, height) {
+        ctx.fillRect(x, y, width, height);
+      }
+
+      function drawText(text, x, y, size, font) {
+        ctx.font = `${size}px ${font}`;
+        ctx.fillText(text, x, y);
+      }
+
+      let isDragging = false;
+      let dragStart = { x: 0, y: 0 };
+      let isFocused = false;
+
+      function onPointerDown(e) {
+        isDragging = true;
+        isFocused = true;
+        console.log(getEventLocation(e).x, cameraZoom, cameraOffset.x);
+        dragStart.x = getEventLocation(e).x / cameraZoom - cameraOffset.x;
+        dragStart.y = getEventLocation(e).y / cameraZoom - cameraOffset.y;
+        //   dragStart.x = (getEventLocation(e).x - cameraOffset.x);
+        //   dragStart.y = (getEventLocation(e).y - cameraOffset.y);
+        //   console.log("down");
+      }
+
+      function onPointerUp(e) {
+        isDragging = false;
+        initialPinchDistance = null;
+        lastZoom = cameraZoom;
+        //   console.log("up");
+      }
+
+      function onPointerMove(e) {
+        //   console.log("move", isDragging);
+        if (isDragging) {
+          console.log(getEventLocation(e).x, cameraZoom, dragStart.x);
+          cameraOffset.x = getEventLocation(e).x / cameraZoom - dragStart.x;
+          cameraOffset.y = getEventLocation(e).y / cameraZoom - dragStart.y;
+          // cameraOffset.x = getEventLocation(e).x - dragStart.x;
+          // cameraOffset.y = getEventLocation(e).y - dragStart.y;
+          // cameraOffset.x = (getEventLocation(e).x - dragStart.x) / cameraZoom;
+          // cameraOffset.y = (getEventLocation(e).y - dragStart.y) / cameraZoom;
+          requestAnimationFrame(draw);
+        }
+      }
+
+      function handleTouch(e, singleTouchHandler) {
+        e.preventDefault();
+        if (e.touches.length == 1) {
+          singleTouchHandler(e);
+        } else if (e.type == "touchmove" && e.touches.length == 2) {
+          isDragging = false;
+          handlePinch(e);
+        }
+      }
+
+      let initialPinchDistance = null;
+      let lastZoom = cameraZoom;
+
+      function handlePinch(e) {
+        e.preventDefault();
+
+        let touch1 = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        let touch2 = { x: e.touches[1].clientX, y: e.touches[1].clientY };
+
+        // This is distance squared, but no need for an expensive sqrt as it's only used in ratio
+        let currentDistance =
+          (touch1.x - touch2.x) ** 2 + (touch1.y - touch2.y) ** 2;
+
+        if (initialPinchDistance == null) {
+          initialPinchDistance = currentDistance;
+        } else {
+          adjustZoom(null, currentDistance / initialPinchDistance);
+        }
+      }
+
+      document.addEventListener("resize", (e) => {
+        console.log("resized", e);
+      });
+
+      function adjustZoom(zoomAmount, zoomFactor) {
+        console.log(isFocused);
+        if (!isDragging && isFocused) {
+          if (zoomAmount) {
+            cameraZoom += zoomAmount;
+          } else if (zoomFactor) {
+            console.log(zoomFactor);
+            cameraZoom = zoomFactor * lastZoom;
+          }
+
+          cameraZoom = Math.min(cameraZoom, MAX_ZOOM);
+          cameraZoom = Math.max(cameraZoom, MIN_ZOOM);
+          requestAnimationFrame(draw);
+        }
+      }
+
+      canvas1.addEventListener("mousedown", onPointerDown);
+      canvas1.addEventListener("mouseleave", (e) => {
+        isFocused = false;
+      });
+      canvas1.addEventListener("touchstart", (e) =>
+        handleTouch(e, onPointerDown),
+      );
+      canvas1.addEventListener("mouseup", onPointerUp);
+      canvas1.addEventListener("touchend", (e) => handleTouch(e, onPointerUp));
+      canvas1.addEventListener("mousemove", onPointerMove);
+      canvas1.addEventListener("touchmove", (e) =>
+        handleTouch(e, onPointerMove),
+      );
+
+      canvas1.addEventListener("wheel", (e) => {
+        console.log(e);
+        console.log(e.pointerType);
+        if (isFocused || e.pointerType === "touch") {
+          e.preventDefault();
+          console.log(document.activeElement);
+          //   cameraOffset.x =
+          //     (getEventLocation(e).x - cameraOffset.x) / cameraZoom;
+          //   cameraOffset.y =
+          //     (getEventLocation(e).y - cameraOffset.y) / cameraZoom;
+          if (canvas1 === document.activeElement)
+            console.log(cameraOffset.x, cameraOffset.y);
+          if (e.deltaY > 0) adjustZoom(-ZOOM_STEP);
+          else adjustZoom(ZOOM_STEP);
+        }
+      });
+    </script>
+    <!-- container -->
+  </body>
+</html>

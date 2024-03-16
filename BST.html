@@ -22,13 +22,7 @@
         </div>
 
         <!-- Drawing canvas where all animation is done.  Note:  can be resized in code -->
-        <canvas id="canvas1" width="1000" height="600"></canvas>
-        <div id="generalAnimationControlSection">
-          <!-- Table for buttons to control general animation (play/pause/undo/etc) ->
-					<!-- (filled in by javascript code, specifically AnimationMain.js)  -->
-
-          <table id="GeneralAnimationControls"></table>
-        </div>
+        <canvas id="canvas1" width="1000" height="600" tabindex="0"></canvas>
       </div>
       <!-- mainContent -->
 
@@ -53,7 +47,8 @@
         };
         let cameraZoom = 1;
         let MAX_ZOOM = 3;
-        let MIN_ZOOM = 0.4;
+        let MIN_ZOOM = 0.5;
+        let ZOOM_STEP = 0.25;
         let SCROLL_SENSITIVITY = 0.002;
         function draw() {
           // Restore to identity matrix
@@ -65,6 +60,7 @@
           //   canvas1.height = window.innerHeight;
 
           //Translate to the canvas centre before zooming - so you'll always zoom on what you're looking directly at
+          console.log(cameraZoom);
           let xTrans = canvas1.width / 2;
           let yTrans = 0;
           ctx.translate(xTrans, yTrans);
@@ -196,12 +192,15 @@
           handleTouch(e, onPointerMove),
         );
         canvas1.addEventListener("wheel", (e) => {
+          console.log(document.activeElement);
           //   cameraOffset.x =
           //     (getEventLocation(e).x - cameraOffset.x) / cameraZoom;
           //   cameraOffset.y =
           //     (getEventLocation(e).y - cameraOffset.y) / cameraZoom;
-          console.log(cameraOffset.x, cameraOffset.y);
-          adjustZoom(-e.deltaY * SCROLL_SENSITIVITY);
+          if (canvas1 === document.activeElement)
+            console.log(cameraOffset.x, cameraOffset.y);
+          if (e.deltaY > 0) adjustZoom(ZOOM_STEP);
+          else adjustZoom(-ZOOM_STEP);
         });
       </script>
     </div>

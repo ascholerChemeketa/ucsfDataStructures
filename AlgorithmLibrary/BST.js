@@ -45,8 +45,14 @@ BST.FIRST_PRINT_POS_X = 50;
 BST.PRINT_VERTICAL_GAP = 20;
 BST.PRINT_HORIZONTAL_GAP = 50;
 
-export function BST(canvas, startdata = [], animdata = []) {
+export function BST(canvas, startdata = [], animdata = null) {
+  this.addControls();
+  let controls = document.getElementById("AlgorithmSpecificControls");
+  //controls.style.display = "none";
+
+  console.log("asdf");
   let am = initCanvas(canvas);
+  console.log();
   this.init(am, canvas.width, canvas.height);
 
   for (let d of startdata) {
@@ -55,12 +61,12 @@ export function BST(canvas, startdata = [], animdata = []) {
   }
   am.clearHistory();
 
-  am.animatedObjects.draw();
   doPlayPause();
-  for (let d of animdata) {
-    this.implementAction(this.insertElement.bind(this), d);
+  if (animdata) {
+    this.implementAction(this.insertElement.bind(this), animdata);
   }
-  //am.skipBack();
+
+  am.animatedObjects.draw();
 }
 
 BST.prototype = new Algorithm();
@@ -75,7 +81,6 @@ BST.prototype.init = function (am, w, h) {
 
   var fn = sc.init;
   fn.call(this, am);
-  this.addControls();
   this.nextIndex = 0;
   this.commands = [];
   this.cmd("CreateLabel", 0, "", 20, 10, 0);

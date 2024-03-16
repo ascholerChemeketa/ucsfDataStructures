@@ -108,4 +108,24 @@ canvas {
   font-size: 1.1rem;
   font-family: monospace;
   color: black;
+  background: #cac;
+  cursor: grab;
+  flex-grow: 1;
+}
+
+#generalAnimationControls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+#mainContent {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 800px) {
+  #mainContent {
+    flex-direction: row;
+  }
 }
