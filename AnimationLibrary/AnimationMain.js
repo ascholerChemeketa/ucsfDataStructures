@@ -154,7 +154,7 @@ function timeoutFn() {
   // try to clear it later, we get behavior we don't want ...
   timer = setTimeout(timeoutFn, 30);
   animationManager.update();
-  objectManager.draw();
+  //objectManager.draw();
 }
 
 function doStep() {
@@ -261,6 +261,9 @@ export function initCanvas(canvas) {
   console.log(canvas.height);
   objectManager = new ObjectManager(canvas);
   animationManager = new AnimationManager(objectManager, canvas);
+
+  var controlBar = document.getElementById("generalAnimationControls");
+  controlBar.appendChild(objectManager.svg);
 
   animationManager.addListener("AnimationStarted", this, animStarted);
   animationManager.addListener("AnimationEnded", this, animEnded);
@@ -1192,12 +1195,16 @@ function AnimationManager(objectManager, canvas) {
           );
           this.animatedObjects.setNodePosition(objectID, newX, newY);
         }
+        
+        objectManager.draw();
       }
       if (this.currFrame >= this.animationBlockLength) {
         if (this.doingUndo) {
           if (this.finishUndoBlock(this.undoStack.pop())) {
             this.awaitingStep = true;
             this.fireEvent("AnimationWaiting", "NoData");
+            objectManager.draw();
+            clearTimeout(timer);
           }
         } else {
           if (
@@ -1207,6 +1214,8 @@ function AnimationManager(objectManager, canvas) {
             this.awaitingStep = true;
             this.fireEvent("AnimationWaiting", "NoData");
             this.currentBlock = [];
+            objectManager.draw();
+            clearTimeout(timer);
           } else {
             this.startNextBlock();
           }

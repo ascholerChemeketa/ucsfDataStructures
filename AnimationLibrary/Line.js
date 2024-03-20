@@ -47,10 +47,30 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
   this.anchorPoint = anchorIndex;
   this.highlightDiff = 0;
   this.curve = cv;
+  
+  this.svgLine = null;
+  this.svgText = null;
+  this.svgArrow = null;
 
   this.alpha = 1.0;
   this.color = function color() {
     return this.edgeColor;
+  };
+
+  
+  this.remove = function () {
+    if(this.svgLine) {
+      this.svgLine.remove();
+      this.svgLine = null;
+    }
+    if(this.svgText) {
+      this.svgText.remove();
+      this.svgText = null;
+    }
+    if(this.svgArrow) {
+      this.svgArrow.remove();
+      this.svgArrow = null;
+    }
   };
 
   this.setColor = function (newColor) {
@@ -128,6 +148,14 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
     context.stroke();
     //context.closePath();
 
+    console.log(this.svgLine)
+    this.svgLine.setAttributeNS(null, 'x1', fromPos[0]);
+    this.svgLine.setAttributeNS(null, 'y1', fromPos[1]);
+    this.svgLine.setAttributeNS(null, 'x2', toPos[0]);
+    this.svgLine.setAttributeNS(null, 'y2', toPos[1]);
+    this.svgLine.setAttributeNS(null, 'marker-end', "url(#SVGTriangleMarker)");
+    
+
     // Position of the edge label:  First, we will place it right along the
     // middle of the curve (or the middle of the line, for curve == 0)
     var labelPosX = 0.25 * fromPos[0] + 0.5 * controlX + 0.25 * toPos[0];
@@ -152,6 +180,9 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
       var xVec = controlX - toPos[0];
       var yVec = controlY - toPos[1];
       var len = Math.sqrt(xVec * xVec + yVec * yVec);
+
+      this.svgLine.setAttributeNS(null, 'marker-end', "url(#SVGTriangleMarker)");
+      console.log("directed")
 
       if (len > 0) {
         xVec = xVec / len;
@@ -181,8 +212,18 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
     }
     ctx.globalAlpha = this.alpha;
 
+
+    if(!this.svgLine) {
+      var svgns = "http://www.w3.org/2000/svg";
+      var line = document.createElementNS(svgns, 'line');
+      line.setAttributeNS(null, 'style', 'fill: none; stroke: blue; stroke-width: 1px;' );
+      ctx.svg.appendChild(line);
+      this.svgLine = line;
+      
+    }
+
     if (this.highlighted) this.drawArrow(this.highlightDiff, "#FF0000", ctx);
-    this.drawArrow(1, this.edgeColor, ctx);
+    else this.drawArrow(1, this.edgeColor, ctx);
   };
 }
 

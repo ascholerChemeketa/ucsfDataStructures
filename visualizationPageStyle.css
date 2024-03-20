@@ -129,3 +129,7 @@ canvas {
     flex-direction: row;
   }
 }
+
+svg circle {
+  shape-rendering: geometricPrecision;
+}

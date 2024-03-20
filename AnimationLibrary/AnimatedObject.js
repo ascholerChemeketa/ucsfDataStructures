@@ -62,6 +62,8 @@ AnimatedObject.prototype.getNull = function () {
   return false;
 };
 
+AnimatedObject.prototype.remove = function () {};
+
 AnimatedObject.prototype.setAlpha = function (newAlpha) {
   this.alpha = newAlpha;
 };

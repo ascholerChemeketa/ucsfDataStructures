@@ -50,9 +50,7 @@ export function BST(canvas, startdata = [], animdata = null) {
   let controls = document.getElementById("AlgorithmSpecificControls");
   //controls.style.display = "none";
 
-  console.log("asdf");
   let am = initCanvas(canvas);
-  console.log();
   this.init(am, canvas.width, canvas.height);
 
   for (let d of startdata) {

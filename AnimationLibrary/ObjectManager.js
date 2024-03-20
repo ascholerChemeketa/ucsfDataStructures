@@ -49,6 +49,21 @@ import { AnimatedBTreeNode } from "./AnimatedBTreeNode.js";
 import { HighlightCircle } from "./HighlightCircle.js";
 import { Line } from "./Line.js";
 
+
+function makeSVG() {
+  const s = `
+  <svg xmlns="http://www.w3.org/2000/svg" role="img">
+    <defs>
+      <marker id="SVGTriangleMarker" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8"
+        markerHeight="8" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z"></path>
+      </marker>
+    </defs>
+  </svg>`;
+  let svg = new DOMParser().parseFromString(s, "text/xml").documentElement;
+  return svg;
+}
+
 export function ObjectManager(canvas) {
   this.Nodes = [];
   this.Edges = [];
@@ -56,6 +71,8 @@ export function ObjectManager(canvas) {
   this.activeLayers = [];
   this.activeLayers[0] = true;
   this.ctx = canvas.getContext("2d");
+  this.svg = makeSVG();
+  this.ctx.svg = this.svg;
   this.framenum = 0;
   this.width = 0;
   this.height = 0;
@@ -65,6 +82,9 @@ export function ObjectManager(canvas) {
   this.draw = function () {
     this.framenum++;
     if (this.framenum > 1000) this.framenum = 0;
+
+    console.log("Drawing frame " + this.framenum);
+    //this.svg.textContent = "";
 
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height); // clear canvas
     //this.statusReport.y = 20;
@@ -423,8 +443,10 @@ export function ObjectManager(canvas) {
   this.removeObject = function (ObjectID) {
     var OldObject = this.Nodes[ObjectID];
     if (ObjectID == this.Nodes.length - 1) {
-      this.Nodes.pop();
+      let n = this.Nodes.pop();
+      n.remove();
     } else {
+      this.Nodes[ObjectID].remove();
       this.Nodes[ObjectID] = null;
     }
   };

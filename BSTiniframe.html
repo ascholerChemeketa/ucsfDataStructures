@@ -10,6 +10,7 @@
   </head>
 
   <body class="VisualizationMainPage">
+
     <div id="mainContent" style="overflow: hidden">
       <!-- Drawing canvas where all animation is done.  Note:  can be resized in code -->
       <canvas id="canvas1" tabindex="0"></canvas>
@@ -24,6 +25,7 @@
     <!-- mainContent -->
 
     <script type="module">
+
       let canvas1 = document.getElementById("canvas1");
       console.log(document.documentElement.clientHeight);
       let mainContent = document.getElementById("mainContent");
@@ -222,7 +224,7 @@
           if (e.deltaY > 0) adjustZoom(-ZOOM_STEP);
           else adjustZoom(ZOOM_STEP);
         }
-      });
+      });  
     </script>
     <!-- container -->
   </body>
