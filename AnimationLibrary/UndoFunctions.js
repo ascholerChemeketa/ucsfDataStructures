@@ -256,6 +256,16 @@ UndoSetText.prototype.constructor = UndoSetText;
 UndoSetText.prototype.undoInitialStep = function (world) {
   world.setText(this.objectID, this.newText, this.labelIndex);
 };
+
+export function UndoSetMessage(str) {
+  this.message = str;
+}
+UndoSetMessage.prototype = new UndoBlock();
+UndoSetMessage.prototype.constructor = UndoSetMessage;
+UndoSetMessage.prototype.undoInitialStep = function (world) {
+  document.getElementById("message").value = this.message;
+};
+
 ////////////////////////////////////////////////////////////
 // UndoSetTextColor
 ////////////////////////////////////////////////////////////

@@ -225,6 +225,14 @@ function addGeneralControls(canvas) {
   var element = document.createElement("div");
   element.setAttribute("display", "inline-block");
 
+  var controlBar = document.getElementById("generalAnimationControls");
+  controlBar.appendChild(element);
+
+  var msgBox = document.createElement("textarea");
+  msgBox.setAttribute("readonly", "readonly");
+  msgBox.setAttribute("id", "message");
+  controlBar.appendChild(msgBox);
+
   var speed = getCookie("VisualizationSpeed");
   if (speed == null || speed == "") {
     speed = ANIMATION_SPEED_DEFAULT;
@@ -254,15 +262,15 @@ function addGeneralControls(canvas) {
 export function initCanvas(canvas) {
   addGeneralControls(canvas);
   canvas.style.width = canvas.clientWidth + "px";
-  canvas.style.height = canvas.clientHeight + "px";
+  canvas.style.height = "200px"; //canvas.clientHeight + "px";
   canvas.width = canvas.clientWidth;
-  canvas.height = canvas.clientHeight;
+  canvas.height = 200; //canvas.clientHeight;
   console.log(canvas.width);
   console.log(canvas.height);
   objectManager = new ObjectManager(canvas);
   animationManager = new AnimationManager(objectManager, canvas);
 
-  var controlBar = document.getElementById("generalAnimationControls");
+  var controlBar = document.getElementById("mainContent");
   controlBar.appendChild(objectManager.svg);
 
   animationManager.addListener("AnimationStarted", this, animStarted);
@@ -627,6 +635,12 @@ function AnimationManager(objectManager, canvas) {
         undoBlock.push(
           new Undo.UndoSetAlpha(parseInt(nextCommand[1]), oldAlpha),
         );
+      } else if (nextCommand[0].toUpperCase() == "SETMESSAGE") {
+        oldText = document.getElementById("message").value;
+        document.getElementById("message").value = nextCommand[1];
+        if (oldText != undefined) {
+          undoBlock.push(new Undo.UndoSetMessage(oldText));
+        }
       } else if (nextCommand[0].toUpperCase() == "SETTEXT") {
         if (nextCommand.length > 3) {
           var oldText = this.animatedObjects.getText(
@@ -638,6 +652,8 @@ function AnimationManager(objectManager, canvas) {
             nextCommand[2],
             parseInt(nextCommand[3]),
           );
+          if (parseInt(nextCommand[1]) === 0)
+            document.getElementById("message").value = nextCommand[2];
           if (oldText != undefined) {
             undoBlock.push(
               new Undo.UndoSetText(
@@ -654,6 +670,8 @@ function AnimationManager(objectManager, canvas) {
             nextCommand[2],
             0,
           );
+          if (parseInt(nextCommand[1]) === 0)
+            document.getElementById("message").value = nextCommand[2];
           if (oldText != undefined) {
             undoBlock.push(
               new Undo.UndoSetText(parseInt(nextCommand[1]), oldText, 0),
@@ -1195,7 +1213,7 @@ function AnimationManager(objectManager, canvas) {
           );
           this.animatedObjects.setNodePosition(objectID, newX, newY);
         }
-        
+
         objectManager.draw();
       }
       if (this.currFrame >= this.animationBlockLength) {

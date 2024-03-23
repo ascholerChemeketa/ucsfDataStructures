@@ -43,7 +43,6 @@ export var AnimatedCircle = function (objectID, objectLabel) {
 
   this.svgCircle = null;
   this.svgText = null;
-  
 };
 
 AnimatedCircle.prototype = new AnimatedObject();
@@ -66,11 +65,11 @@ AnimatedObject.prototype.setWidth = function (newWidth) {
 };
 
 AnimatedCircle.prototype.remove = function () {
-  if(this.svgCircle) {
+  if (this.svgCircle) {
     this.svgCircle.remove();
     this.svgCircle = null;
   }
-  if(this.svgText) {
+  if (this.svgText) {
     this.svgText.remove();
     this.svgText = null;
   }
@@ -97,16 +96,21 @@ AnimatedCircle.prototype.setHighlightIndex = function (hlIndex) {
 AnimatedCircle.prototype.draw = function (ctx) {
   ctx.globalAlpha = this.alpha;
 
-  if(!this.svgCircle) {
+  if (!this.svgCircle) {
     var svgns = "http://www.w3.org/2000/svg";
-    var circle = document.createElementNS(svgns, 'circle');
-    circle.setAttributeNS(null, 'style', 'fill: none; stroke: blue; stroke-width: 1px;' );
-    circle.setAttributeNS(null, 'r', this.radius);
+    var circle = document.createElementNS(svgns, "circle");
+    circle.setAttributeNS(
+      null,
+      "style",
+      'fill: "black"; stroke: red; stroke-width: 1px;',
+    );
+    circle.setAttributeNS(null, "r", this.radius);
     ctx.svg.appendChild(circle);
+    circle.addEventListener("click", () => console.log("asdfasdfads"), false);
     this.svgCircle = circle;
   }
-  this.svgCircle.setAttributeNS(null, 'cx', this.x);
-  this.svgCircle.setAttributeNS(null, 'cy', this.y);
+  this.svgCircle.setAttributeNS(null, "cx", this.x);
+  this.svgCircle.setAttributeNS(null, "cy", this.y);
 
   if (this.highlighted) {
     ctx.fillStyle = "#ff0000";
@@ -121,10 +125,18 @@ AnimatedCircle.prototype.draw = function (ctx) {
     );
     ctx.closePath();
     ctx.fill();
-    
-    this.svgCircle.setAttributeNS(null, 'style', 'fill: none; stroke: red; stroke-width: 3px;' );
+
+    this.svgCircle.setAttributeNS(
+      null,
+      "style",
+      "fill: none; stroke: red; stroke-width: 3px;",
+    );
   } else
-  this.svgCircle.setAttributeNS(null, 'style', 'fill: none; stroke: blue; stroke-width: 1px;' );
+    this.svgCircle.setAttributeNS(
+      null,
+      "style",
+      "fill: white; stroke: blue; stroke-width: 1px;",
+    );
 
   ctx.fillStyle = this.backgroundColor;
   ctx.strokeStyle = this.foregroundColor;
@@ -181,18 +193,21 @@ AnimatedCircle.prototype.draw = function (ctx) {
         this.y,
       );
     } else {
-
-      if(!this.svgText) {
-      var svgns = "http://www.w3.org/2000/svg";
-      var text = document.createElementNS(svgns, 'text');
-      text.setAttributeNS(null, 'dominant-baseline', 'middle');
-      text.setAttributeNS(null, 'text-anchor', 'middle');
-      text.setAttributeNS(null, 'style', 'fill: blue; stroke: none; stroke-width: 1px;' );
-      this.svgText = text;
-      ctx.svg.appendChild(text);
+      if (!this.svgText) {
+        var svgns = "http://www.w3.org/2000/svg";
+        var text = document.createElementNS(svgns, "text");
+        text.setAttributeNS(null, "dominant-baseline", "middle");
+        text.setAttributeNS(null, "text-anchor", "middle");
+        text.setAttributeNS(
+          null,
+          "style",
+          "fill: blue; stroke: none; stroke-width: 1px;",
+        );
+        this.svgText = text;
+        ctx.svg.appendChild(text);
       }
-      this.svgText.setAttributeNS(null, 'x', this.x);
-      this.svgText.setAttributeNS(null, 'y', this.y + 1);
+      this.svgText.setAttributeNS(null, "x", this.x);
+      this.svgText.setAttributeNS(null, "y", this.y + 1);
       this.svgText.textContent = this.label;
 
       ctx.fillText(this.label, this.x, this.y + 1);

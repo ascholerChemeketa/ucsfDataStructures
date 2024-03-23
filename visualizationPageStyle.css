@@ -110,7 +110,7 @@ canvas {
   color: black;
   background: #cac;
   cursor: grab;
-  flex-grow: 1;
+  --flex-grow: 1;
 }
 
 #generalAnimationControls {
@@ -126,10 +126,14 @@ canvas {
 
 @media (min-width: 800px) {
   #mainContent {
-    flex-direction: row;
+    flex-direction: column;
   }
 }
 
 svg circle {
   shape-rendering: geometricPrecision;
+}
+
+svg {
+  height: 400px;
 }

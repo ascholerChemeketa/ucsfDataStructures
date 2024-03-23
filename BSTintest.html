@@ -1,0 +1,204 @@
+<!doctype html>
+<html>
+  <head>
+    <title>IFrameBinary Search Tree Visualization</title>
+    <style>
+      body {
+        margin: 0;
+      }
+      #container {
+        display: flex;
+        height: 100vh;
+      }
+      #container > div {
+        flex: 1;
+      }
+      #container > #a {
+        background-color: #fff0f0;
+        flex: 2;
+      }
+      #container > #b {
+        background-color: blue;
+      }
+      #container > #c {
+        background-color: green;
+      }
+      svg {
+        width: 100%;
+        height: auto;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="container">
+      <div id="a">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          role="img"
+          viewBox="300 0 600 300"
+          preserveAspectRatio="xMidYMid slice"
+        >
+          <defs>
+            <marker
+              id="SVGTriangleMarker"
+              viewBox="0 0 10 10"
+              refX="10"
+              refY="5"
+              markerWidth="8"
+              markerHeight="8"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z"></path>
+            </marker>
+          </defs>
+          <g id="diagram">
+            <circle
+              style="fill: white; stroke: blue; stroke-width: 1px"
+              r="20"
+              cx="674"
+              cy="50"
+            ></circle>
+            <text
+              dominant-baseline="middle"
+              text-anchor="middle"
+              style="fill: blue; stroke: none; stroke-width: 1px"
+              x="674"
+              y="51"
+            >
+              200
+            </text>
+            <circle
+              style="fill: white; stroke: blue; stroke-width: 1px"
+              r="20"
+              cx="649"
+              cy="100"
+            ></circle>
+            <text
+              dominant-baseline="middle"
+              text-anchor="middle"
+              style="fill: blue; stroke: none; stroke-width: 1px"
+              x="649"
+              y="101"
+            >
+              100
+            </text>
+            <line
+              style="fill: none; stroke: blue; stroke-width: 1px"
+              x1="665.0557280900008"
+              y1="67.88854381999832"
+              x2="657.9442719099992"
+              y2="82.11145618000168"
+              marker-end="url(#SVGTriangleMarker)"
+            ></line>
+            <circle
+              style="fill: white; stroke: blue; stroke-width: 1px"
+              r="20"
+              cx="624"
+              cy="150"
+            ></circle>
+            <text
+              dominant-baseline="middle"
+              text-anchor="middle"
+              style="fill: blue; stroke: none; stroke-width: 1px"
+              x="624"
+              y="151"
+            >
+              50
+            </text>
+            <line
+              style="fill: none; stroke: blue; stroke-width: 1px"
+              x1="640.0557280900008"
+              y1="117.88854381999832"
+              x2="632.9442719099992"
+              y2="132.11145618000168"
+              marker-end="url(#SVGTriangleMarker)"
+            ></line>
+          </g>
+        </svg>
+      </div>
+      <div id="b">b</div>
+      <div id="c">c</div>
+    </div>
+    <script>
+      function getMousePosition(evt) {
+        var CTM = svg.getScreenCTM();
+        return {
+          x: (evt.clientX - CTM.e) / CTM.a,
+          y: (evt.clientY - CTM.f) / CTM.d,
+        };
+      }
+      class Dragable {
+        constructor(el) {
+          this.startCoords = { x: 0, y: 0 };
+          this.dragging = false;
+          this.el = el;
+          console.log(this.el);
+          this.dragStart = this.dragStart.bind(this);
+          this.dragEnd = this.dragEnd.bind(this);
+          this.dragMove = this.dragMove.bind(this);
+
+          el.addEventListener("mousedown", this.dragStart);
+          el.addEventListener("mouseup", this.dragEnd);
+          el.addEventListener("mousemove", this.dragMove);
+          el.addEventListener("mouseleave", this.dragEnd);
+        }
+        dragStart(e) {
+          this.dragging = true;
+          this.startCoords = getMousePosition(e);
+          console.log(this.el);
+        }
+        dragEnd(e) {
+          this.dragging = false;
+        }
+        dragMove(e) {
+          if (!this.dragging) return;
+          console.log(
+            e.offsetX,
+            e.offsetY,
+            this.startCoords.x,
+            this.startCoords.y,
+          );
+          let mousePos = getMousePosition(e);
+          let d = this.el.getElementById("diagram");
+          console.log(
+            d,
+            e,
+            this.startCoords,
+            `translate(${mousePos.x - this.startCoords.x}, ${mousePos.y - this.startCoords.y})`,
+          );
+
+          const additionalTransform = this.el.createSVGTransform();
+          additionalTransform.setTranslate(
+            mousePos.x - this.startCoords.x,
+            mousePos.y - this.startCoords.y,
+          );
+          this.el.transform.baseVal.appendItem(additionalTransform);
+          // When doing this multiple times, `translate()`s might be piling up,
+          // like transform="translate(10, 0) translate(10, 0) translate(10, 0)".
+          // Consolidate them into a single matrix transformation.
+          this.el.transform.baseVal.consolidate();
+
+          console.log(d.transform);
+          // d.setAttribute(
+          //   "transform",
+          //   `translate(${mousePos.x - this.startCoords.x}, ${mousePos.y - this.startCoords.y})`,
+          // );
+          //  this.el.style.translate = `${e.offsetX - this.startCoords.x}px ${e.offsetY - this.startCoords.y}px`;
+        }
+      }
+
+      let svg = document.querySelector("svg");
+      new Dragable(svg);
+      svg.addEventListener("click", (e) => {
+        console.log(e);
+        console.log(svg.viewBox);
+        let d = svg.getElementById("diagram");
+        console.log(d);
+        //d.setAttribute("transform", "translate(100,100)");
+        console.log(d);
+        console.log(d.transform);
+      });
+    </script>
+  </body>
+</html>

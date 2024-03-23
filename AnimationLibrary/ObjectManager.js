@@ -49,7 +49,6 @@ import { AnimatedBTreeNode } from "./AnimatedBTreeNode.js";
 import { HighlightCircle } from "./HighlightCircle.js";
 import { Line } from "./Line.js";
 
-
 function makeSVG() {
   const s = `
   <svg xmlns="http://www.w3.org/2000/svg" role="img">
@@ -66,8 +65,8 @@ function makeSVG() {
 
 export function ObjectManager(canvas) {
   this.Nodes = [];
-  this.Edges = [];
-  this.BackEdges = [];
+  this.Edges = new Map();
+  this.BackEdges = new Map();
   this.activeLayers = [];
   this.activeLayers[0] = true;
   this.ctx = canvas.getContext("2d");
@@ -78,6 +77,50 @@ export function ObjectManager(canvas) {
   this.height = 0;
   //this.statusReport = new AnimatedLabel(-1, "XXX", true, 30);
   this.cssStyle = window.getComputedStyle(canvas);
+
+  this.getEdgeInternal = function (from, to, collection) {
+    if (!collection.has(from)) return null;
+    if (!collection.get(from).has(to)) return null;
+    return collection.get(from).get(to);
+  };
+
+  this.getBackEdge = function (from, to) {
+    return this.getEdgeInternal(from, to, this.BackEdges);
+  };
+
+  this.getEdge = function (from, to) {
+    return this.getEdgeInternal(from, to, this.Edges);
+  };
+
+  this.addEdge = function (from, to, edge) {
+    if (!this.Edges.has(from)) this.Edges.set(from, new Map());
+
+    this.Edges.get(from).set(to, edge);
+  };
+
+  this.removeEdge = function (from, to) {
+    if (this.Edges.has(from)) this.Edges.get(from).delete(to);
+  };
+
+  this.removeBackEdge = function (from, to) {
+    if (this.BackEdges.has(from)) this.BackEdges.get(from).delete(to);
+  };
+
+  this.addBackEdge = function (from, to, edge) {
+    if (!this.BackEdges.has(from)) this.BackEdges.set(from, new Map());
+
+    this.BackEdges.get(from).set(to, edge);
+  };
+
+  this.getBackEdges = function (from) {
+    if (!this.BackEdges.has(from)) return new Map();
+    return this.BackEdges.get(from);
+  };
+
+  this.getEdges = function (from) {
+    if (!this.Edges.has(from)) return new Map();
+    return this.Edges.get(from);
+  };
 
   this.draw = function () {
     this.framenum++;
@@ -125,16 +168,25 @@ export function ObjectManager(canvas) {
       }
     }
 
-    for (i = 0; i < this.Edges.length; i++) {
-      if (this.Edges[i] != null) {
-        for (j = 0; j < this.Edges[i].length; j++) {
-          if (this.Edges[i][j].addedToScene) {
-            this.Edges[i][j].pulseHighlight(this.framenum);
-            this.Edges[i][j].draw(this.ctx);
-          }
+    for (let [startIndex, targets] of this.Edges) {
+      for (let [endIndex, edge] of targets) {
+        if (edge.addedToScene) {
+          edge.pulseHighlight(this.framenum);
+          edge.draw(this.ctx);
         }
       }
     }
+
+    // for (i = 0; i < this.Edges.length; i++) {
+    //   if (this.Edges[i] != null) {
+    //     for (j = 0; j < this.Edges[i].length; j++) {
+    //       if (this.Edges[i][j].addedToScene) {
+    //         this.Edges[i][j].pulseHighlight(this.framenum);
+    //         this.Edges[i][j].draw(this.ctx);
+    //       }
+    //     }
+    //   }
+    // }
     //this.statusReport.draw(this.ctx);
   };
 
@@ -161,19 +213,22 @@ export function ObjectManager(canvas) {
 
   this.setEdgeAlpha = function (fromID, toID, alphaVal) {
     var oldAlpha = 1.0;
-    if (this.Edges[fromID] != null && this.Edges[fromID] != undefined) {
-      var len = this.Edges[fromID].length;
-      for (var i = len - 1; i >= 0; i--) {
-        if (
-          this.Edges[fromID][i] != null &&
-          this.Edges[fromID][i] != undefined &&
-          this.Edges[fromID][i].Node2 == this.Nodes[toID]
-        ) {
-          oldAlpha = this.Edges[fromID][i].alpha;
-          this.Edges[fromID][i].alpha = alphaVal;
-        }
-      }
+    let edge = this.getEdge(fromID, toID);
+    if (edge) {
+      oldAlpha = edge.alpha;
+      edge.alpha = alphaVal;
     }
+    // if (this.Edges[fromID] != null && this.Edges[fromID] != undefined) {
+    //   var len = this.Edges[fromID].length;
+    //   for (var i = len - 1; i >= 0; i--) {
+    //     if (
+    //       this.Edges[fromID][i] != null &&
+    //       this.Edges[fromID][i] != undefined &&
+    //       this.Edges[fromID][i].Node2 == this.Nodes[toID]
+    //     ) {
+    //     }
+    //   }
+    // }
     return oldAlpha;
   };
 
@@ -227,17 +282,26 @@ export function ObjectManager(canvas) {
           this.activeLayers[this.Nodes[i].layer] == true;
       }
     }
-    for (i = this.Edges.length - 1; i >= 0; i--) {
-      if (this.Edges[i] != null && this.Edges[i] != undefined) {
-        for (var j = 0; j < this.Edges[i].length; j++) {
-          if (this.Edges[i][j] != null && this.Edges[i][j] != undefined) {
-            this.Edges[i][j].addedToScene =
-              this.activeLayers[this.Edges[i][j].Node1.layer] == true &&
-              this.activeLayers[this.Edges[i][j].Node2.layer] == true;
-          }
-        }
+
+    for (let [startIndex, targets] of this.Edges) {
+      for (let [endIndex, edge] of targets) {
+        edge.addedToScene =
+          this.activeLayers[edge.Node1.layer] == true &&
+          this.activeLayers[edge.Node2.layer] == true;
       }
     }
+
+    // for (i = this.Edges.length - 1; i >= 0; i--) {
+    //   if (this.Edges[i] != null && this.Edges[i] != undefined) {
+    //     for (var j = 0; j < this.Edges[i].length; j++) {
+    //       if (this.Edges[i][j] != null && this.Edges[i][j] != undefined) {
+    //         this.Edges[i][j].addedToScene =
+    //           this.activeLayers[this.Edges[i][j].Node1.layer] == true &&
+    //           this.activeLayers[this.Edges[i][j].Node2.layer] == true;
+    //       }
+    //     }
+    //   }
+    // }
   };
 
   this.setLayer = function (objectID, layer) {
@@ -248,34 +312,49 @@ export function ObjectManager(canvas) {
       } else {
         this.Nodes[objectID].addedToScene = false;
       }
-      if (this.Edges[objectID] != null && this.Edges[objectID] != undefined) {
-        for (var i = 0; i < this.Edges[objectID].length; i++) {
-          var nextEdge = this.Edges[objectID][i];
-          if (nextEdge != null && nextEdge != undefined) {
-            nextEdge.addedToScene =
-              nextEdge.Node1.addedToScene && nextEdge.Node2.addedToScene;
-          }
+
+      if (this.Edges.has(objectID)) {
+        for (let [obj2, edge] of this.Edges.get(objectID)) {
+          edge.addedToScene =
+            edge.Node1.addedToScene && edge.Node2.addedToScene;
         }
       }
-      if (
-        this.BackEdges[objectID] != null &&
-        this.BackEdges[objectID] != undefined
-      ) {
-        for (var i = 0; i < this.BackEdges[objectID].length; i++) {
-          var nextEdge = this.BackEdges[objectID][i];
-          if (nextEdge != null && nextEdge != undefined) {
-            nextEdge.addedToScene =
-              nextEdge.Node1.addedToScene && nextEdge.Node2.addedToScene;
-          }
+
+      // if (this.Edges[objectID] != null && this.Edges[objectID] != undefined) {
+      //   for (var i = 0; i < this.Edges[objectID].length; i++) {
+      //     var nextEdge = this.Edges[objectID][i];
+      //     if (nextEdge != null && nextEdge != undefined) {
+      //       nextEdge.addedToScene =
+      //         nextEdge.Node1.addedToScene && nextEdge.Node2.addedToScene;
+      //     }
+      //   }
+      // }
+
+      if (this.BackEdges.has(objectID)) {
+        for (let [obj2, edge] of this.BackEdges.get(objectID)) {
+          edge.addedToScene =
+            edge.Node1.addedToScene && edge.Node2.addedToScene;
         }
       }
+      // if (
+      //   this.BackEdges[objectID] != null &&
+      //   this.BackEdges[objectID] != undefined
+      // ) {
+      //   for (var i = 0; i < this.BackEdges[objectID].length; i++) {
+      //     var nextEdge = this.BackEdges[objectID][i];
+      //     if (nextEdge != null && nextEdge != undefined) {
+      //       nextEdge.addedToScene =
+      //         nextEdge.Node1.addedToScene && nextEdge.Node2.addedToScene;
+      //     }
+      //   }
+      // }
     }
   };
 
   this.clearAllObjects = function () {
     this.Nodes = [];
-    this.Edges = [];
-    this.BackEdges = [];
+    this.Edges = new Map();
+    this.BackEdges = new Map();
   };
 
   this.setForegroundColor = function (objectID, color) {
@@ -365,78 +444,111 @@ export function ObjectManager(canvas) {
   this.disconnect = function (objectIDfrom, objectIDto) {
     var undo = null;
     var i;
-    if (this.Edges[objectIDfrom] != null) {
-      var len = this.Edges[objectIDfrom].length;
-      for (i = len - 1; i >= 0; i--) {
-        if (
-          this.Edges[objectIDfrom][i] != null &&
-          this.Edges[objectIDfrom][i].Node2 == this.Nodes[objectIDto]
-        ) {
-          var deleted = this.Edges[objectIDfrom][i];
-          undo = deleted.createUndoDisconnect();
-          this.Edges[objectIDfrom][i] = this.Edges[objectIDfrom][len - 1];
-          len -= 1;
-          this.Edges[objectIDfrom].pop();
-        }
-      }
+
+    let edge = this.getEdge(objectIDfrom, objectIDto);
+    if (edge) {
+      undo = edge.createUndoDisconnect();
+      edge.remove();
+      this.removeEdge(objectIDfrom, objectIDto);
     }
-    if (this.BackEdges[objectIDto] != null) {
-      len = this.BackEdges[objectIDto].length;
-      for (i = len - 1; i >= 0; i--) {
-        if (
-          this.BackEdges[objectIDto][i] != null &&
-          this.BackEdges[objectIDto][i].Node1 == this.Nodes[objectIDfrom]
-        ) {
-          deleted = this.BackEdges[objectIDto][i];
-          // Note:  Don't need to remove this child, did it above on the regular edge
-          this.BackEdges[objectIDto][i] = this.BackEdges[objectIDto][len - 1];
-          len -= 1;
-          this.BackEdges[objectIDto].pop();
-        }
-      }
+
+    // if (this.Edges[objectIDfrom] != null) {
+    //   var len = this.Edges[objectIDfrom].length;
+    //   for (i = len - 1; i >= 0; i--) {
+    //     if (
+    //       this.Edges[objectIDfrom][i] != null &&
+    //       this.Edges[objectIDfrom][i].Node2 == this.Nodes[objectIDto]
+    //     ) {
+    //       var deleted = this.Edges[objectIDfrom][i];
+    //       deleted.remove();
+    //       undo = deleted.createUndoDisconnect();
+    //       this.Edges[objectIDfrom][i] = this.Edges[objectIDfrom][len - 1];
+    //       len -= 1;
+    //       this.Edges[objectIDfrom].pop();
+    //     }
+    //   }
+    // }
+    let backEdge = this.getBackEdge(objectIDto, objectIDfrom);
+    if (backEdge) {
+      backEdge.remove();
+      this.removeBackEdge(objectIDfrom, objectIDto);
     }
+
+    // if (this.BackEdges[objectIDto] != null) {
+    //   len = this.BackEdges[objectIDto].length;
+    //   for (i = len - 1; i >= 0; i--) {
+    //     if (
+    //       this.BackEdges[objectIDto][i] != null &&
+    //       this.BackEdges[objectIDto][i].Node1 == this.Nodes[objectIDfrom]
+    //     ) {
+    //       deleted = this.BackEdges[objectIDto][i];
+    //       deleted.remove();
+    //       // Note:  Don't need to remove this child, did it above on the regular edge
+    //       this.BackEdges[objectIDto][i] = this.BackEdges[objectIDto][len - 1];
+    //       len -= 1;
+    //       this.BackEdges[objectIDto].pop();
+    //     }
+    //   }
+    // }
     return undo;
   };
 
   this.deleteIncident = function (objectID) {
     var undoStack = [];
 
-    if (this.Edges[objectID] != null) {
-      var len = this.Edges[objectID].length;
-      for (var i = len - 1; i >= 0; i--) {
-        var deleted = this.Edges[objectID][i];
-        var node2ID = deleted.Node2.identifier();
-        undoStack.push(deleted.createUndoDisconnect());
-
-        var len2 = this.BackEdges[node2ID].length;
-        for (var j = len2 - 1; j >= 0; j--) {
-          if (this.BackEdges[node2ID][j] == deleted) {
-            this.BackEdges[node2ID][j] = this.BackEdges[node2ID][len2 - 1];
-            len2 -= 1;
-            this.BackEdges[node2ID].pop();
-          }
-        }
-      }
-      this.Edges[objectID] = null;
+    let edgeList = this.getEdges(objectID);
+    for (let [to, edge] of edgeList) {
+      undoStack.push(edge.createUndoDisconnect());
+      edge.remove();
+      this.removeEdge(objectID, to);
+      this.removeBackEdge(to, objectID);
     }
-    if (this.BackEdges[objectID] != null) {
-      len = this.BackEdges[objectID].length;
-      for (i = len - 1; i >= 0; i--) {
-        deleted = this.BackEdges[objectID][i];
-        var node1ID = deleted.Node1.identifier();
-        undoStack.push(deleted.createUndoDisconnect());
 
-        len2 = this.Edges[node1ID].length;
-        for (j = len2 - 1; j >= 0; j--) {
-          if (this.Edges[node1ID][j] == deleted) {
-            this.Edges[node1ID][j] = this.Edges[node1ID][len2 - 1];
-            len2 -= 1;
-            this.Edges[node1ID].pop();
-          }
-        }
-      }
-      this.BackEdges[objectID] = null;
+    // if (this.Edges[objectID] != null) {
+    //   var len = this.Edges[objectID].length;
+    //   for (var i = len - 1; i >= 0; i--) {
+    //     var deleted = this.Edges[objectID][i];
+    //     var node2ID = deleted.Node2.identifier();
+    //     undoStack.push(deleted.createUndoDisconnect());
+
+    //     var len2 = this.BackEdges[node2ID].length;
+    //     for (var j = len2 - 1; j >= 0; j--) {
+    //       if (this.BackEdges[node2ID][j] == deleted) {
+    //         this.BackEdges[node2ID][j] = this.BackEdges[node2ID][len2 - 1];
+    //         len2 -= 1;
+    //         this.BackEdges[node2ID].pop();
+    //       }
+    //     }
+    //   }
+    //   this.Edges[objectID] = null;
+    // }
+
+    let backList = this.getBackEdges(objectID);
+    for (let [to, edge] of backList) {
+      undoStack.push(edge.createUndoDisconnect());
+      edge.remove();
+      this.removeEdge(objectID, to);
+      this.removeBackEdge(to, objectID);
     }
+
+    // if (this.BackEdges[objectID] != null) {
+    //   len = this.BackEdges[objectID].length;
+    //   for (i = len - 1; i >= 0; i--) {
+    //     deleted = this.BackEdges[objectID][i];
+    //     var node1ID = deleted.Node1.identifier();
+    //     undoStack.push(deleted.createUndoDisconnect());
+
+    //     len2 = this.Edges[node1ID].length;
+    //     for (j = len2 - 1; j >= 0; j--) {
+    //       if (this.Edges[node1ID][j] == deleted) {
+    //         this.Edges[node1ID][j] = this.Edges[node1ID][len2 - 1];
+    //         len2 -= 1;
+    //         this.Edges[node1ID].pop();
+    //       }
+    //     }
+    //   }
+    //   this.BackEdges[objectID] = null;
+    // }
     return undoStack;
   };
 
@@ -544,21 +656,23 @@ export function ObjectManager(canvas) {
       lab,
       connectionPoint,
     );
-    if (
-      this.Edges[objectIDfrom] == null ||
-      this.Edges[objectIDfrom] == undefined
-    ) {
-      this.Edges[objectIDfrom] = [];
-    }
-    if (
-      this.BackEdges[objectIDto] == null ||
-      this.BackEdges[objectIDto] == undefined
-    ) {
-      this.BackEdges[objectIDto] = [];
-    }
+    // if (
+    //   this.Edges[objectIDfrom] == null ||
+    //   this.Edges[objectIDfrom] == undefined
+    // ) {
+    //   this.Edges[objectIDfrom] = [];
+    // }
+    // if (
+    //   this.BackEdges[objectIDto] == null ||
+    //   this.BackEdges[objectIDto] == undefined
+    // ) {
+    //   this.BackEdges[objectIDto] = [];
+    // }
     l.addedToScene = fromObj.addedToScene && toObj.addedToScene;
-    this.Edges[objectIDfrom].push(l);
-    this.BackEdges[objectIDto].push(l);
+    this.addEdge(objectIDfrom, objectIDto, l);
+    this.addBackEdge(objectIDto, objectIDfrom, l);
+    // this.Edges[objectIDfrom].push(l);
+    // this.BackEdges[objectIDto].push(l);
   };
 
   this.setNull = function (objectID, nullVal) {
@@ -577,19 +691,24 @@ export function ObjectManager(canvas) {
   this.setEdgeColor = function (fromID, toID, color) {
     // returns old color
     var oldColor = "#000000";
-    if (this.Edges[fromID] != null && this.Edges[fromID] != undefined) {
-      var len = this.Edges[fromID].length;
-      for (var i = len - 1; i >= 0; i--) {
-        if (
-          this.Edges[fromID][i] != null &&
-          this.Edges[fromID][i] != undefined &&
-          this.Edges[fromID][i].Node2 == this.Nodes[toID]
-        ) {
-          oldColor = this.Edges[fromID][i].color();
-          this.Edges[fromID][i].setColor(color);
-        }
-      }
+    let e = this.getEdge(fromID, toID);
+    if (e) {
+      oldColor = e.color();
+      e.setColor(color);
     }
+    // if (this.Edges[fromID] != null && this.Edges[fromID] != undefined) {
+    //   var len = this.Edges[fromID].length;
+    //   for (var i = len - 1; i >= 0; i--) {
+    //     if (
+    //       this.Edges[fromID][i] != null &&
+    //       this.Edges[fromID][i] != undefined &&
+    //       this.Edges[fromID][i].Node2 == this.Nodes[toID]
+    //     ) {
+    //       oldColor = this.Edges[fromID][i].color();
+    //       this.Edges[fromID][i].setColor(color);
+    //     }
+    //   }
+    // }
     return oldColor;
   };
 
@@ -698,19 +817,25 @@ export function ObjectManager(canvas) {
   this.setEdgeHighlight = function (fromID, toID, val) {
     // returns old color
     var oldHighlight = false;
-    if (this.Edges[fromID] != null && this.Edges[fromID] != undefined) {
-      var len = this.Edges[fromID].length;
-      for (var i = len - 1; i >= 0; i--) {
-        if (
-          this.Edges[fromID][i] != null &&
-          this.Edges[fromID][i] != undefined &&
-          this.Edges[fromID][i].Node2 == this.Nodes[toID]
-        ) {
-          oldHighlight = this.Edges[fromID][i].highlighted;
-          this.Edges[fromID][i].setHighlight(val);
-        }
-      }
+    let e = this.getEdge(fromID, toID);
+    if (e) {
+      oldHighlight = e.highlighted;
+      e.setHighlight(val);
     }
+
+    // if (this.Edges[fromID] != null && this.Edges[fromID] != undefined) {
+    //   var len = this.Edges[fromID].length;
+    //   for (var i = len - 1; i >= 0; i--) {
+    //     if (
+    //       this.Edges[fromID][i] != null &&
+    //       this.Edges[fromID][i] != undefined &&
+    //       this.Edges[fromID][i].Node2 == this.Nodes[toID]
+    //     ) {
+    //       oldHighlight = this.Edges[fromID][i].highlighted;
+    //       this.Edges[fromID][i].setHighlight(val);
+    //     }
+    //   }
+    // }
     return oldHighlight;
   };
   this.addLabelObject = function (objectID, objectLabel, centering) {

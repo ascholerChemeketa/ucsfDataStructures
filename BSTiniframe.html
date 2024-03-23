@@ -10,10 +10,9 @@
   </head>
 
   <body class="VisualizationMainPage">
-
-    <div id="mainContent" style="overflow: hidden">
+    <div id="mainContent" style="--overflow: hidden">
       <!-- Drawing canvas where all animation is done.  Note:  can be resized in code -->
-      <canvas id="canvas1" tabindex="0"></canvas>
+      <canvas id="canvas1" tabindex="0" width="300"></canvas>
       <div id="algoControlSection">
         <!-- Table for buttons to control specific animation (insert/find/etc) -->
         <!-- (filled in by javascript code specific to the animtion) -->
@@ -25,7 +24,6 @@
     <!-- mainContent -->
 
     <script type="module">
-
       let canvas1 = document.getElementById("canvas1");
       console.log(document.documentElement.clientHeight);
       let mainContent = document.getElementById("mainContent");
@@ -36,7 +34,7 @@
       // c2.width = 1000;
       // c2.height = 600;
       import { BST } from "./dist/entry.js";
-      let anim = new BST(canvas1, [200, 100, 50], 25);
+      let anim = new BST(canvas1, [200, 100, 50]);
 
       let ctx = canvas1.getContext("2d");
       var zoomIntensity = 0.2;
@@ -57,6 +55,7 @@
       let MIN_ZOOM = 0.5;
       let ZOOM_STEP = 0.25;
       let SCROLL_SENSITIVITY = 0.002;
+
       function draw() {
         // Restore to identity matrix
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -224,7 +223,7 @@
           if (e.deltaY > 0) adjustZoom(-ZOOM_STEP);
           else adjustZoom(ZOOM_STEP);
         }
-      });  
+      });
     </script>
     <!-- container -->
   </body>
