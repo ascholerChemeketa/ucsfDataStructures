@@ -37,19 +37,37 @@ export var HighlightCircle = function (objectID, color, radius) {
   this.x = 0;
   this.y = 0;
   this.alpha = 1;
+  
+  this.svgCircle = null;
 };
 
 HighlightCircle.prototype = new AnimatedObject();
 HighlightCircle.prototype.constructor = HighlightCircle;
 
+HighlightCircle.prototype.remove = function () {
+  if (this.svgCircle) {
+    this.svgCircle.remove();
+    this.svgCircle = null;
+  }
+};
+
 HighlightCircle.prototype.draw = function (ctx) {
-  ctx.globalAlpha = this.alpha;
-  ctx.strokeStyle = this.foregroundColor;
-  ctx.lineWidth = this.thickness;
-  ctx.beginPath();
-  ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, true);
-  ctx.closePath();
-  ctx.stroke();
+
+  if (!this.svgCircle) {
+    var svgns = "http://www.w3.org/2000/svg";
+    var circle = document.createElementNS(svgns, "circle");
+    circle.setAttributeNS(
+      null,
+      "style",
+      'fill: none; stroke: var(--svgColor--althighlight); stroke-width: 2px;',
+    );
+    circle.setAttribute("pointer-events", "visible");
+    circle.setAttributeNS(null, "r", this.radius);
+    ctx.svg.getElementById("nodes").appendChild(circle);
+    this.svgCircle = circle;
+  }
+  this.svgCircle.setAttributeNS(null, "cx", this.x);
+  this.svgCircle.setAttributeNS(null, "cy", this.y);
 };
 
 HighlightCircle.prototype.createUndoDelete = function () {

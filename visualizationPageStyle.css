@@ -2,7 +2,7 @@
 
 body {
   font:
-    100% Verdana,
+    1rem Roboto, Verdana,
     Arial,
     Helvetica,
     sans-serif;
@@ -13,95 +13,11 @@ body {
   color: #000000;
 }
 
-.VisualizationMainPage #mainContent {
-  /*padding: 0 20px; /* remember that padding is the space inside the div box and margin is the space outside the div box */
-  background: #ffffff;
-}
-
-.VisualizationMainPage #container {
-  background: #ffffff;
-  /*margin: 0 auto; /* the auto margins (in conjunction with a width) center the page */
-  text-align: left; /* this overrides the text-align: center on the body element. */
-}
-
 .VisualizationMainPage #algoControlSection {
-  background: #ddeedd;
+  background: #ddebee;
   color: #000000;
 }
 
-.VisualizationMainPage #generalAnimationControlSection {
-  background: #ddeedd;
-  color: #006600;
-}
-
-.VisualizationMainPage #header {
-  background: #006633;
-  color: #ffcc33;
-  padding: 0 10px 0 20px;
-}
-
-.VisualizationMainPage #header A:visited {
-  text-decoration: none;
-  color: #ffcc33;
-}
-
-.VisualizationMainPage #header h1 {
-  margin: 0;
-  padding: 10px 0;
-}
-
-.VisualizationMainPage #header A:link {
-  text-decoration: none;
-  color: #ffcc33;
-}
-
-.VisualizationMainPage #container {
-  background: #ffffff;
-  margin: 0 auto; /* the auto margins (in conjunction with a width) center the page */
-  text-align: left; /* this overrides the text-align: center on the body element. */
-}
-
-.VisualizationMainPage #footer A:visited {
-  text-decoration: none;
-  color: ffcc33;
-}
-
-.VisualizationMainPage #footer A:link {
-  text-decoration: none;
-  color: #ffcc33;
-}
-
-.VisualizationMainPage #mainContent h1 {
-  padding: 0 20px;
-  background: #ffffff;
-  color: #006633;
-}
-
-.VisualizationMainPage #mainContent h2 {
-  padding: 0 20px;
-  background: #ffffff;
-  color: #006633;
-}
-
-.VisualizationMainPage #mainContent h3 {
-  padding: 0 20px;
-  background: #ffffff;
-  color: #006633;
-}
-
-.VisualizationMainPage #footer {
-  padding: 0 10px;
-  background: #006633;
-  color: #ffcc33;
-}
-.VisualizationMainPage #footer p {
-  margin: 0;
-  padding: 10px 0;
-}
-
-EM {
-  text-decoration: bold;
-}
 
 canvas {
   /* background: black; */
@@ -114,9 +30,13 @@ canvas {
 }
 
 #generalAnimationControls {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items:stretch;
+  flex: 5px;
+  margin: 5px;
+  gap: 2px;
+  row-gap: 5px;
 }
 
 #mainContent {
@@ -124,16 +44,119 @@ canvas {
   flex-direction: column;
 }
 
-@media (min-width: 800px) {
-  #mainContent {
-    flex-direction: column;
+
+#mainContent > svg {
+  flex: 1;
+}
+
+#mainContent > canvas {
+  flex: 0;
+}
+
+#algoControlSection {
+  font-size: 0.8rem;
+}
+
+#AlgorithmSpecificControls {
+  font-size: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  row-gap: 5px;
+  margin: 5px;
+}
+
+#AlgorithmSpecificControls > * {
+  flex: 1;
+}
+
+#AlgorithmSpecificControls hr {
+  min-width: 90%;
+}
+
+
+#algoControlSection {
+  container-name: sidebar;
+  container-type: inline-size;
+  min-width: 150px;
+}
+
+@media (min-width: 450px) {
+
+  #algoControlSection {
+    --flex: 200px 0;
+    overflow: auto;
+    resize: horizontal;
+    width: 200px;
+    scrollbar-width: thin;
   }
+  #mainContent {
+    flex-direction: row;
+  }
+  #mainContent > svg {
+    --max-height: 400px;
+  }
+}
+
+svg {
+  color:rgb(88, 172, 77);
 }
 
 svg circle {
   shape-rendering: geometricPrecision;
+  fill: white;
 }
 
-svg {
-  height: 400px;
+svg text {
+  user-select: none;
+}
+
+.controlGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 90%;
+}
+
+.controlGroup :is(input[type="text"], select) {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+
+
+.stepButtons {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.stepButtons * {
+  flex: 1;
+}
+
+
+
+@container sidebar (width < 200px) {
+  #algoControlSection .controlGroup {
+    flex-direction: column;
+  }
+  
+  .controlGroup {
+    align-content: stretch;
+  }
+
+  .controlGroup :is(input[type="text"], select) {
+    width: 100%;
+  }
+  
+}
+
+:root {
+  --svgColor: rgb(85, 115, 176);
+  --svgColor--highlight: rgb(231, 36, 36);
+  --svgColor--althighlight: rgb(111, 0, 130);
+  --svgFillColor: white;
 }

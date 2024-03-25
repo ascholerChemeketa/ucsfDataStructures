@@ -43,12 +43,21 @@ export function AnimatedLabel(id, val, center, initialWidth) {
   this.leftWidth = -1;
   this.centerWidth = -1;
   this.highlightIndex = -1;
+  
+  this.svgText = null;
 }
 
 AnimatedLabel.prototype = new AnimatedObject();
 AnimatedLabel.prototype.constructor = AnimatedLabel;
 
 AnimatedLabel.prototype.alwaysOnTop = true;
+
+AnimatedLabel.prototype.remove = function () {
+  if (this.svgText) {
+    this.svgText.remove();
+    this.svgText = null;
+  }
+};
 
 AnimatedLabel.prototype.centered = function () {
   return this.centering;
@@ -58,6 +67,27 @@ AnimatedLabel.prototype.draw = function (ctx) {
   if (!this.addedToScene) {
     return;
   }
+
+
+  if (!this.svgText) {
+    var svgns = "http://www.w3.org/2000/svg";
+    var text = document.createElementNS(svgns, "text");
+    text.setAttributeNS(null, "dominant-baseline", "middle");
+    text.setAttributeNS(null, "text-anchor", "middle");
+    text.setAttributeNS(
+      null,
+      "style",
+      "fill: currentColor; stroke: none; stroke-width: 1px;",
+    );
+    text.setAttribute("pointer-events", "none");
+    ctx.svg.getElementById("nodes").appendChild(text);
+    this.svgText = text;
+
+  }
+  this.svgText.setAttributeNS(null, "x", this.x);
+  this.svgText.setAttributeNS(null, "y", this.y + 1);
+  this.svgText.textContent = this.label;
+
 
   ctx.globalAlpha = this.alpha;
   let cssStyle = window.getComputedStyle(ctx.canvas);

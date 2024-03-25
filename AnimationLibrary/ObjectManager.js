@@ -49,17 +49,122 @@ import { AnimatedBTreeNode } from "./AnimatedBTreeNode.js";
 import { HighlightCircle } from "./HighlightCircle.js";
 import { Line } from "./Line.js";
 
+
+class Dragable {
+  constructor(el) {
+    this.offset = { x: 0, y: 0 };
+    this.dragging = false;
+    this.el = el;
+    console.log(this.el)
+    console.log(this.el.getAttribute("viewBox"))
+
+    this.dragStart = this.dragStart.bind(this);
+    this.dragEnd = this.dragEnd.bind(this);
+    this.dragMove = this.dragMove.bind(this);
+
+    el.addEventListener("touchstart", this.dragStart);
+    el.addEventListener("mousedown", this.dragStart);
+    el.addEventListener("mouseup", this.dragEnd);
+    el.addEventListener("touchend", this.dragEnd);
+    el.addEventListener("touchmove", this.dragMove);
+    el.addEventListener("mousemove", this.dragMove);
+    el.addEventListener("mouseleave", this.dragEnd);
+  }
+
+  getMousePosition(evt) {
+    if (evt.type.indexOf("touch") !== -1) {
+      evt = evt.touches[0];
+    }
+
+    var CTM = this.el.getScreenCTM();
+    // console.log(evt);
+    // console.log(evt.screenX, CTM.e, CTM.a, evt.screenY, CTM.f, CTM.d)
+
+    // console.log(this.el.clientLeft)
+    let mousePos =  {
+      // x: evt.screenX, 
+      // y: evt.screenY
+      x: (evt.clientX) / CTM.a,
+      y: (evt.clientY) / CTM.d,
+    };
+    this.lastMouse = mousePos;
+    return mousePos;
+  }
+
+  dragStart(e) {
+    this.dragging = true;
+    this.startDragCoords = this.getMousePosition(e);
+  }
+  dragEnd(e) {
+    if (!this.dragging) return;
+    this.dragging = false;
+    
+    let curPos = this.lastMouse;
+    console.log(this.lastMouse)
+    if (e.type.indexOf("touch") === -1) {
+      curPos = this.getMousePosition(e);
+    }
+    let delta = { x: 0, y: 0 };
+    delta.x = curPos.x - this.startDragCoords.x;
+    delta.y = curPos.y - this.startDragCoords.y;
+    this.offset.x += delta.x;
+    this.offset.y += delta.y;
+  }
+  dragMove(e) {
+    if (!this.dragging) return;
+    console.log(this.el)
+    console.log(this.el.getAttribute("viewBox"))
+    //this.el.setAttribute("viewBox", "600 0 600 300")
+
+    let curPos = this.getMousePosition(e);
+    let delta = { x: 0, y: 0 };
+    delta.x = curPos.x - this.startDragCoords.x;
+    delta.y = curPos.y - this.startDragCoords.y;
+    
+    this.el.setAttribute("viewBox", `${-this.offset.x - delta.x} ${-this.offset.y - delta.y} 800 400`)
+
+
+    // const additionalTransform = this.el.createSVGTransform();
+    // additionalTransform.setTranslate( 
+    //   //0 , 1
+    //   deltaX,
+    //   deltaY,
+    // );
+    // this.el.transform.baseVal.appendItem(additionalTransform);
+    // // When doing this multiple times, `translate()`s might be piling up,
+    // // like transform="translate(10, 0) translate(10, 0) translate(10, 0)".
+    // // Consolidate them into a single matrix transformation.
+    // this.el.transform.baseVal.consolidate();
+    //this.startCoords = this.getMousePosition(e);
+
+    // d.setAttribute(
+    //   "transform",
+    //   `translate(${mousePos.x - this.startCoords.x}, ${mousePos.y - this.startCoords.y})`,
+    // );
+    //  this.el.style.translate = `${e.offsetX - this.startCoords.x}px ${e.offsetY - this.startCoords.y}px`;
+  }
+}
+
 function makeSVG() {
   const s = `
-  <svg xmlns="http://www.w3.org/2000/svg" role="img">
+  <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 800 400" preserveAspectRatio="xMidYMin slice">
     <defs>
       <marker id="SVGTriangleMarker" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8"
         markerHeight="8" orient="auto-start-reverse">
-        <path d="M 0 0 L 10 5 L 0 10 z"></path>
+        <path fill="var(--svgColor)" d="M 0 0 L 10 5 L 0 10 z"></path>
+      </marker>
+      <marker id="SVGTriangleMarkerHighlight" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8"
+        markerHeight="8" orient="auto-start-reverse">
+        <path fill="var(--svgColor--highlight)" d="M 0 0 L 10 5 L 0 10 z"></path>
       </marker>
     </defs>
+    <g id="allElements">
+      <g id="edges" />
+      <g id="nodes" />
+    </g>
   </svg>`;
   let svg = new DOMParser().parseFromString(s, "text/xml").documentElement;
+  new Dragable(svg);
   return svg;
 }
 
@@ -125,9 +230,6 @@ export function ObjectManager(canvas) {
   this.draw = function () {
     this.framenum++;
     if (this.framenum > 1000) this.framenum = 0;
-
-    console.log("Drawing frame " + this.framenum);
-    //this.svg.textContent = "";
 
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height); // clear canvas
     //this.statusReport.y = 20;
@@ -447,48 +549,17 @@ export function ObjectManager(canvas) {
 
     let edge = this.getEdge(objectIDfrom, objectIDto);
     if (edge) {
-      undo = edge.createUndoDisconnect();
+      //undo = edge.createUndoDisconnect();
       edge.remove();
       this.removeEdge(objectIDfrom, objectIDto);
-    }
-
-    // if (this.Edges[objectIDfrom] != null) {
-    //   var len = this.Edges[objectIDfrom].length;
-    //   for (i = len - 1; i >= 0; i--) {
-    //     if (
-    //       this.Edges[objectIDfrom][i] != null &&
-    //       this.Edges[objectIDfrom][i].Node2 == this.Nodes[objectIDto]
-    //     ) {
-    //       var deleted = this.Edges[objectIDfrom][i];
-    //       deleted.remove();
-    //       undo = deleted.createUndoDisconnect();
-    //       this.Edges[objectIDfrom][i] = this.Edges[objectIDfrom][len - 1];
-    //       len -= 1;
-    //       this.Edges[objectIDfrom].pop();
-    //     }
-    //   }
-    // }
-    let backEdge = this.getBackEdge(objectIDto, objectIDfrom);
-    if (backEdge) {
-      backEdge.remove();
       this.removeBackEdge(objectIDfrom, objectIDto);
     }
 
-    // if (this.BackEdges[objectIDto] != null) {
-    //   len = this.BackEdges[objectIDto].length;
-    //   for (i = len - 1; i >= 0; i--) {
-    //     if (
-    //       this.BackEdges[objectIDto][i] != null &&
-    //       this.BackEdges[objectIDto][i].Node1 == this.Nodes[objectIDfrom]
-    //     ) {
-    //       deleted = this.BackEdges[objectIDto][i];
-    //       deleted.remove();
-    //       // Note:  Don't need to remove this child, did it above on the regular edge
-    //       this.BackEdges[objectIDto][i] = this.BackEdges[objectIDto][len - 1];
-    //       len -= 1;
-    //       this.BackEdges[objectIDto].pop();
-    //     }
-    //   }
+    // let backEdge = this.getBackEdge(objectIDto, objectIDfrom);
+    // if (backEdge) {
+    //   backEdge.remove();
+    //   this.removeEdge(objectIDfrom, objectIDto);
+    //   this.removeBackEdge(objectIDfrom, objectIDto);
     // }
     return undo;
   };
@@ -504,25 +575,6 @@ export function ObjectManager(canvas) {
       this.removeBackEdge(to, objectID);
     }
 
-    // if (this.Edges[objectID] != null) {
-    //   var len = this.Edges[objectID].length;
-    //   for (var i = len - 1; i >= 0; i--) {
-    //     var deleted = this.Edges[objectID][i];
-    //     var node2ID = deleted.Node2.identifier();
-    //     undoStack.push(deleted.createUndoDisconnect());
-
-    //     var len2 = this.BackEdges[node2ID].length;
-    //     for (var j = len2 - 1; j >= 0; j--) {
-    //       if (this.BackEdges[node2ID][j] == deleted) {
-    //         this.BackEdges[node2ID][j] = this.BackEdges[node2ID][len2 - 1];
-    //         len2 -= 1;
-    //         this.BackEdges[node2ID].pop();
-    //       }
-    //     }
-    //   }
-    //   this.Edges[objectID] = null;
-    // }
-
     let backList = this.getBackEdges(objectID);
     for (let [to, edge] of backList) {
       undoStack.push(edge.createUndoDisconnect());
@@ -530,25 +582,6 @@ export function ObjectManager(canvas) {
       this.removeEdge(objectID, to);
       this.removeBackEdge(to, objectID);
     }
-
-    // if (this.BackEdges[objectID] != null) {
-    //   len = this.BackEdges[objectID].length;
-    //   for (i = len - 1; i >= 0; i--) {
-    //     deleted = this.BackEdges[objectID][i];
-    //     var node1ID = deleted.Node1.identifier();
-    //     undoStack.push(deleted.createUndoDisconnect());
-
-    //     len2 = this.Edges[node1ID].length;
-    //     for (j = len2 - 1; j >= 0; j--) {
-    //       if (this.Edges[node1ID][j] == deleted) {
-    //         this.Edges[node1ID][j] = this.Edges[node1ID][len2 - 1];
-    //         len2 -= 1;
-    //         this.Edges[node1ID].pop();
-    //       }
-    //     }
-    //   }
-    //   this.BackEdges[objectID] = null;
-    // }
     return undoStack;
   };
 

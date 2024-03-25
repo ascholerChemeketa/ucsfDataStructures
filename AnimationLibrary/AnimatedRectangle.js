@@ -54,6 +54,8 @@ export var AnimatedRectangle = function (
   this.nullPointer = false;
   this.alpha = 1.0;
   this.addedToScene = true;
+  this.svgRect = null;
+  this.svgText = null;
 };
 
 AnimatedRectangle.prototype = new AnimatedObject();
@@ -65,6 +67,17 @@ AnimatedRectangle.prototype.setNull = function (np) {
 
 AnimatedRectangle.prototype.getNull = function () {
   return this.nullPointer;
+};
+
+AnimatedRectangle.prototype.remove = function () {
+  if (this.svgRect) {
+    this.svgRect.remove();
+    this.svgRect = null;
+  }
+  if (this.svgText) {
+    this.svgText.remove();
+    this.svgText = null;
+  }
 };
 
 AnimatedRectangle.prototype.left = function () {
@@ -158,13 +171,47 @@ AnimatedRectangle.prototype.draw = function (context) {
   if (!this.addedToScene) {
     return;
   }
+  context.globalAlpha = this.alpha;
+
+  if (!this.svgRect) {
+    var svgns = "http://www.w3.org/2000/svg";
+    var rect = document.createElementNS(svgns, "rect");
+    rect.setAttributeNS(
+      null,
+      "style",
+      'fill: var(--svgFillColor); stroke: var(--svgColor);',
+    );
+    context.svg.getElementById("nodes").appendChild(rect);
+    this.svgRect = rect;
+    this.svgRect.setAttributeNS(null, "width", this.w);
+    this.svgRect.setAttributeNS(null, "height", this.h);
+    this.svgRect.setAttributeNS(null, "rx", 2);
+    this.svgRect.setAttributeNS(null, "ry", 2);
+
+
+    var text = document.createElementNS(svgns, "text");
+    text.setAttributeNS(null, "dominant-baseline", "middle");
+    text.setAttributeNS(null, "text-anchor", "middle");
+    text.setAttributeNS(
+      null,
+      "style",
+      "fill: var(--svgColor); stroke: none; stroke-width: 1px;",
+    );
+    this.svgText = text;
+    this.svgRect.after(text);
+  }
+  this.svgRect.setAttributeNS(null, "x", this.x);
+  this.svgRect.setAttributeNS(null, "y", this.y);
+
+  this.svgText.setAttributeNS(null, "x", this.x + this.w / 2.0);
+  this.svgText.setAttributeNS(null, "y", this.y + this.h / 2.0 + 1);
+  this.svgText.textContent = this.label;
 
   var startX;
   var startY;
   var labelPosX;
   var labelPosY;
 
-  context.globalAlpha = this.alpha;
 
   if (this.xJustify == "left") {
     startX = this.x;
@@ -211,7 +258,20 @@ AnimatedRectangle.prototype.draw = function (context) {
     context.closePath();
     context.stroke();
     context.fill();
+    this.svgRect.setAttributeNS(
+      null,
+      "style",
+      'fill: var(--svgFillColor); stroke: var(--svgColor--highlight); stroke-width: 3px;',
+    );
+  } else {
+    this.svgRect.setAttributeNS(
+      null,
+      "style",
+      'fill: var(--svgFillColor); stroke: var(--svgColor); stroke-width: 1px;',
+    );
   }
+
+
   context.strokeStyle = this.foregroundColor;
   context.fillStyle = this.backgroundColor;
 

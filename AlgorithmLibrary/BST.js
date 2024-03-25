@@ -29,6 +29,7 @@ import { initCanvas, doPlayPause } from "../AnimationLibrary/AnimationMain.js";
 import {
   Algorithm,
   addControlToAlgorithmBar,
+  addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
 
 BST.LINK_COLOR = "#007700";
@@ -51,7 +52,7 @@ export function BST(canvas, startdata = [], animdata = null) {
   //controls.style.display = "none";
 
   let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+  this.init(am, 800, 400);
 
   for (let d of startdata) {
     this.implementAction(this.insertElement.bind(this), d);
@@ -59,7 +60,6 @@ export function BST(canvas, startdata = [], animdata = null) {
   }
   am.clearHistory();
 
-  doPlayPause();
   if (animdata) {
     this.implementAction(this.insertElement.bind(this), animdata);
   }
@@ -73,7 +73,7 @@ BST.superclass = Algorithm.prototype;
 
 BST.prototype.init = function (am, w, h) {
   var sc = BST.superclass;
-  this.startingX = w / 2;
+  this.startingX = w / 2 + 50;
   this.first_print_pos_y = h - 2 * BST.PRINT_VERTICAL_GAP;
   this.print_max = w - 10;
 
@@ -82,7 +82,7 @@ BST.prototype.init = function (am, w, h) {
   this.nextIndex = 0;
   this.commands = [];
   //this.cmd("CreateLabel", 0, "", 20, 10, 0);
-  this.cmd("CreateRectangle", 0, "root", 50, 20, w / 2 - 70, 35);
+  this.cmd("CreateRectangle", 0, "root", 50, 20, this.startingX - 100, 35);
   this.nextIndex = 1;
   this.animationManager.StartNewAnimation(this.commands);
   this.animationManager.skipForward();
@@ -90,32 +90,28 @@ BST.prototype.init = function (am, w, h) {
 };
 
 BST.prototype.addControls = function () {
-  this.insertField = addControlToAlgorithmBar("Text", "");
-  this.insertField.onkeydown = this.returnSubmit(
-    this.insertField,
-    this.insertCallback.bind(this),
-    4,
-  );
+  addSeparatorToAlgorithmBar();
+  this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+
   this.insertButton = addControlToAlgorithmBar("Button", "Insert");
   this.insertButton.onclick = this.insertCallback.bind(this);
-  this.deleteField = addControlToAlgorithmBar("Text", "");
-  this.deleteField.onkeydown = this.returnSubmit(
-    this.deleteField,
-    this.deleteCallback.bind(this),
-    4,
-  );
+
   this.deleteButton = addControlToAlgorithmBar("Button", "Delete");
   this.deleteButton.onclick = this.deleteCallback.bind(this);
-  this.findField = addControlToAlgorithmBar("Text", "");
-  this.findField.onkeydown = this.returnSubmit(
-    this.findField,
-    this.findCallback.bind(this),
-    4,
-  );
+
   this.findButton = addControlToAlgorithmBar("Button", "Find");
   this.findButton.onclick = this.findCallback.bind(this);
-  this.printButton = addControlToAlgorithmBar("Button", "Print");
-  this.printButton.onclick = this.printCallback.bind(this);
+
+  addSeparatorToAlgorithmBar();
+
+  this.printpreButton = addControlToAlgorithmBar("Button", "Print PreOrder");
+  this.printpreButton.onclick = this.print.bind(this, "Pre");
+
+  this.printButton = addControlToAlgorithmBar("Button", "Print InOrder");
+  this.printButton.onclick = this.print.bind(this);
+
+  this.printpostButton = addControlToAlgorithmBar("Button", "Print PostOrder");
+  this.printpostButton.onclick = this.print.bind(this);
 };
 
 BST.prototype.reset = function () {
@@ -124,72 +120,79 @@ BST.prototype.reset = function () {
 };
 
 BST.prototype.insertCallback = function (event) {
-  var insertedValue = this.insertField.value;
+  var insertedValue = this.inputField.value;
   // Get text value
   insertedValue = this.normalizeNumber(insertedValue, 4);
   if (insertedValue != "") {
     // set text value
-    this.insertField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.insertElement.bind(this), insertedValue);
   }
 };
 
 BST.prototype.deleteCallback = function (event) {
-  var deletedValue = this.deleteField.value;
+  var deletedValue = this.inputField.value;
   if (deletedValue != "") {
     deletedValue = this.normalizeNumber(deletedValue, 4);
-    this.deleteField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.deleteElement.bind(this), deletedValue);
   }
 };
 
-BST.prototype.printCallback = function (event) {
-  this.implementAction(this.printTree.bind(this), "");
+BST.prototype.print = function (order) {
+  if (order == undefined) {
+    order = "In";
+  }
+  this.implementAction(this.printTree.bind(this, order));
 };
 
-BST.prototype.printTree = function (unused) {
+BST.prototype.printTree = function (order) {
   this.commands = [];
   this.printOutput = "";
 
   if (this.treeRoot != null) {
     this.cmd("SetMessage", "Starting from root");
-    this.highlightID = this.nextIndex++;
-    var firstLabel = this.nextIndex;
-    this.cmd(
-      "CreateHighlightCircle",
-      this.highlightID,
-      BST.HIGHLIGHT_CIRCLE_COLOR,
-      this.treeRoot.x,
-      this.treeRoot.y,
-    );
-    this.xPosOfNextLabel = BST.FIRST_PRINT_POS_X;
-    this.yPosOfNextLabel = this.first_print_pos_y;
-    this.printTreeRec(this.treeRoot);
-    this.cmd("Delete", this.highlightID);
+    this.cmd("SetHighlight", this.treeRoot.graphicID, 1);
     this.cmd("Step");
 
-    for (var i = firstLabel; i < this.nextIndex; i++) {
-      this.cmd("Delete", i);
-    }
-    this.nextIndex = this.highlightID; /// Reuse objects.  Not necessary.
+    this.cmd("SetHighlight", this.treeRoot.graphicID, 0);
+    this.printTreeRec(this.treeRoot, order);
+
+    this.cmd("SetMessage", "Final output: " + this.printOutput);
   }
   return this.commands;
 };
 
-BST.prototype.printTreeRec = function (tree) {
-  this.cmd("Step");
+BST.prototype.printLeft = function (tree, order) {
   if (tree.left != null) {
     this.cmd("SetMessage", tree.data + " has left child, visit it...");
-    this.cmd("Move", this.highlightID, tree.left.x, tree.left.y);
-    this.printTreeRec(tree.left);
-    this.cmd("Move", this.highlightID, tree.x, tree.y);
+    this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 1);
+    this.cmd("Step");
+    this.cmd("SetHighlight", tree.graphicID, 0);
+    this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 0);
+    this.printTreeRec(tree.left, order);
+    this.cmd("SetHighlight", tree.graphicID, 1);
+  } else {
+    this.cmd("SetMessage", tree.data + " has no left child");
     this.cmd("Step");
   }
-  var nextLabelID = this.nextIndex++;
-  this.cmd("CreateLabel", nextLabelID, tree.data, tree.x, tree.y);
-  this.cmd("SetForegroundColor", nextLabelID, BST.PRINT_COLOR);
-  this.cmd("Move", nextLabelID, this.xPosOfNextLabel, this.yPosOfNextLabel);
+};
+BST.prototype.printRight = function (tree, order) {
+  if (tree.right != null) {
+    this.cmd("SetMessage", tree.data + " has right child, visit it...");
+    this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 1);
+    this.cmd("Step");
+    this.cmd("SetHighlight", tree.graphicID, 0);
+    this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 0);
+    this.printTreeRec(tree.right, order);
+    this.cmd("SetHighlight", tree.graphicID, 1);
+  } else {
+    this.cmd("SetMessage", tree.data + " has no right child");
+    this.cmd("Step");
+  }
+};
 
+BST.prototype.printSelf = function (tree) {
   if (this.printOutput.length > 0) {
     this.printOutput += ", ";
   }
@@ -199,27 +202,34 @@ BST.prototype.printTreeRec = function (tree) {
     "Print " + tree.data + "\nCurrent output: " + this.printOutput,
   );
   this.cmd("Step");
+};
 
-  this.xPosOfNextLabel += BST.PRINT_HORIZONTAL_GAP;
-  if (this.xPosOfNextLabel > this.print_max) {
-    this.xPosOfNextLabel = BST.FIRST_PRINT_POS_X;
-    this.yPosOfNextLabel += BST.PRINT_VERTICAL_GAP;
+BST.prototype.printTreeRec = function (tree, order) {
+  this.cmd("SetHighlight", tree.graphicID, 1);
+
+  if (order == "Pre") {
+    this.printSelf(tree);
+    this.printLeft(tree, order);
+    this.printRight(tree, order);
+  } else if (order == "Post") {
+    this.printLeft(tree, order);
+    this.printRight(tree, order);
+    this.printSelf(tree);
+  } else {
+    this.printLeft(tree, order);
+    this.printSelf(tree);
+    this.printRight(tree, order);
   }
-  if (tree.right != null) {
-    this.cmd("SetMessage", tree.data + " has right child, visit it...");
-    this.cmd("Move", this.highlightID, tree.right.x, tree.right.y);
-    this.printTreeRec(tree.right);
-    this.cmd("Move", this.highlightID, tree.x, tree.y);
-    this.cmd("Step");
-  }
+
   this.cmd("SetMessage", "Done with " + tree.data + " return to parent");
-  return;
+  this.cmd("SetHighlight", tree.graphicID, 0);
+  this.cmd("Step");
 };
 
 BST.prototype.findCallback = function (event) {
   var findValue;
-  findValue = this.normalizeNumber(this.findField.value, 4);
-  this.findField.value = "";
+  findValue = this.normalizeNumber(this.inputField.value, 4);
+  this.inputField.value = "";
   this.implementAction(this.findElement.bind(this), findValue);
 };
 
@@ -228,25 +238,26 @@ BST.prototype.findElement = function (findValue) {
 
   this.highlightID = this.nextIndex++;
 
+  this.cmd("SetMessage", "Searching for " + findValue + "\nstarting from root");
+  this.cmd("Step");
   this.doFind(this.treeRoot, findValue);
 
   return this.commands;
 };
 
 BST.prototype.doFind = function (tree, value) {
-  this.cmd("SetMessage", "Searching for " + value);
   if (tree != null) {
     this.cmd("SetHighlight", tree.graphicID, 1);
     if (tree.data == value) {
       this.cmd(
-        "Set Message",
+        "SetMessage",
         "Searching for " +
           value +
-          " : " +
+          " \n" +
           value +
           " = " +
           value +
-          " (Element found!)",
+          "\n(Element found!)",
       );
       this.cmd("Step");
       this.cmd("SetMessage", "Found:" + value);
@@ -257,64 +268,45 @@ BST.prototype.doFind = function (tree, value) {
           "SetMessage",
           "Searching for " +
             value +
-            " : " +
+            " \n" +
             value +
             " < " +
             tree.data +
-            " (look to left subtree)",
+            "\n(look to left subtree)",
         );
+
+        if(tree.left != null)
+        this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 1);
         this.cmd("Step");
+
+        if(tree.left != null)
+        this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 0);
         this.cmd("SetHighlight", tree.graphicID, 0);
-        if (tree.left != null) {
-          this.cmd(
-            "CreateHighlightCircle",
-            this.highlightID,
-            BST.HIGHLIGHT_CIRCLE_COLOR,
-            tree.x,
-            tree.y,
-          );
-          this.cmd("Move", this.highlightID, tree.left.x, tree.left.y);
-          this.cmd("Step");
-          this.cmd("Delete", this.highlightID);
-        }
         this.doFind(tree.left, value);
       } else {
         this.cmd(
           "SetMessage",
           "Searching for " +
             value +
-            " : " +
+            " \n" +
             value +
             " > " +
             tree.data +
-            " (look to right subtree)",
+            "\n(look to right subtree)",
         );
+        if(tree.right != null)
+        this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 1);
         this.cmd("Step");
+        if(tree.right != null)
+        this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 0);
         this.cmd("SetHighlight", tree.graphicID, 0);
-        if (tree.right != null) {
-          this.cmd(
-            "CreateHighlightCircle",
-            this.highlightID,
-            BST.HIGHLIGHT_CIRCLE_COLOR,
-            tree.x,
-            tree.y,
-          );
-          this.cmd("Move", this.highlightID, tree.right.x, tree.right.y);
-          this.cmd("Step");
-          this.cmd("Delete", this.highlightID);
-        }
         this.doFind(tree.right, value);
       }
     }
   } else {
     this.cmd(
       "SetMessage",
-      "Searching for " + value + " : " + "< Empty Tree > (Element not found)",
-    );
-    this.cmd("Step");
-    this.cmd(
-      "SetMessage",
-      "Searching for " + value + " : " + " (Element not found)",
+      "Searching for " + value + " \n" + "hit null (Element not found)",
     );
   }
 };
@@ -322,7 +314,6 @@ BST.prototype.doFind = function (tree, value) {
 BST.prototype.insertElement = function (insertedValue) {
   this.commands = new Array();
   this.cmd("SetMessage", "Inserting " + insertedValue);
-  this.highlightID = this.nextIndex++;
 
   if (this.treeRoot == null) {
     this.cmd(
@@ -334,8 +325,15 @@ BST.prototype.insertElement = function (insertedValue) {
     );
     this.cmd("SetForegroundColor", this.nextIndex, BST.FOREGROUND_COLOR);
     this.cmd("SetBackgroundColor", this.nextIndex, BST.BACKGROUND_COLOR);
-    this.cmd("Connect", 0, this.nextIndex, BST.LINK_COLOR);
+
+    this.cmd(
+      "SetMessage",
+      `Root is null. Inserting ${insertedValue} as the root`,
+    );
     this.cmd("Step");
+
+    this.cmd("Connect", 0, this.nextIndex, BST.LINK_COLOR);
+    //this.cmd("SetHighlight", this.nextIndex, 1);
     this.treeRoot = new BSTNode(
       insertedValue,
       this.nextIndex,
@@ -344,11 +342,18 @@ BST.prototype.insertElement = function (insertedValue) {
     );
     this.nextIndex += 1;
   } else {
-    this.cmd("CreateCircle", this.nextIndex, insertedValue, 100, 100);
+    this.cmd(
+      "CreateCircle",
+      this.nextIndex,
+      insertedValue,
+      this.startingX - 100,
+      100,
+    );
     this.cmd("SetForegroundColor", this.nextIndex, BST.FOREGROUND_COLOR);
     this.cmd("SetBackgroundColor", this.nextIndex, BST.BACKGROUND_COLOR);
+    //this.cmd("SetHighlight", this.nextIndex, 1);
     this.cmd("Step");
-    var insertElem = new BSTNode(insertedValue, this.nextIndex, 100, 100);
+    var insertElem = new BSTNode(insertedValue, this.nextIndex, 50, 100);
 
     this.nextIndex += 1;
     this.cmd("SetHighlight", insertElem.graphicID, 1);
@@ -368,11 +373,15 @@ BST.prototype.insert = function (elem, tree) {
       "SetMessage",
       elem.data + " < " + tree.data + ".  Looking at left subtree",
     );
+    if(tree.left != null)
+    this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 1);
   } else {
     this.cmd(
       "SetMessage",
       elem.data + " >= " + tree.data + ".  Looking at right subtree",
     );
+    if(tree.right != null)
+    this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 1);
   }
   this.cmd("Step");
   this.cmd("SetHighlight", tree.graphicID, 0);
@@ -387,16 +396,8 @@ BST.prototype.insert = function (elem, tree) {
       elem.parent = tree;
       this.cmd("Connect", tree.graphicID, elem.graphicID, BST.LINK_COLOR);
     } else {
-      this.cmd(
-        "CreateHighlightCircle",
-        this.highlightID,
-        BST.HIGHLIGHT_CIRCLE_COLOR,
-        tree.x,
-        tree.y,
-      );
-      this.cmd("Move", this.highlightID, tree.left.x, tree.left.y);
-      this.cmd("Step");
-      this.cmd("Delete", this.highlightID);
+      if(tree.left != null)
+      this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 0);
       this.insert(elem, tree.left);
     }
   } else {
@@ -410,16 +411,8 @@ BST.prototype.insert = function (elem, tree) {
       elem.y = tree.y + BST.HEIGHT_DELTA;
       this.cmd("Move", elem.graphicID, elem.x, elem.y);
     } else {
-      this.cmd(
-        "CreateHighlightCircle",
-        this.highlightID,
-        BST.HIGHLIGHT_CIRCLE_COLOR,
-        tree.x,
-        tree.y,
-      );
-      this.cmd("Move", this.highlightID, tree.right.x, tree.right.y);
-      this.cmd("Step");
-      this.cmd("Delete", this.highlightID);
+      if(tree.right != null)
+      this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 0);
       this.insert(elem, tree.right);
     }
   }
@@ -430,7 +423,6 @@ BST.prototype.deleteElement = function (deletedValue) {
   this.cmd("SetMessage", "Deleting " + deletedValue);
   this.cmd("Step");
   this.cmd("SetMessage", "");
-  this.highlightID = this.nextIndex++;
   this.treeDelete(this.treeRoot, deletedValue);
   this.cmd("SetMessage", "");
   // Do delete
@@ -449,11 +441,15 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
         "SetMessage",
         valueToDelete + " < " + tree.data + ".  Looking at left subtree",
       );
+      if(tree.left != null)
+      this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 1);
     } else if (valueToDelete > tree.data) {
       this.cmd(
         "SetMessage",
         valueToDelete + " > " + tree.data + ".  Looking at right subtree",
       );
+      if(tree.right != null)
+      this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 1);
     } else {
       this.cmd(
         "SetMessage",
@@ -461,7 +457,6 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
       );
     }
     this.cmd("Step");
-    this.cmd("SetHighlight", tree.graphicID, 0);
 
     if (valueToDelete == tree.data) {
       if (tree.left == null && tree.right == null) {
@@ -472,7 +467,7 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
         } else if (tree.parent != null) {
           tree.parent.right = null;
         } else {
-          treeRoot = null;
+          this.treeRoot = null;
         }
         this.resizeTree();
         this.cmd("Step");
@@ -482,13 +477,13 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           "Node to delete has no left child.  \nSet parent of deleted node to right child of deleted node.",
         );
         if (tree.parent != null) {
-          this.cmd("Disconnect", tree.parent.graphicID, tree.graphicID);
           this.cmd(
             "Connect",
             tree.parent.graphicID,
             tree.right.graphicID,
             BST.LINK_COLOR,
           );
+          this.cmd("Disconnect", tree.parent.graphicID, tree.graphicID);
           this.cmd("Step");
           this.cmd("Delete", tree.graphicID);
           if (leftchild) {
@@ -509,13 +504,13 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           "Node to delete has no right child.  \nSet parent of deleted node to left child of deleted node.",
         );
         if (tree.parent != null) {
-          this.cmd("Disconnect", tree.parent.graphicID, tree.graphicID);
           this.cmd(
             "Connect",
             tree.parent.graphicID,
             tree.left.graphicID,
             BST.LINK_COLOR,
           );
+          this.cmd("Disconnect", tree.parent.graphicID, tree.graphicID);
           this.cmd("Step");
           this.cmd("Delete", tree.graphicID);
           if (leftchild) {
@@ -536,6 +531,7 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           "SetMessage",
           "Node to delete has two childern.  \nFind largest node in left subtree.",
         );
+        this.cmd("Step");
 
         this.highlightID = this.nextIndex;
         this.nextIndex += 1;
@@ -549,12 +545,25 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
         var tmp = tree;
         tmp = tree.left;
         this.cmd("Move", this.highlightID, tmp.x, tmp.y);
+        this.cmd(
+          "SetMessage",
+          "Go to left subtree.",
+        );
         this.cmd("Step");
         while (tmp.right != null) {
           tmp = tmp.right;
+          this.cmd(
+            "SetMessage",
+            "Move right to find largest value.",
+          );
           this.cmd("Move", this.highlightID, tmp.x, tmp.y);
           this.cmd("Step");
         }
+        this.cmd(
+          "SetMessage",
+          "No right child found.  Largest value is " + tmp.data + ".",
+        );
+        this.cmd("Step");
         this.cmd("SetText", tree.graphicID, " ");
         var labelID = this.nextIndex;
         this.nextIndex += 1;
@@ -571,7 +580,9 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
         this.cmd("Delete", labelID);
         this.cmd("SetText", tree.graphicID, tree.data);
         this.cmd("Delete", this.highlightID);
-        this.cmd("SetMessage", "Remove node whose value we copied.");
+        this.cmd("SetMessage", "Remove node whose value we copied.\nParent adopts deleted node's children.");
+
+        this.cmd("Disconnect", tmp.parent.graphicID, tmp.graphicID);
 
         if (tmp.left == null) {
           if (tmp.parent != tree) {
@@ -582,7 +593,6 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           this.cmd("Delete", tmp.graphicID);
           this.resizeTree();
         } else {
-          this.cmd("Disconnect", tmp.parent.graphicID, tmp.graphicID);
           this.cmd(
             "Connect",
             tmp.parent.graphicID,
@@ -590,6 +600,8 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
             BST.LINK_COLOR,
           );
           this.cmd("Step");
+          
+          //this.cmd("Disconnect", tmp.graphicID, tmp.left.graphicID);
           this.cmd("Delete", tmp.graphicID);
           if (tmp.parent != tree) {
             tmp.parent.right = tmp.left;
@@ -602,32 +614,18 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
         }
       }
     } else if (valueToDelete < tree.data) {
-      if (tree.left != null) {
-        this.cmd(
-          "CreateHighlightCircle",
-          this.highlightID,
-          BST.HIGHLIGHT_CIRCLE_COLOR,
-          tree.x,
-          tree.y,
-        );
-        this.cmd("Move", this.highlightID, tree.left.x, tree.left.y);
-        this.cmd("Step");
-        this.cmd("Delete", this.highlightID);
-      }
+      
+      this.cmd("SetHighlight", tree.graphicID, 0);
+    
+      if(tree.left != null)
+       this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 0);
+    
       this.treeDelete(tree.left, valueToDelete);
     } else {
-      if (tree.right != null) {
-        this.cmd(
-          "CreateHighlightCircle",
-          this.highlightID,
-          BST.HIGHLIGHT_CIRCLE_COLOR,
-          tree.x,
-          tree.y,
-        );
-        this.cmd("Move", this.highlightID, tree.right.x, tree.right.y);
-        this.cmd("Step");
-        this.cmd("Delete", this.highlightID);
-      }
+      this.cmd("SetHighlight", tree.graphicID, 0);
+      if(tree.right != null)
+       this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 0);
+      
       this.treeDelete(tree.right, valueToDelete);
     }
   } else {
@@ -710,23 +708,21 @@ function BSTNode(val, id, initialX, initialY) {
 }
 
 BST.prototype.disableUI = function (event) {
-  this.insertField.disabled = true;
-  this.insertButton.disabled = true;
-  this.deleteField.disabled = true;
-  this.deleteButton.disabled = true;
-  this.findField.disabled = true;
-  this.findButton.disabled = true;
-  this.printButton.disabled = true;
+  let inputs = document
+    .getElementById("AlgorithmSpecificControls")
+    .querySelectorAll("input");
+  for (let i of inputs) {
+    i.disabled = true;
+  }
 };
 
 BST.prototype.enableUI = function (event) {
-  this.insertField.disabled = false;
-  this.insertButton.disabled = false;
-  this.deleteField.disabled = false;
-  this.deleteButton.disabled = false;
-  this.findField.disabled = false;
-  this.findButton.disabled = false;
-  this.printButton.disabled = false;
+  let inputs = document
+    .getElementById("AlgorithmSpecificControls")
+    .querySelectorAll("input");
+  for (let i of inputs) {
+    i.disabled = false;
+  }
 };
 
 var currentAlg;

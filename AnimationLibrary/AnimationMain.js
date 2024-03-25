@@ -59,8 +59,6 @@ function setCookie(cookieName, value, expireDays) {
   document.cookie = cookieName + "=" + value;
 }
 
-var ANIMATION_SPEED_DEFAULT = 80;
-
 // TODO:  Move these out of global space into animation manager?
 var objectManager;
 var animationManager;
@@ -68,7 +66,7 @@ var animationManager;
 var reporter;
 
 var paused = false;
-var playPauseBackButton;
+//var playPauseBackButton;
 var skipBackButton;
 var stepBackButton;
 var stepForwardButton;
@@ -172,106 +170,106 @@ function doSkipBack() {
 function doStepBack() {
   animationManager.stepBack();
 }
+
 export function doPlayPause() {
   paused = !paused;
-  if (paused) {
-    playPauseBackButton.setAttribute("value", "Auto Play");
-    if (skipBackButton.disabled == false) {
-      stepBackButton.disabled = false;
-    }
-  } else {
-    playPauseBackButton.setAttribute("value", "Enable Stepping");
-  }
   animationManager.SetPaused(paused);
 }
 
-function addControl(type, name, location) {
+function makeInput(type, value, title, id) {
   var element = document.createElement("input");
-
   element.setAttribute("type", type);
-  element.setAttribute("value", name);
-
-  var tableEntry = document.createElement("td");
-
-  tableEntry.appendChild(element);
-
-  var controlBar = document.getElementById(tableEntry);
-
-  //Append the element in page (in span).
-  controlBar.appendChild(element);
+  element.setAttribute("value", value);
+  if (title != null && title !== "")
+  element.setAttribute("title", title);
+  if (id != null && id !== "") element.id = id;
   return element;
 }
 
-function addControlToAnimationBar(type, name, containerType = "input") {
-  var element = document.createElement(containerType);
-  element.setAttribute("type", type);
-  element.setAttribute("value", name);
+function addControlTo(element, parent, label) {
+  let trueParent = parent;
+  if (label) {
+    var labelEl = document.createElement("label");
+    labelEl.innerHTML = label;
+    labelEl.id = element.id + "Label";
+    if(element.id)
+      labelEl.setAttribute("for", element.id);
 
-  var controlBar = document.getElementById("generalAnimationControls");
-  controlBar.appendChild(element);
+    let div = document.createElement("div");
+    div.className = "controlGroup";
+    parent.appendChild(div);
+
+    trueParent = div;
+    div.appendChild(labelEl);
+  }
+
+  trueParent.appendChild(element);
   return element;
+}
+
+function speedChange(speed) {
+  if (speed === "step") {
+    animationManager.SetPaused(true);
+    animationManager.SetSpeed(1);
+  } else {
+    speed = parseFloat(speed);
+    animationManager.SetPaused(false);
+    animationManager.SetSpeed(speed);
+  }
+  setCookie("VisualizationSpeed", String(speed));
 }
 
 function addGeneralControls(canvas) {
   var controlBar = document.getElementById("generalAnimationControls");
 
-  skipBackButton = addControlToAnimationBar("Button", "<<");
-  stepBackButton = addControlToAnimationBar("Button", "<");
-  stepForwardButton = addControlToAnimationBar("Button", ">");
-  skipForwardButton = addControlToAnimationBar("Button", ">>");
-  playPauseBackButton = addControlToAnimationBar("Button", "Pause");
-  playPauseBackButton.onclick = doPlayPause;
+  var stepButtons = document.createElement("div");
+  stepButtons.classList.add("stepButtons");
+  controlBar.appendChild(stepButtons);
+  skipBackButton = addControlTo(makeInput("Button", "<<", "Skip Back", "skipBackButton"), stepButtons);
+  stepBackButton = addControlTo(makeInput("Button", "<", "Step Back", "stepBackButton"), stepButtons);
+  stepForwardButton = addControlTo(makeInput("Button", ">", "Step Forward", "stepForwardButton"), stepButtons);
+  skipForwardButton = addControlTo(makeInput("Button", ">>", "Skip Forward", "skipForwardButton"), stepButtons);
 
-  var element = document.createElement("div");
-  element.setAttribute("display", "inline-block");
+  var speed = getCookie("VisualizationSpeed");
+  if (!parseFloat(speed)){
+    speed = "step";
+  } else {
+    speed = parseFloat(speed);
+  }
+  speedChange(speed);
 
-  var controlBar = document.getElementById("generalAnimationControls");
-  controlBar.appendChild(element);
+  var speedSelect = document.createElement("select");
+  speedSelect.setAttribute("id", "animationSpeed");
+  speedSelect.setAttribute("name", "animationSpeed");
+
+  speedSelect.innerHTML = `
+    <option value="step" ${speed == "step" ? "selected" : ""}>Step</option>
+    <option value="10" ${speed == 10 ? "selected" : ""}>Slow</option>
+    <option value="4" ${speed == 4 ? "selected" : ""}>Medium</option>
+    <option value="2" ${speed == 2 ? "selected" : ""}>Fast</option>
+    <option value="1" ${speed == 1 ? "selected" : ""}>Max</option>`;
+
+  speedSelect.addEventListener("change", (e) => {
+    speedChange(e.target.value);
+  });
+  addControlTo(speedSelect, controlBar, "Speed");
 
   var msgBox = document.createElement("textarea");
   msgBox.setAttribute("readonly", "readonly");
   msgBox.setAttribute("id", "message");
+  msgBox.setAttribute("rows", "4");
   controlBar.appendChild(msgBox);
-
-  var speed = getCookie("VisualizationSpeed");
-  if (speed == null || speed == "") {
-    speed = ANIMATION_SPEED_DEFAULT;
-  } else {
-    speed = parseInt(speed);
-  }
-
-  element.innerHTML =
-    '<input type="number" id="animationSpeed" name="animationSpeed" min="10" max="100" value="40" step="10" />';
-
-  element.innerHTML = `<select name="animationSpeed" id="animationSpeed">
-    <option value="20" ${speed == 20 ? "selected" : ""}>20</option>
-    <option value="40" ${speed == 40 ? "selected" : ""}>40</option>
-    <option value="50" ${speed == 60 ? "selected" : ""}>60</option>
-    <option value="80" ${speed == 80 ? "selected" : ""}>80</option>
-    <option value="100" ${speed == 100 ? "selected" : ""}>100</option>
-    </select>`;
-
-  element.addEventListener("change", (e) => {
-    setCookie("VisualizationSpeed", String(e.target.value));
-    animationManager.SetSpeed(e.target.value);
-  });
-
-  controlBar.appendChild(element);
 }
 
 export function initCanvas(canvas) {
-  addGeneralControls(canvas);
-  canvas.style.width = canvas.clientWidth + "px";
-  canvas.style.height = "200px"; //canvas.clientHeight + "px";
-  canvas.width = canvas.clientWidth;
-  canvas.height = 200; //canvas.clientHeight;
-  console.log(canvas.width);
-  console.log(canvas.height);
+  canvas.style.width = canvas.width + "px";
+  canvas.style.height = canvas.height + "px";
   objectManager = new ObjectManager(canvas);
   animationManager = new AnimationManager(objectManager, canvas);
+  addGeneralControls(canvas);
 
-  var controlBar = document.getElementById("mainContent");
-  controlBar.appendChild(objectManager.svg);
+  var controlBar = document.getElementById("algoControlSection");
+  controlBar.after(objectManager.svg);
 
   animationManager.addListener("AnimationStarted", this, animStarted);
   animationManager.addListener("AnimationEnded", this, animEnded);
@@ -288,21 +286,6 @@ export function initCanvas(canvas) {
   skipForwardButton.onclick =
     animationManager.skipForward.bind(animationManager);
 
-  var speed = getCookie("VisualizationSpeed");
-  if (speed == null || speed == "") {
-    speed = ANIMATION_SPEED_DEFAULT;
-  } else {
-    speed = parseInt(speed);
-  }
-  animationManager.SetSpeed(speed);
-
-  // reporter = document.createElement("div");
-  // reporter.setAttribute("id", "reporter");
-  // reporter.innerHTML = "";
-  //canvas.parentNode.insertBefore(reporter, canvas);
-
-  // objectManager.width = canvas.width;
-  // objectManager.height = canvas.height;
   return animationManager;
 }
 
@@ -334,6 +317,9 @@ function AnimationManager(objectManager, canvas) {
   this.currFrame = 0;
   this.animationBlockLength = 0;
 
+  // The number of frames per animation
+  this.baseFramesPerAnimation = 10;
+
   //  The animation block that is currently running.  Array of singleAnimations
   this.currentBlock = null;
 
@@ -359,14 +345,15 @@ function AnimationManager(objectManager, canvas) {
   // Pause / unpause animation
   this.SetPaused = function (pausedValue) {
     this.animationPaused = pausedValue;
+    paused = pausedValue;
     if (!this.animationPaused) {
       this.step();
     }
   };
 
-  // Set the speed of the animation, from 0 (slow) to 100 (fast)
+  // Set the speed of the animation, from 0 (slow) to this.max_duration (fast)
   this.SetSpeed = function (newSpeed) {
-    this.animationBlockLength = Math.floor((100 - newSpeed) / 2);
+    this.animationBlockLength = Math.max((this.baseFramesPerAnimation * newSpeed), 0);
   };
 
   this.parseBool = function (str) {
@@ -610,6 +597,9 @@ function AnimationManager(objectManager, canvas) {
         );
         undoBlock.push(new Undo.UndoSetBackgroundColor(id, oldColor));
       } else if (nextCommand[0].toUpperCase() == "SETHIGHLIGHT") {
+        console.log(
+          nextCommand[1] + " " + nextCommand[2] + " " + nextCommand[3],
+        );
         var newHighlight = this.parseBool(nextCommand[2]);
         this.animatedObjects.setHighlight(
           parseInt(nextCommand[1]),
@@ -713,6 +703,8 @@ function AnimationManager(objectManager, canvas) {
           );
         }
         undoBlock.push(new Undo.UndoCreate(parseInt(nextCommand[1])));
+        
+        this.animatedObjects.draw();
       } else if (nextCommand[0].toUpperCase() == "CREATELABEL") {
         if (nextCommand.length == 6) {
           this.animatedObjects.addLabelObject(

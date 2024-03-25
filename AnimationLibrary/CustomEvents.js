@@ -24,18 +24,18 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-Function.prototype.bind = function () {
-  var _function = this;
+// Function.prototype.bind = function () {
+//   var _function = this;
 
-  var args = Array.prototype.slice.call(arguments);
-  var scope = args.shift();
-  return function () {
-    for (var i = 0; i < arguments.length; i++) {
-      args.push(arguments[i]);
-    }
-    return _function.apply(scope, args);
-  };
-};
+//   var args = Array.prototype.slice.call(arguments);
+//   var scope = args.shift();
+//   return function () {
+//     for (var i = 0; i < arguments.length; i++) {
+//       args.push(arguments[i]);
+//     }
+//     return _function.apply(scope, args);
+//   };
+// };
 
 export function EventListener() {
   this.events = [];

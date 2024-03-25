@@ -24,16 +24,15 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-function addLabelToAlgorithmBar(labelName) {
-  var element = document.createTextNode(labelName);
-
-  var tableEntry = document.createElement("td");
-  tableEntry.appendChild(element);
-
+function addLabelToAlgorithmBar(labelName, labelId, labelTarget) {
+  var element = document.createElement("label");
+  element.innerHTML = labelName;
+  if(labelId)
+    element.id = labelId;
+  if(labelTarget)
+    element.setAttribute("for", labelTarget);
   var controlBar = document.getElementById("AlgorithmSpecificControls");
-
-  //Append the element in page (in span).
-  controlBar.appendChild(tableEntry);
+  controlBar.appendChild(element);
   return element;
 }
 
@@ -87,22 +86,33 @@ function addRadioButtonGroupToAlgorithmBar(buttonNames, groupName) {
   return buttonList;
 }
 
-function addControlToAlgorithmBar(type, name) {
+function addControlToAlgorithmBar(type, name, id, label) {
   var element = document.createElement("input");
-
   element.setAttribute("type", type);
   element.setAttribute("value", name);
-  //    element.setAttribute("name", name);
+  element.id = id;
+  
+  let parent = document.getElementById("AlgorithmSpecificControls");
+  if(label) {
+    var labelEl = document.createElement("label");
+    labelEl.innerHTML = label;
+    labelEl.id = id + "Label";
+    labelEl.setAttribute("for", id);
 
-  var tableEntry = document.createElement("td");
+    let div = document.createElement("div");
+    div.className = "controlGroup";
+    parent.appendChild(div);
+    parent = div;
+    parent.appendChild(labelEl);
+  }
 
-  tableEntry.appendChild(element);
-
-  var controlBar = document.getElementById("AlgorithmSpecificControls");
-
-  //Append the element in page (in span).
-  controlBar.appendChild(tableEntry);
+  parent.appendChild(element);
   return element;
+}
+
+function addSeparatorToAlgorithmBar() {
+  var element = document.createElement("hr");
+  var controlBar = document.getElementById("AlgorithmSpecificControls").appendChild(element);
 }
 
 function Algorithm(am) {}
@@ -347,5 +357,6 @@ export {
   addLabelToAlgorithmBar,
   addControlToAlgorithmBar,
   addCheckboxToAlgorithmBar,
+  addSeparatorToAlgorithmBar,
   addRadioButtonGroupToAlgorithmBar,
 };
