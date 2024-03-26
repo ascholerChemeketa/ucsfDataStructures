@@ -166,9 +166,7 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
     context.moveTo(fromPos[0], fromPos[1]);
     context.quadraticCurveTo(controlX, controlY, toPos[0], toPos[1]);
     context.stroke();
-    //context.closePath();
 
-    console.log(this.svgLine)
     this.svgLine.setAttributeNS(null, 'x1', fromPos[0]);
     this.svgLine.setAttributeNS(null, 'y1', fromPos[1]);
     this.svgLine.setAttributeNS(null, 'x2', toPos[0]);
@@ -239,6 +237,9 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
       this.svgLine = line;
       
       ctx.svg.getElementById("edges").appendChild(line);
+      if(this.label && this.label.length > 0) {
+        console.log("LABEL NOT IMPLEMENTED")
+      }
     }
 
     if (this.highlighted) this.drawArrow(this.highlightDiff, "#FF0000", ctx);

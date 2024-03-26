@@ -55,8 +55,6 @@ class Dragable {
     this.offset = { x: 0, y: 0 };
     this.dragging = false;
     this.el = el;
-    console.log(this.el)
-    console.log(this.el.getAttribute("viewBox"))
 
     this.dragStart = this.dragStart.bind(this);
     this.dragEnd = this.dragEnd.bind(this);
@@ -77,13 +75,7 @@ class Dragable {
     }
 
     var CTM = this.el.getScreenCTM();
-    // console.log(evt);
-    // console.log(evt.screenX, CTM.e, CTM.a, evt.screenY, CTM.f, CTM.d)
-
-    // console.log(this.el.clientLeft)
     let mousePos =  {
-      // x: evt.screenX, 
-      // y: evt.screenY
       x: (evt.clientX) / CTM.a,
       y: (evt.clientY) / CTM.d,
     };
@@ -94,13 +86,16 @@ class Dragable {
   dragStart(e) {
     this.dragging = true;
     this.startDragCoords = this.getMousePosition(e);
+    //Update offset in case zoom changed it
+    let curViewBox = this.el.getAttribute('viewBox').split(" ");
+    this.offset.x = -curViewBox[0];
+    this.offset.y = -curViewBox[1];
   }
   dragEnd(e) {
     if (!this.dragging) return;
     this.dragging = false;
     
     let curPos = this.lastMouse;
-    console.log(this.lastMouse)
     if (e.type.indexOf("touch") === -1) {
       curPos = this.getMousePosition(e);
     }
@@ -112,36 +107,18 @@ class Dragable {
   }
   dragMove(e) {
     if (!this.dragging) return;
-    console.log(this.el)
-    console.log(this.el.getAttribute("viewBox"))
-    //this.el.setAttribute("viewBox", "600 0 600 300")
 
     let curPos = this.getMousePosition(e);
     let delta = { x: 0, y: 0 };
     delta.x = curPos.x - this.startDragCoords.x;
     delta.y = curPos.y - this.startDragCoords.y;
+
     
-    this.el.setAttribute("viewBox", `${-this.offset.x - delta.x} ${-this.offset.y - delta.y} 800 400`)
-
-
-    // const additionalTransform = this.el.createSVGTransform();
-    // additionalTransform.setTranslate( 
-    //   //0 , 1
-    //   deltaX,
-    //   deltaY,
-    // );
-    // this.el.transform.baseVal.appendItem(additionalTransform);
-    // // When doing this multiple times, `translate()`s might be piling up,
-    // // like transform="translate(10, 0) translate(10, 0) translate(10, 0)".
-    // // Consolidate them into a single matrix transformation.
-    // this.el.transform.baseVal.consolidate();
-    //this.startCoords = this.getMousePosition(e);
-
-    // d.setAttribute(
-    //   "transform",
-    //   `translate(${mousePos.x - this.startCoords.x}, ${mousePos.y - this.startCoords.y})`,
-    // );
-    //  this.el.style.translate = `${e.offsetX - this.startCoords.x}px ${e.offsetY - this.startCoords.y}px`;
+    let curViewBox = this.el.getAttribute('viewBox').split(" ");
+    curViewBox[0] = -this.offset.x - delta.x;
+    curViewBox[1] = -this.offset.y - delta.y;
+    this.el.setAttribute('viewBox', curViewBox.join(" "));
+    console.log(this.el)
   }
 }
 
@@ -180,7 +157,31 @@ export function ObjectManager(canvas) {
   this.framenum = 0;
   this.width = 0;
   this.height = 0;
-  //this.statusReport = new AnimatedLabel(-1, "XXX", true, 30);
+
+  //Default viewport measurements
+  this.svgBaseViewWidth = 800;
+  this.svgBaseViewHeight = 400;
+  this.svgXOffset = 0;
+  this.svgYOffset = 0;
+  this.svgZoom = 1;
+
+  this.setZoom = function (zoomLevel) {
+    let zoomDelta = zoomLevel - this.svgZoom;
+    this.svgZoom = zoomLevel;
+    
+    //Zoom from top center
+    let centerFactorX = (-zoomDelta) * this.svgBaseViewWidth / 2;
+    let centerFactorY = 0;
+
+    let vb = this.svg.getAttribute('viewBox').split(" ");
+    vb[0] = parseFloat(vb[0]) + centerFactorX;
+    vb[1] = parseFloat(vb[1]) + centerFactorY;
+    vb[2] = this.svgBaseViewWidth * this.svgZoom;
+    vb[3] = this.svgBaseViewHeight * this.svgZoom;
+    this.svg.setAttribute('viewBox', vb.join(" "));
+    console.log(this.svg)
+  }
+
   this.cssStyle = window.getComputedStyle(canvas);
 
   this.getEdgeInternal = function (from, to, collection) {
@@ -231,9 +232,7 @@ export function ObjectManager(canvas) {
     this.framenum++;
     if (this.framenum > 1000) this.framenum = 0;
 
-    this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height); // clear canvas
-    //this.statusReport.y = 20;
-    //this.statusReport.x = this.width / 2;
+    this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
     var i;
     var j;

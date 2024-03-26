@@ -121,6 +121,16 @@ function animWaiting() {
   // objectManager.statusReport.setForegroundColor("#FF0000");
 }
 
+function animReady() {
+  skipForwardButton.disabled = false;
+  skipBackButton.disabled = true;
+  stepForwardButton.disabled = false;
+  stepBackButton.disabled = true;
+  //reporter.innerHTML = "Animation Running";
+  // objectManager.statusReport.setText("Animation Running");
+  // objectManager.statusReport.setForegroundColor("#009900");
+}
+
 function animStarted() {
   skipForwardButton.disabled = false;
   skipBackButton.disabled = false;
@@ -142,9 +152,13 @@ function animEnded() {
   //objectManager.statusReport.setForegroundColor("#000000");
 }
 
-function anumUndoUnavailable() {
+function animUndoUnavailable() {
   skipBackButton.disabled = true;
   stepBackButton.disabled = true;
+}
+function animAdvanceUnavailable() {
+  skipForwardButton.disabled = true;
+  stepForwardButton.disabled = true;
 }
 
 function timeoutFn() {
@@ -219,7 +233,7 @@ function speedChange(speed) {
   setCookie("VisualizationSpeed", String(speed));
 }
 
-function addGeneralControls(canvas) {
+function addGeneralControls(objectManager, canvas) {
   var controlBar = document.getElementById("generalAnimationControls");
 
   var stepButtons = document.createElement("div");
@@ -243,16 +257,37 @@ function addGeneralControls(canvas) {
   speedSelect.setAttribute("name", "animationSpeed");
 
   speedSelect.innerHTML = `
-    <option value="step" ${speed == "step" ? "selected" : ""}>Step</option>
-    <option value="10" ${speed == 10 ? "selected" : ""}>Slow</option>
-    <option value="4" ${speed == 4 ? "selected" : ""}>Medium</option>
-    <option value="2" ${speed == 2 ? "selected" : ""}>Fast</option>
-    <option value="1" ${speed == 1 ? "selected" : ""}>Max</option>`;
+    <option value="step" selected="selected">Step</option>
+    <option value="10">Slow</option>
+    <option value="4">Medium</option>
+    <option value="2">Fast</option>
+    <option value="1">Max</option>`;
 
   speedSelect.addEventListener("change", (e) => {
     speedChange(e.target.value);
   });
   addControlTo(speedSelect, controlBar, "Speed");
+
+  var zoom = getCookie("VisualizationZoom");
+  if (!parseFloat(zoom)) {
+    zoom = 1;
+  }
+  objectManager.setZoom(zoom);
+
+  var zoomSelect = document.createElement("select");
+  zoomSelect.setAttribute("id", "zoomLevel");
+  zoomSelect.setAttribute("name", "zoomLevel");
+  zoomSelect.innerHTML = `
+    <option value="2" ${zoom == 2 ? "selected" : ""}>0.5x</option>
+    <option value="1" ${zoom == 1 ? "selected" : ""}>1x</option>
+    <option value="0.75" ${zoom == 0.75 ? "selected" : ""}>1.33x</option>
+    <option value="0.5" ${zoom == 0.5 ? "selected" : ""}>2x</option>`;
+
+  zoomSelect.addEventListener("change", (e) => {
+    setCookie("VisualizationZoom", e.target.value);
+    objectManager.setZoom(e.target.value);
+  });
+  addControlTo(zoomSelect, controlBar, "Zoom");
 
   var msgBox = document.createElement("textarea");
   msgBox.setAttribute("readonly", "readonly");
@@ -266,18 +301,24 @@ export function initCanvas(canvas) {
   canvas.style.height = canvas.height + "px";
   objectManager = new ObjectManager(canvas);
   animationManager = new AnimationManager(objectManager, canvas);
-  addGeneralControls(canvas);
+  addGeneralControls(objectManager, canvas);
 
   var controlBar = document.getElementById("algoControlSection");
   controlBar.after(objectManager.svg);
 
+  animationManager.addListener("AnimationReady", this, animReady);
   animationManager.addListener("AnimationStarted", this, animStarted);
   animationManager.addListener("AnimationEnded", this, animEnded);
   animationManager.addListener("AnimationWaiting", this, animWaiting);
   animationManager.addListener(
     "AnimationUndoUnavailable",
     this,
-    anumUndoUnavailable,
+    animUndoUnavailable,
+  );
+  animationManager.addListener(
+    "AnimationAdvanceUnavailable",
+    this,
+    animAdvanceUnavailable,
   );
 
   skipBackButton.onclick = animationManager.skipBack.bind(animationManager);
@@ -301,6 +342,9 @@ function AnimationManager(objectManager, canvas) {
   this.animationPaused = false;
   this.awaitingStep = false;
   this.currentlyAnimating = false;
+
+  // Playing a single animation
+  this.singleMode = false;
 
   // Array holding the code for the animation.  This is
   // an array of strings, each of which is an animation command
@@ -404,7 +448,7 @@ function AnimationManager(objectManager, canvas) {
     var undoBlock = [];
     if (this.currentAnimation == this.AnimationSteps.length) {
       this.currentlyAnimating = false;
-      this.awaitingStep = false;
+      this.awaitingStep = this.singleMode;
       this.fireEvent("AnimationEnded", "NoData");
       clearTimeout(timer);
       this.animatedObjects.update();
@@ -597,9 +641,6 @@ function AnimationManager(objectManager, canvas) {
         );
         undoBlock.push(new Undo.UndoSetBackgroundColor(id, oldColor));
       } else if (nextCommand[0].toUpperCase() == "SETHIGHLIGHT") {
-        console.log(
-          nextCommand[1] + " " + nextCommand[2] + " " + nextCommand[3],
-        );
         var newHighlight = this.parseBool(nextCommand[2]);
         this.animatedObjects.setHighlight(
           parseInt(nextCommand[1]),
@@ -977,6 +1018,8 @@ function AnimationManager(objectManager, canvas) {
       // so to be safe we'll kill it and start it again.
       clearTimeout(timer);
       timer = setTimeout(timeoutFn, 30);
+    } else {
+      this.fireEvent("AnimationReady", "NoData");
     }
   };
   // Step forwards one step.  A no-op if the animation is not currently paused
@@ -1041,8 +1084,11 @@ function AnimationManager(objectManager, canvas) {
       clearTimeout(timer);
       this.animatedObjects.update();
       this.animatedObjects.draw();
-      if (this.undoStack == null || this.undoStack.length == 0) {
-        this.fireEvent("AnimationUndoUnavailable", "NoData");
+      if ((this.undoStack == null || this.undoStack.length == 0)) {
+        if(!this.singleMode)
+          this.fireEvent("AnimationUndoUnavailable", "NoData");
+        else
+          this.fireEvent("AnimationReady", "NoData");
       }
     }
   };
@@ -1089,11 +1135,14 @@ function AnimationManager(objectManager, canvas) {
       }
       this.animatedObjects.update();
       this.currentlyAnimating = false;
-      this.awaitingStep = false;
       this.doingUndo = false;
+      this.awaitingStep = false; //this.singleMode;
 
       this.animatedObjects.runFast = false;
-      this.fireEvent("AnimationEnded", "NoData");
+      if(!this.singleMode)
+        this.fireEvent("AnimationEnded", "NoData");
+      else
+        this.fireEvent("AnimationAdvanceUnavailable", "NoData");
       clearTimeout(timer);
       this.animatedObjects.update();
       this.animatedObjects.draw();
@@ -1105,6 +1154,11 @@ function AnimationManager(objectManager, canvas) {
       undoBlock[i].undoInitialStep(this.animatedObjects);
     }
     this.doingUndo = false;
+    
+    //In single mode, never actually finish undoing
+    if(this.singleMode) {
+      return this.undoAnimationStepIndices.length !== 0;
+    }
 
     // If we are at the final end of the animation ...
     if (this.undoAnimationStepIndices.length == 0) {
@@ -1238,6 +1292,12 @@ function AnimationManager(objectManager, canvas) {
 
 AnimationManager.prototype = new EventListener();
 AnimationManager.prototype.constructor = AnimationManager;
+
+AnimationManager.prototype.setSingleMode = function () {
+  this.singleMode = true;
+  let parent = document.getElementById("AlgorithmSpecificControls");
+  parent.style.display = 'none';
+}
 
 export function SingleAnimation(id, fromX, fromY, toX, toY) {
   this.objectID = id;
