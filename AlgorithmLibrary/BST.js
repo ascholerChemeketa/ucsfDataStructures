@@ -40,31 +40,40 @@ BST.PRINT_COLOR = BST.FOREGROUND_COLOR;
 
 BST.WIDTH_DELTA = 50;
 BST.HEIGHT_DELTA = 50;
-BST.STARTING_Y = 50;
+BST.STARTING_Y = 30;
 
 BST.FIRST_PRINT_POS_X = 50;
 BST.PRINT_VERTICAL_GAP = 20;
 BST.PRINT_HORIZONTAL_GAP = 50;
 
-export function BST(canvas, startdata = [], animdata = null) {
+export function BST(opts) { 
+  if(!opts) opts = {};
+
+  let canvas = document.createElement("canvas");
   this.addControls();
-  let controls = document.getElementById("AlgorithmSpecificControls");
-  //controls.style.display = "none";
 
   let am = initCanvas(canvas);
   this.init(am, 800, 400);
 
-  for (let d of startdata) {
-    this.implementAction(this.insertElement.bind(this), d);
-    am.skipForward();
+  if(opts.initialData) {
+    for (let d of opts.initialData) {
+      this.implementAction(this.insertElement.bind(this), d);
+      am.skipForward();
+    }
+    am.clearHistory();
+    am.animatedObjects.draw();
   }
-  am.clearHistory();
 
-  if (animdata) {
-    this.implementAction(this.insertElement.bind(this), animdata);
+  if(opts.singleMode) {
+    am.setSingleMode(true);
+    am.requestHeight(250);
+  } else {
+    am.requestHeight(350);
   }
 
-  am.animatedObjects.draw();
+  if(opts.zoom) {
+    am.setZoom(opts.zoom);
+  }
 }
 
 BST.prototype = new Algorithm();
@@ -82,11 +91,24 @@ BST.prototype.init = function (am, w, h) {
   this.nextIndex = 0;
   this.commands = [];
   //this.cmd("CreateLabel", 0, "", 20, 10, 0);
-  this.cmd("CreateRectangle", 0, "root", 50, 20, this.startingX - 100, 35);
+  this.cmd("CreateRectangle", 0, "root", 50, 20, this.startingX - 100, BST.STARTING_Y - 20);
   this.nextIndex = 1;
   this.animationManager.StartNewAnimation(this.commands);
   this.animationManager.skipForward();
   this.animationManager.clearHistory();
+
+  this.doInsert = function (val) {
+    this.implementAction( this.insertElement.bind(this), val);
+  };
+  this.doDelete = function (val) {
+    this.implementAction( this.deleteElement.bind(this), val);
+  };
+  this.doFind = function (val) {
+    this.implementAction( this.findElement.bind(this), val);
+  };
+  this.doPrint = function (order = "In") {
+    this.implementAction( this.printTree.bind(this), order);
+  };
 };
 
 BST.prototype.addControls = function () {
@@ -240,12 +262,12 @@ BST.prototype.findElement = function (findValue) {
 
   this.cmd("SetMessage", "Searching for " + findValue + "\nstarting from root");
   this.cmd("Step");
-  this.doFind(this.treeRoot, findValue);
+  this.findImpl(this.treeRoot, findValue);
 
   return this.commands;
 };
 
-BST.prototype.doFind = function (tree, value) {
+BST.prototype.findImpl = function (tree, value) {
   if (tree != null) {
     this.cmd("SetHighlight", tree.graphicID, 1);
     if (tree.data == value) {
@@ -282,7 +304,7 @@ BST.prototype.doFind = function (tree, value) {
         if(tree.left != null)
         this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 0);
         this.cmd("SetHighlight", tree.graphicID, 0);
-        this.doFind(tree.left, value);
+        this.findImpl(tree.left, value);
       } else {
         this.cmd(
           "SetMessage",
@@ -300,7 +322,7 @@ BST.prototype.doFind = function (tree, value) {
         if(tree.right != null)
         this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 0);
         this.cmd("SetHighlight", tree.graphicID, 0);
-        this.doFind(tree.right, value);
+        this.findImpl(tree.right, value);
       }
     }
   } else {
@@ -346,8 +368,8 @@ BST.prototype.insertElement = function (insertedValue) {
       "CreateCircle",
       this.nextIndex,
       insertedValue,
-      this.startingX - 100,
-      100,
+      this.startingX - 200,
+      BST.STARTING_Y,
     );
     this.cmd("SetForegroundColor", this.nextIndex, BST.FOREGROUND_COLOR);
     this.cmd("SetBackgroundColor", this.nextIndex, BST.BACKGROUND_COLOR);

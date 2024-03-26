@@ -118,7 +118,6 @@ class Dragable {
     curViewBox[0] = -this.offset.x - delta.x;
     curViewBox[1] = -this.offset.y - delta.y;
     this.el.setAttribute('viewBox', curViewBox.join(" "));
-    console.log(this.el)
   }
 }
 
@@ -179,7 +178,6 @@ export function ObjectManager(canvas) {
     vb[2] = this.svgBaseViewWidth * this.svgZoom;
     vb[3] = this.svgBaseViewHeight * this.svgZoom;
     this.svg.setAttribute('viewBox', vb.join(" "));
-    console.log(this.svg)
   }
 
   this.cssStyle = window.getComputedStyle(canvas);

@@ -257,7 +257,7 @@ function addGeneralControls(objectManager, canvas) {
   speedSelect.setAttribute("name", "animationSpeed");
 
   speedSelect.innerHTML = `
-    <option value="step" selected="selected">Step</option>
+    <option value="step" selected="selected">Off</option>
     <option value="10">Slow</option>
     <option value="4">Medium</option>
     <option value="2">Fast</option>
@@ -266,7 +266,7 @@ function addGeneralControls(objectManager, canvas) {
   speedSelect.addEventListener("change", (e) => {
     speedChange(e.target.value);
   });
-  addControlTo(speedSelect, controlBar, "Speed");
+  addControlTo(speedSelect, controlBar, "Auto Step Speed");
 
   var zoom = getCookie("VisualizationZoom");
   if (!parseFloat(zoom)) {
@@ -399,6 +399,23 @@ function AnimationManager(objectManager, canvas) {
   this.SetSpeed = function (newSpeed) {
     this.animationBlockLength = Math.max((this.baseFramesPerAnimation * newSpeed), 0);
   };
+  
+  this.requestHeight = function (newHeight) {
+    const data = { subject: 'lti.frameResize', message_id: window.frameElement.id, height: newHeight }
+    window.parent.postMessage(data, '*')
+  }
+
+  this.setZoom = function (newZoom) {
+    let zoomSelect = document.getElementById("zoomLevel");
+    let opts = zoomSelect.options;
+    for(let o of opts) {
+      if (o.innerText == newZoom) {
+        o.selected = true;
+        objectManager.setZoom(o.value);
+        break;
+      }
+    }
+  }
 
   this.parseBool = function (str) {
     var uppercase = str.toUpperCase();
