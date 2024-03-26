@@ -14,7 +14,7 @@ body {
 }
 
 .VisualizationMainPage #algoControlSection {
-  background: #ddebee;
+  background: var(--controlBackground);
   color: #000000;
 }
 
@@ -42,6 +42,7 @@ canvas {
 #mainContent {
   display: flex;
   flex-direction: column;
+  height: 100vh;
 }
 
 
@@ -85,7 +86,6 @@ canvas {
 @media (min-width: 450px) {
 
   #algoControlSection {
-    --flex: 200px 0;
     overflow: auto;
     resize: horizontal;
     width: 200px;
@@ -94,13 +94,11 @@ canvas {
   #mainContent {
     flex-direction: row;
   }
-  #mainContent > svg {
-    --max-height: 400px;
-  }
 }
 
 svg {
-  color:rgb(88, 172, 77);
+  max-width: 800px;
+  cursor:move;
 }
 
 svg circle {
@@ -159,4 +157,5 @@ svg text {
   --svgColor--highlight: rgb(231, 36, 36);
   --svgColor--althighlight: rgb(111, 0, 130);
   --svgFillColor: white;
+  --controlBackground: #f0f8ff;
 }

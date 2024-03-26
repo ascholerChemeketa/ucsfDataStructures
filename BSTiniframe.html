@@ -12,29 +12,26 @@
 
   <body class="VisualizationMainPage">
     
-    <div id="mainContent" style="height: 400px">
+    <div id="mainContent">
       <div id="algoControlSection">
         <!-- Table for buttons to control specific animation (insert/find/etc) -->
         <!-- (filled in by javascript code specific to the animtion) -->
         <div id="generalAnimationControls"></div>
         <div id="AlgorithmSpecificControls"></div>
       </div>
-      <canvas id="animCanvas" tabindex="0" width="300"></canvas>
     </div>
 
     <!-- mainContent -->
 
     <script type="module">
-      // let animCanvas = document.getElementById("animCanvas");
-      // console.log(document.documentElement.clientHeight);
-      // let mainContent = document.getElementById("mainContent");
-      // console.log(mainContent);
-      // mainContent.style.height = document.documentElement.clientHeight + "px";
-      // console.log(mainContent);
 
       import { BST } from "./dist/entry.js";
-      let anim = new BST(animCanvas, [200, 100, 50,101, 120, 76, 74, 37]);
-      //anim.print("Pre")
+      //let anim = new BST();
+      let anim = new BST({initialData: [200, 100, 50,101, 120, 76, 74, 37], singleMode: true, zoom: "2x"});
+      anim.doInsert(220);
+      //anim.doDelete(100);
+      //anim.doFind(100);
+      //anim.doPrint("In");
     </script>
     <!-- container -->
   </body>

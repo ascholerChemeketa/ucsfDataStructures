@@ -7,13 +7,18 @@
   <body>
     <div>
       <iframe
-        src="BSTiniframe.html"
-        style="width: 100%; aspect-ratio: 3/2; max-height: 600px"
-      ></iframe>
-      <iframe
-        src="BSTintest.html"
-        style="width: 100%; aspect-ratio: 4/2"
+        src="BSTiniframe.html" id="BST1"
+        style="width: 100%; aspect-ratio: 4/2; max-height: 400px"
       ></iframe>
     </div>
   </body>
+  <script>
+    window.addEventListener("message", (event) => {
+        if (event.data.subject == "lti.frameResize") {
+            console.log(event.data);
+            let iframe = document.getElementById(event.data.message_id);
+            iframe.style.height = event.data.height + "px";
+        } 
+    });
+  </script>
 </html>
