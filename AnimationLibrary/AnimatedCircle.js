@@ -129,7 +129,6 @@ AnimatedCircle.prototype.draw = function (ctx) {
     this.svgCircle = circle;
 
     circle.addEventListener("click", () => {
-      console.log("clicked", this.label);
       let input = document.getElementById("inputField");
       if(input)
         input.value = this.label;

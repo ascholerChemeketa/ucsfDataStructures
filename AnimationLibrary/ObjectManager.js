@@ -106,6 +106,8 @@ class Dragable {
     this.offset.y += delta.y;
   }
   dragMove(e) {
+    e.preventDefault();
+   //e.disableTouchScroll();
     if (!this.dragging) return;
 
     let curPos = this.getMousePosition(e);
@@ -121,9 +123,10 @@ class Dragable {
   }
 }
 
-function makeSVG() {
+function makeSVG(centered) {
+  let sizeStyle = centered ? "xMidYMin" : "xMinYMin";
   const s = `
-  <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 800 400" preserveAspectRatio="xMidYMin slice">
+  <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 800 400" preserveAspectRatio="${sizeStyle} slice">
     <defs>
       <marker id="SVGTriangleMarker" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8"
         markerHeight="8" orient="auto-start-reverse">
@@ -135,8 +138,8 @@ function makeSVG() {
       </marker>
     </defs>
     <g id="allElements">
-      <g id="edges" />
       <g id="nodes" />
+      <g id="edges" />
     </g>
   </svg>`;
   let svg = new DOMParser().parseFromString(s, "text/xml").documentElement;
@@ -144,18 +147,19 @@ function makeSVG() {
   return svg;
 }
 
-export function ObjectManager(canvas) {
+export function ObjectManager(canvas, centered = false) {
   this.Nodes = [];
   this.Edges = new Map();
   this.BackEdges = new Map();
   this.activeLayers = [];
   this.activeLayers[0] = true;
   this.ctx = canvas.getContext("2d");
-  this.svg = makeSVG();
+  this.svg = makeSVG(centered);
   this.ctx.svg = this.svg;
   this.framenum = 0;
   this.width = 0;
   this.height = 0;
+  this.centered = centered;
 
   //Default viewport measurements
   this.svgBaseViewWidth = 800;
@@ -165,11 +169,13 @@ export function ObjectManager(canvas) {
   this.svgZoom = 1;
 
   this.setZoom = function (zoomLevel) {
+    if(innerWidth < 400)
+      zoomLevel /= 1.5;
     let zoomDelta = zoomLevel - this.svgZoom;
     this.svgZoom = zoomLevel;
     
     //Zoom from top center
-    let centerFactorX = (-zoomDelta) * this.svgBaseViewWidth / 2;
+    let centerFactorX = this.centered ? (-zoomDelta) * this.svgBaseViewWidth / 2 : 0;
     let centerFactorY = 0;
 
     let vb = this.svg.getAttribute('viewBox').split(" ");
@@ -546,10 +552,10 @@ export function ObjectManager(canvas) {
 
     let edge = this.getEdge(objectIDfrom, objectIDto);
     if (edge) {
-      //undo = edge.createUndoDisconnect();
+      undo = edge.createUndoDisconnect();
       edge.remove();
       this.removeEdge(objectIDfrom, objectIDto);
-      this.removeBackEdge(objectIDfrom, objectIDto);
+      this.removeBackEdge(objectIDto, objectIDfrom);
     }
 
     // let backEdge = this.getBackEdge(objectIDto, objectIDfrom);
@@ -576,8 +582,10 @@ export function ObjectManager(canvas) {
     for (let [to, edge] of backList) {
       undoStack.push(edge.createUndoDisconnect());
       edge.remove();
-      this.removeEdge(objectID, to);
-      this.removeBackEdge(to, objectID);
+      // this.removeEdge(objectID, to);
+      // this.removeBackEdge(to, objectID);
+      this.removeEdge(to, objectID);
+      this.removeBackEdge(objectID, to);
     }
     return undoStack;
   };

@@ -1,21 +1,26 @@
 <!doctype html>
 <html>
   <head>
-    <title>IFrameBinary Search Tree Visualization</title>
+    <title>Multiple animation test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
 
   <body>
     <div>
       <iframe
-        src="BSTiniframe.html" id="BST1"
-        style="width: 100%; aspect-ratio: 4/2; max-height: 400px"
+        src="BST.html" id="BST"
+        style="width: 100%; aspect-ratio: 4/2;"
       ></iframe>
+      <iframe
+        src="QueueLL.html" id="QLL"
+        style="width: 100%; aspect-ratio: 4/2;"
+      ></iframe>
+      
     </div>
   </body>
   <script>
     window.addEventListener("message", (event) => {
         if (event.data.subject == "lti.frameResize") {
-            console.log(event.data);
             let iframe = document.getElementById(event.data.message_id);
             iframe.style.height = event.data.height + "px";
         } 

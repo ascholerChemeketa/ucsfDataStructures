@@ -1,3 +1,5 @@
+import "./visualizationPageStyle.css"; 
+export { RandomGenerator } from "./AnimationLibrary/Utils.js";
 export { AVL } from "./AlgorithmLibrary/AVL.js";
 export { BFS } from "./AlgorithmLibrary/BFS.js";
 export { BinomialQueue } from "./AlgorithmLibrary/BinomialQueue.js";

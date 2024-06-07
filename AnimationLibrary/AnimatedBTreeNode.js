@@ -61,6 +61,9 @@ AnimatedBTreeNode.prototype.init = function (
 
   this.backgroundColor = fillColor;
   this.foregroundColor = edgeColor;
+  
+  this.svgRect = null;
+  this.svgLabels = [];
 
   this.widthPerElement = widthPerElem;
   this.nodeHeight = h;
@@ -69,6 +72,16 @@ AnimatedBTreeNode.prototype.init = function (
   this.labelColors = new Array(this.numLabels);
   for (var i = 0; i < this.numLabels; i++) {
     this.labelColors[i] = this.foregroundColor;
+  }
+};
+
+AnimatedBTreeNode.prototype.remove = function () {
+  if (this.svgRect) {
+    this.svgRect.remove();
+    this.svgRect = null;
+  }
+  for (var i = 0; i < this.svgLabels.length; i++) {
+    this.svgLabels[i].remove();
   }
 };
 
@@ -121,10 +134,22 @@ AnimatedBTreeNode.prototype.draw = function (context) {
   var startY;
 
   startX = this.left();
-  if (startX == NaN) {
+  if (isNaN(startX)) {
     startX = 0;
   }
   startY = this.top();
+
+  if (!this.svgRect) {
+    var svgns = "http://www.w3.org/2000/svg";
+    var rect = document.createElementNS(svgns, "rect");
+    rect.setAttributeNS(
+      null,
+      "style",
+      'fill: var(--svgFillColor); stroke: var(--svgColor);',
+    );
+    context.svg.getElementById("nodes").appendChild(rect);
+    this.svgRect = rect;
+  }
 
   if (this.highlighted) {
     context.strokeStyle = "#ff0000";
@@ -150,6 +175,12 @@ AnimatedBTreeNode.prototype.draw = function (context) {
     context.fill();
   }
 
+  this.svgRect.setAttributeNS(null, "x", startX);
+  this.svgRect.setAttributeNS(null, "y", startY);
+  
+  this.svgRect.setAttributeNS(null, "width", this.getWidth());
+  this.svgRect.setAttributeNS(null, "height", this.nodeHeight);
+
   context.strokeStyle = this.foregroundColor;
   context.fillStyle = this.backgroundColor;
 
@@ -167,15 +198,47 @@ AnimatedBTreeNode.prototype.draw = function (context) {
   context.textBaseline = "middle";
 
   for (var i = 0; i < this.numLabels; i++) {
+    if (i >= this.svgLabels.length) {
+      var svgns = "http://www.w3.org/2000/svg";
+      var text = document.createElementNS(svgns, "text");
+      text.setAttributeNS(null, "dominant-baseline", "middle");
+      text.setAttributeNS(null, "text-anchor", "middle");
+      text.setAttributeNS(
+        null,
+        "style",
+        "fill: var(--svgColor); stroke: none; stroke-width: 1px;",
+      );
+      this.svgLabels.push(text);
+      this.svgRect.after(text);
+
+      text.addEventListener("click", () => {
+        let input = document.getElementById("inputField");
+        if(input)
+          input.value = text.textContent;
+      });
+    }
+
+
     var labelx =
       this.x -
       (this.widthPerElement * this.numLabels) / 2 +
       this.widthPerElement / 2 +
       i * this.widthPerElement;
-    var labely = this.y;
+    var labely = this.y + 1;
 
     context.fillStyle = this.labelColors[i];
     context.fillText(this.labels[i], labelx, labely);
+    
+    this.svgLabels[i].textContent = this.labels[i];
+    this.svgLabels[i].setAttributeNS(null, "x", labelx);
+    this.svgLabels[i].setAttributeNS(null, "y", labely);
+  }
+
+  if(this.numLabels < this.svgLabels.length) {
+    for(var i = this.numLabels; i < this.svgLabels.length; i++) {
+      this.svgLabels[i].remove();
+    }
+    this.svgLabels = this.svgLabels.slice(0, this.numLabels);
   }
 };
 
@@ -189,6 +252,24 @@ AnimatedBTreeNode.prototype.setForegroundColor = function (newColor) {
     labelColor[i] = newColor;
   }
 };
+
+AnimatedBTreeNode.prototype.setHighlight = function (value) {
+  this.highlighted = value;
+  if(!this.svgRect) return;
+  if (this.highlighted) {
+    this.svgRect.setAttributeNS(
+      null,
+      "style",
+      'fill: var(--svgFillColor); stroke: var(--svgColor--highlight); stroke-width: 3px;',
+    );
+  } else
+    this.svgRect.setAttributeNS(
+      null,
+      "style",
+      'fill: var(--svgFillColor); stroke: var(--svgColor); stroke-width: 1px;',
+    );
+};
+
 
 // TODO:  Kill the magic numbers here
 AnimatedBTreeNode.prototype.getTailPointerAttachPos = function (
@@ -247,6 +328,8 @@ AnimatedBTreeNode.prototype.getText = function (index) {
 AnimatedBTreeNode.prototype.setTextColor = function (color, textIndex) {
   textIndex = textIndex == undefined ? 0 : textIndex;
   this.labelColors[textIndex] = color;
+  if(this.svgLabels[textIndex])
+    this.svgLabels[textIndex].setAttributeNS(null, "style", "fill: " + color + "; stroke: none;");
 };
 
 AnimatedBTreeNode.prototype.setText = function (newText, textIndex) {

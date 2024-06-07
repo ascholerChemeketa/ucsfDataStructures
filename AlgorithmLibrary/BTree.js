@@ -24,12 +24,14 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { initAnimationManager } from "../AnimationLibrary/AnimationMain.js";
+import { Colors } from "../AnimationLibrary/Utils.js";
 import {
   Algorithm,
   addControlToAlgorithmBar,
+  addSelectToAlgorithmBar,
   addRadioButtonGroupToAlgorithmBar,
-  addCheckboxToAlgorithmBar,
+  addCheckboxToAlgorithmBar, addSeparatorToAlgorithmBar
 } from "../AlgorithmLibrary/Algorithm.js";
 
 var FIRST_PRINT_POS_X = 50;
@@ -51,17 +53,42 @@ var MESSAGE_Y = 10;
 
 var LINK_COLOR = "#007700";
 var HIGHLIGHT_CIRCLE_COLOR = "#007700";
-var FOREGROUND_COLOR = "#007700";
-var BACKGROUND_COLOR = "#EEFFEE";
+var FOREGROUND_COLOR = Colors.BASE;
+var BACKGROUND_COLOR = Colors.FILL;
 var PRINT_COLOR = FOREGROUND_COLOR;
 
-export function BTree(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+export function BTree(opts = {}) {
+  if(!opts.title) opts.title = "BTree";
+  opts.centered = true;
+
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  
+  if(!opts.maxDegree) opts.maxDegree = 3;
+  if(!opts.preemptiveSplit) opts.preemptiveSplit = false;
+
+  this.max_degree = opts.maxDegree; 
+  this.max_keys = this.max_degree - 1;
+  this.preemptiveSplit = opts.preemptiveSplit && this.max_degree % 2 == 0;
+
+  let am = initAnimationManager(opts);
+  this.init(am, 800, 400);
+
+  if(opts.initialData) {
+    for (let d of opts.initialData) {
+      this.implementAction(this.insertElement.bind(this), d);
+      am.skipForward();
+    }
+    am.clearHistory();
+    am.animatedObjects.draw();
+  }
+  
 }
 
 BTree.prototype = new Algorithm();
-BTree.prototype.varructor = BTree;
+BTree.prototype.constructor = BTree;
 BTree.superclass = Algorithm.prototype;
 
 BTree.prototype.init = function (am, w, h) {
@@ -70,15 +97,10 @@ BTree.prototype.init = function (am, w, h) {
 
   this.starting_x = w / 2;
 
-  this.preemptiveSplit = false;
+  this.addControls(); 
 
-  this.addControls();
-
-  this.max_keys = 2;
   this.min_keys = 1;
   this.split_index = 1;
-
-  this.max_degree = 3;
 
   this.messageID = this.nextIndex++;
   this.cmd("CreateLabel", this.messageID, "", MESSAGE_X, MESSAGE_Y, 0);
@@ -94,42 +116,34 @@ BTree.prototype.init = function (am, w, h) {
 
   this.xPosOfNextLabel = 100;
   this.yPosOfNextLabel = 200;
+  
+  this.doEnqueue = function (val) {
+    this.implementAction( this.enqueue.bind(this), val);
+  };
+  this.doDequeue = function () {
+    this.implementAction( this.dequeue.bind(this) );
+  };
 };
 
 BTree.prototype.addControls = function () {
+  addSeparatorToAlgorithmBar();
   this.controls = [];
 
-  this.insertField = addControlToAlgorithmBar("Text", "");
-  this.insertField.onkeydown = this.returnSubmit(
-    this.insertField,
+  this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+  this.controls.push(this.inputField);
+  this.inputField.onkeydown = this.returnSubmit(  
+    this.inputField,
     this.insertCallback.bind(this),
-    4,
+    6,
   );
-  this.controls.push(this.insertField);
 
   this.insertButton = addControlToAlgorithmBar("Button", "Insert");
   this.insertButton.onclick = this.insertCallback.bind(this);
   this.controls.push(this.insertButton);
 
-  this.deleteField = addControlToAlgorithmBar("Text", "");
-  this.deleteField.onkeydown = this.returnSubmit(
-    this.deleteField,
-    this.deleteCallback.bind(this),
-    4,
-  );
-  this.controls.push(this.deleteField);
-
   this.deleteButton = addControlToAlgorithmBar("Button", "Delete");
   this.deleteButton.onclick = this.deleteCallback.bind(this);
   this.controls.push(this.deleteButton);
-
-  this.findField = addControlToAlgorithmBar("Text", "");
-  this.findField.onkeydown = this.returnSubmit(
-    this.findField,
-    this.findCallback.bind(this),
-    4,
-  );
-  this.controls.push(this.findField);
 
   this.findButton = addControlToAlgorithmBar("Button", "Find");
   this.findButton.onclick = this.findCallback.bind(this);
@@ -143,44 +157,36 @@ BTree.prototype.addControls = function () {
   this.clearButton.onclick = this.clearCallback.bind(this);
   this.controls.push(this.clearButton);
 
-  var i;
-  this.radioButtonNames = [];
-  for (i = MIN_MAX_DEGREE; i <= MAX_MAX_DEGREE; i++) {
-    this.radioButtonNames.push("Max. Degree = " + String(i));
+  addSeparatorToAlgorithmBar();
+
+  var degreeSelect = addSelectToAlgorithmBar("Degree", "degree", "degree");
+  let degreeBody = '';
+  for (let i = MIN_MAX_DEGREE; i <= MAX_MAX_DEGREE; i++) {
+    degreeBody += `<option value="${i}" ${i == this.max_degree ? "selected" : ""}>${i}</option>`;
   }
-
-  this.maxDegreeRadioButtons = addRadioButtonGroupToAlgorithmBar(
-    this.radioButtonNames,
-    "MaxDegree",
-  );
-
-  this.maxDegreeRadioButtons[0].checked = true;
-  for (i = 0; i < this.maxDegreeRadioButtons.length; i++) {
-    this.maxDegreeRadioButtons[i].onclick = this.maxDegreeChangedHandler.bind(
-      this,
-      i + MIN_MAX_DEGREE,
-    );
+  degreeSelect.onchange = (event) => {
+    this.maxDegreeChangedHandler.bind(this, parseInt(event.target.value))();
   }
-
-  this.premptiveSplitBox = addCheckboxToAlgorithmBar(
-    "Preemtive Split / Merge (Even max degree only)",
-  );
-  this.premptiveSplitBox.onclick = this.premtiveSplitCallback.bind(this);
-
+  degreeSelect.innerHTML = degreeBody;
+  this.controls.push(degreeSelect);
+  
+  this.preemptiveSplitBox = addControlToAlgorithmBar("checkbox", "preemptiveSplit", "preemptiveSplit", "Preemptive Split / Merge<br>(Even max degree only)");
+  this.preemptiveSplitBox.onclick = this.preemptiveSplitCallback.bind(this);
+  this.controls.push(this.preemptiveSplitBox);
+  this.enableUI();
   // Other buttons ...
 };
 
 BTree.prototype.reset = function () {
   this.nextIndex = 3;
-  this.max_degree = 3;
-  this.max_keys = 2;
-  this.min_keys = 1;
-  this.split_index = 1;
+  // this.max_keys = 2;
+  // this.min_keys = 1;
+  // this.split_index = 1;
   // NOTE: The order of these last two this.commands matters!
   this.treeRoot = null;
-  this.ignoreInputs = true;
-  // maxDegreeButtonArray[this.max_degree].selected = true;
-  this.ignoreInputs = false;
+  // this.ignoreInputs = true;
+  // // maxDegreeButtonArray[this.max_degree].selected = true;
+  // this.ignoreInputs = false;
 };
 
 BTree.prototype.enableUI = function (event) {
@@ -188,23 +194,8 @@ BTree.prototype.enableUI = function (event) {
   for (i = 0; i < this.controls.length; i++) {
     this.controls[i].disabled = false;
   }
-
-  // TODO  Only enable even maxdegree if preemptive merge is on
-
-  if (this.preemptiveSplit) {
-    var initialEven = MIN_MAX_DEGREE % 2;
-    var i;
-    for (i = initialEven; i <= MAX_MAX_DEGREE - MIN_MAX_DEGREE; i += 2) {
-      this.maxDegreeRadioButtons[i].disabled = false;
-    }
-  } else {
-    for (i = 0; i < this.maxDegreeRadioButtons.length; i++) {
-      this.maxDegreeRadioButtons[i].disabled = false;
-    }
-  }
-
-  if (this.max_degree % 2 == 0) {
-    this.premptiveSplitBox.disabled = false;
+  if (this.max_degree % 2 !== 0) {
+    this.preemptiveSplitBox.disabled = true;
   }
 };
 BTree.prototype.disableUI = function (event) {
@@ -212,11 +203,11 @@ BTree.prototype.disableUI = function (event) {
     this.controls[i].disabled = true;
   }
 
-  for (i = 0; i < this.maxDegreeRadioButtons.length; i++) {
-    this.maxDegreeRadioButtons[i].disabled = true;
-  }
+  // for (i = 0; i < this.maxDegreeRadioButtons.length; i++) {
+  //   this.maxDegreeRadioButtons[i].disabled = true;
+  // }
 
-  this.premptiveSplitBox.disabled = true;
+  // this.preemptiveSplitBox.disabled = true;
 };
 
 //TODO:  Fix me!
@@ -230,18 +221,18 @@ BTree.prototype.maxDegreeChangedHandler = function (newMaxDegree, event) {
 
 BTree.prototype.insertCallback = function (event) {
   var insertedValue;
-  insertedValue = this.normalizeNumber(this.insertField.value, 4);
+  insertedValue = this.normalizeNumber(this.inputField.value, 4);
   if (insertedValue != "") {
-    this.insertField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.insertElement.bind(this), insertedValue);
   }
 };
 
 BTree.prototype.deleteCallback = function (event) {
-  var deletedValue = this.deleteField.value;
+  var deletedValue = this.inputField.value;
   if (deletedValue != "") {
-    deletedValue = this.normalizeNumber(this.deleteField.value, 4);
-    this.deleteField.value = "";
+    deletedValue = this.normalizeNumber(this.inputField.value, 4);
+    this.inputField.value = "";
     this.implementAction(this.deleteElement.bind(this), deletedValue);
   }
 };
@@ -250,11 +241,11 @@ BTree.prototype.clearCallback = function (event) {
   this.implementAction(this.clearTree.bind(this), "");
 };
 
-BTree.prototype.premtiveSplitCallback = function (event) {
-  if (this.preemptiveSplit != this.premptiveSplitBox.checked) {
+BTree.prototype.preemptiveSplitCallback = function (event) {
+  if (this.preemptiveSplit != this.preemptiveSplitBox.checked) {
     this.implementAction(
       this.changePreemtiveSplit.bind(this),
-      this.premptiveSplitBox.checked,
+      this.preemptiveSplitBox.checked,
     );
   }
 };
@@ -263,8 +254,8 @@ BTree.prototype.changePreemtiveSplit = function (newValue) {
   this.commands = new Array();
   this.cmd("Step");
   this.preemptiveSplit = newValue;
-  if (this.premptiveSplitBox.checked != this.preemptiveSplit) {
-    this.premptiveSplitBox.checked = this.preemptiveSplit;
+  if (this.preemptiveSplitBox.checked != this.preemptiveSplit) {
+    this.preemptiveSplitBox.checked = this.preemptiveSplit;
   }
   return this.commands;
 };
@@ -275,19 +266,23 @@ BTree.prototype.printCallback = function (event) {
 
 BTree.prototype.printTree = function (unused) {
   this.commands = new Array();
-  this.cmd("SetText", this.messageID, "Printing tree");
+  this.cmd("SetMessage", "Printing tree");
   var firstLabel = this.nextIndex;
 
   this.xPosOfNextLabel = FIRST_PRINT_POS_X;
   this.yPosOfNextLabel = this.first_print_pos_y;
 
+  this.printMessage = "";
+
   this.printTreeRec(this.treeRoot);
+
+  this.cmd("SetMessage", `At end of root node. Final output:\n${this.printMessage}`);
   this.cmd("Step");
-  for (var i = firstLabel; i < this.nextIndex; i++) {
-    this.cmd("Delete", i);
-  }
-  this.nextIndex = firstLabel;
-  this.cmd("SetText", this.messageID, "");
+  // for (var i = firstLabel; i < this.nextIndex; i++) {
+  //   this.cmd("Delete", i);
+  // }
+  // this.nextIndex = firstLabel;
+  // this.cmd("SetMessage", "");
   return this.commands;
 };
 
@@ -296,48 +291,58 @@ BTree.prototype.printTreeRec = function (tree) {
   var nextLabelID;
   if (tree.isLeaf) {
     for (var i = 0; i < tree.numKeys; i++) {
-      nextLabelID = this.nextIndex++;
-      this.cmd(
-        "CreateLabel",
-        nextLabelID,
-        tree.keys[i],
-        this.getLabelX(tree, i),
-        tree.y,
-      );
-      this.cmd("SetForegroundColor", nextLabelID, PRINT_COLOR);
-      this.cmd("Move", nextLabelID, this.xPosOfNextLabel, this.yPosOfNextLabel);
-      this.cmd("Step");
-      this.xPosOfNextLabel += PRINT_HORIZONTAL_GAP;
-      if (this.xPosOfNextLabel > PRINT_MAX) {
-        this.xPosOfNextLabel = FIRST_PRINT_POS_X;
-        this.yPosOfNextLabel += PRINT_VERTICAL_GAP;
-      }
+      this.printMessage += tree.keys[i] + " ";
+      // nextLabelID = this.nextIndex++;
+      // this.cmd(
+      //   "CreateLabel",
+      //   nextLabelID,
+      //   tree.keys[i],
+      //   this.getLabelX(tree, i),
+      //   tree.y,
+      // );
+      // this.cmd("SetForegroundColor", nextLabelID, PRINT_COLOR);
+      // this.cmd("Move", nextLabelID, this.xPosOfNextLabel, this.yPosOfNextLabel);
+      // this.cmd("Step");
+      // this.xPosOfNextLabel += PRINT_HORIZONTAL_GAP;
+      // if (this.xPosOfNextLabel > PRINT_MAX) {
+      //   this.xPosOfNextLabel = FIRST_PRINT_POS_X;
+      //   this.yPosOfNextLabel += PRINT_VERTICAL_GAP;
+      // }
     }
+    this.cmd("SetMessage", `In leaf. Print all values. Output is:\n${this.printMessage}`);
+    this.cmd("Step");
     this.cmd("SetHighlight", tree.graphicID, 0);
+    this.cmd("SetMessage", `Return to parent.`);
   } else {
+    this.cmd("SetMessage", `Descend to leftmost child.`);
     this.cmd("SetEdgeHighlight", tree.graphicID, tree.children[0].graphicID, 1);
     this.cmd("Step");
     this.cmd("SetHighlight", tree.graphicID, 0);
     this.cmd("SetEdgeHighlight", tree.graphicID, tree.children[0].graphicID, 0);
     this.printTreeRec(tree.children[0]);
+
     for (i = 0; i < tree.numKeys; i++) {
       this.cmd("SetHighlight", tree.graphicID, 1);
-      nextLabelID = this.nextIndex++;
-      this.cmd(
-        "CreateLabel",
-        nextLabelID,
-        tree.keys[i],
-        this.getLabelX(tree, i),
-        tree.y,
-      );
-      this.cmd("SetForegroundColor", nextLabelID, PRINT_COLOR);
-      this.cmd("Move", nextLabelID, this.xPosOfNextLabel, this.yPosOfNextLabel);
+      this.printMessage += tree.keys[i] + " ";
+      this.cmd("SetMessage", `Print next value in node (${tree.keys[i]}). Output is:\n${this.printMessage}`);
+
+      // nextLabelID = this.nextIndex++;
+      // this.cmd(
+      //   "CreateLabel",
+      //   nextLabelID,
+      //   tree.keys[i],
+      //   this.getLabelX(tree, i),
+      //   tree.y,
+      // );
+      // this.cmd("SetForegroundColor", nextLabelID, PRINT_COLOR);
+      // this.cmd("Move", nextLabelID, this.xPosOfNextLabel, this.yPosOfNextLabel);
       this.cmd("Step");
-      this.xPosOfNextLabel += PRINT_HORIZONTAL_GAP;
-      if (this.xPosOfNextLabel > PRINT_MAX) {
-        this.xPosOfNextLabel = FIRST_PRINT_POS_X;
-        this.yPosOfNextLabel += PRINT_VERTICAL_GAP;
-      }
+      // this.xPosOfNextLabel += PRINT_HORIZONTAL_GAP;
+      // if (this.xPosOfNextLabel > PRINT_MAX) {
+      //   this.xPosOfNextLabel = FIRST_PRINT_POS_X;
+      //   this.yPosOfNextLabel += PRINT_VERTICAL_GAP;
+      // }
+      this.cmd("SetMessage", `Descend to next child.`);
       this.cmd(
         "SetEdgeHighlight",
         tree.graphicID,
@@ -387,11 +392,7 @@ BTree.prototype.changeDegree = function (degree) {
   this.treeRoot = null;
   this.nextIndex = 3;
   var newDegree = degree;
-  this.ignoreInputs = true;
-  //TODO:  Check me!
-  this.maxDegreeRadioButtons[newDegree - MIN_MAX_DEGREE].checked = true;
 
-  this.ignoreInputs = false;
   this.max_degree = newDegree;
   this.max_keys = newDegree - 1;
   this.min_keys = Math.floor((newDegree + 1) / 2) - 1;
@@ -401,22 +402,22 @@ BTree.prototype.changeDegree = function (degree) {
   }
   if (newDegree % 2 != 0 && this.preemptiveSplit) {
     this.preemptiveSplit = false;
-    this.premptiveSplitBox.checked = false;
+    this.preemptiveSplitBox.checked = false;
   }
   return this.commands;
 };
 
 BTree.prototype.findCallback = function (event) {
   var findValue;
-  findValue = this.normalizeNumber(this.findField.value, 4);
-  this.findField.value = "";
+  findValue = this.normalizeNumber(this.inputField.value, 4);
+  this.inputField.value = "";
   this.implementAction(this.findElement.bind(this), findValue);
 };
 
 BTree.prototype.findElement = function (findValue) {
   this.commands = new Array();
 
-  this.cmd("SetText", this.messageID, "Finding " + findValue);
+  this.cmd("SetMessage", "Finding " + findValue);
   this.findInTree(this.treeRoot, findValue);
 
   return this.commands;
@@ -429,6 +430,8 @@ BTree.prototype.findInTree = function (tree, val) {
     var i;
     for (i = 0; i < tree.numKeys && tree.keys[i] < val; i++);
     if (i == tree.numKeys) {
+      
+      this.cmd("SetMessage", `${val} is above ${tree.keys[i - 1]}`);
       if (!tree.isLeaf) {
         this.cmd(
           "SetEdgeHighlight",
@@ -437,6 +440,8 @@ BTree.prototype.findInTree = function (tree, val) {
           1,
         );
         this.cmd("Step");
+        this.cmd("SetMessage", `Search for ${val} in rightmost child.`);
+
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd(
           "SetEdgeHighlight",
@@ -447,14 +452,17 @@ BTree.prototype.findInTree = function (tree, val) {
         this.findInTree(tree.children[tree.numKeys], val);
       } else {
         this.cmd("SetHighlight", tree.graphicID, 0);
-        this.cmd(
-          "SetText",
-          this.messageID,
+        this.cmd("SetMessage",
           "Element " + val + " is not in the tree",
         );
       }
     } else if (tree.keys[i] > val) {
       if (!tree.isLeaf) {
+        console.log(i, tree.numKeys, tree.keys[i])
+        if(i == 0)
+          this.cmd("SetMessage", `${val} is below ${tree.keys[0]}`);
+        else
+          this.cmd("SetMessage", `${val} is between ${tree.keys[i - 1]} and ${tree.keys[i]}`);
         this.cmd(
           "SetEdgeHighlight",
           tree.graphicID,
@@ -462,6 +470,11 @@ BTree.prototype.findInTree = function (tree, val) {
           1,
         );
         this.cmd("Step");
+        if(i == 0)
+          this.cmd("SetMessage", `Search leftmost child for ${val}`);
+        else
+          this.cmd("SetMessage", `Search in child between ${tree.keys[i - 1]} and ${tree.keys[i]}`);
+
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd(
           "SetEdgeHighlight",
@@ -472,25 +485,21 @@ BTree.prototype.findInTree = function (tree, val) {
         this.findInTree(tree.children[i], val);
       } else {
         this.cmd("SetHighlight", tree.graphicID, 0);
-        this.cmd(
-          "SetText",
-          this.messageID,
+        this.cmd("SetMessage",
           "Element " + val + " is not in the tree",
         );
       }
     } else {
-      this.cmd("SetTextColor", tree.graphicID, "#FF0000", i);
-      this.cmd("SetText", this.messageID, "Element " + val + " found");
+      this.cmd("SetTextColor", tree.graphicID, Colors.HIGHLIGHT, i);
+      this.cmd("SetMessage", "Element " + val + " found");
       this.cmd("Step");
-      this.cmd("SetTextColor", tree.graphicID, FOREGROUND_COLOR, i);
+      this.cmd("SetTextColor", tree.graphicID, Colors.BASE, i);
       this.cmd("SetHighlight", tree.graphicID, 0);
 
       this.cmd("Step");
     }
   } else {
-    this.cmd(
-      "SetText",
-      this.messageID,
+    this.cmd("SetMessage",
       "Element " + val + " is not in the tree",
     );
   }
@@ -499,7 +508,7 @@ BTree.prototype.findInTree = function (tree, val) {
 BTree.prototype.insertElement = function (insertedValue) {
   this.commands = new Array();
 
-  this.cmd("SetText", this.messageID, "Inserting " + insertedValue);
+  this.cmd("SetMessage", "Inserting " + insertedValue + ". Start from root.");
   this.cmd("Step");
 
   if (this.treeRoot == null) {
@@ -521,36 +530,47 @@ BTree.prototype.insertElement = function (insertedValue) {
     );
     this.treeRoot.keys[0] = insertedValue;
     this.cmd("SetText", this.treeRoot.graphicID, insertedValue, 0);
+    this.cmd("SetMessage", "Root is null, create node and add value.");
+    this.cmd("Step");
+
   } else {
     if (this.preemptiveSplit) {
       if (this.treeRoot.numKeys == this.max_keys) {
+        this.cmd("SetMessage", "Root Node is full, need to split node.");
         this.split(this.treeRoot);
         this.resizeTree();
+
+        this.cmd("SetMessage",
+          "Restart insert at root.",
+        );
+        this.cmd("SetHighlight", this.treeRoot.graphicID, 1);
         this.cmd("Step");
+        this.isRestarting = true;
+
       }
+      this.isRestarting = false;
       this.insertNotFull(this.treeRoot, insertedValue);
     } else {
       this.insert(this.treeRoot, insertedValue);
     }
+
     if (!this.treeRoot.isLeaf) {
       this.resizeTree();
     }
   }
 
-  this.cmd("SetText", this.messageID, "");
+  this.cmd("SetMessage", "");
 
   return this.commands;
 };
 
 BTree.prototype.insertNotFull = function (tree, insertValue) {
   this.cmd("SetHighlight", tree.graphicID, 1);
-  this.cmd("Step");
   if (tree.isLeaf) {
-    this.cmd(
-      "SetText",
-      this.messageID,
-      "Inserting " + insertValue + ".  Inserting into a leaf",
+    this.cmd("SetMessage",
+      "Found leaf. Inserting " + insertValue + ".",
     );
+    this.cmd("Step");
     tree.numKeys++;
     this.cmd("SetNumElements", tree.graphicID, tree.numKeys);
     var insertIndex = tree.numKeys - 1;
@@ -564,6 +584,10 @@ BTree.prototype.insertNotFull = function (tree, insertValue) {
     this.cmd("SetHighlight", tree.graphicID, 0);
     this.resizeTree();
   } else {
+    if(!this.isRestarting) {
+      this.cmd("SetMessage", "Not a leaf. Find appropriate child to insert into.");
+      this.cmd("Step");
+    }
     var findIndex = 0;
     while (findIndex < tree.numKeys && tree.keys[findIndex] < insertValue) {
       findIndex++;
@@ -574,6 +598,15 @@ BTree.prototype.insertNotFull = function (tree, insertValue) {
       tree.children[findIndex].graphicID,
       1,
     );
+
+    if(findIndex == 0)
+      this.cmd("SetMessage", `${insertValue} is below ${tree.keys[0]}`);
+    else if(findIndex == tree.numKeys)
+      this.cmd("SetMessage", `${insertValue} is above ${tree.keys[findIndex - 1]}`);
+    else
+      this.cmd("SetMessage", `${insertValue} is between ${tree.keys[findIndex - 1]} and ${tree.keys[findIndex]}`);
+
+
     this.cmd("Step");
     this.cmd(
       "SetEdgeHighlight",
@@ -581,13 +614,25 @@ BTree.prototype.insertNotFull = function (tree, insertValue) {
       tree.children[findIndex].graphicID,
       0,
     );
+
+
     this.cmd("SetHighlight", tree.graphicID, 0);
     if (tree.children[findIndex].numKeys == this.max_keys) {
+      this.cmd("SetMessage",
+        "Child Node now is full.  Split it ...",
+      );
       var newTree = this.split(tree.children[findIndex]);
+    
       this.resizeTree();
+      this.cmd("SetMessage",
+        "Restart insert at this node.",
+      );
+      this.cmd("SetHighlight", tree.graphicID, 1);
       this.cmd("Step");
+      this.isRestarting = true;
       this.insertNotFull(newTree, insertValue);
     } else {
+      this.isRestarting = false;
       this.insertNotFull(tree.children[findIndex], insertValue);
     }
   }
@@ -595,13 +640,11 @@ BTree.prototype.insertNotFull = function (tree, insertValue) {
 
 BTree.prototype.insert = function (tree, insertValue) {
   this.cmd("SetHighlight", tree.graphicID, 1);
-  this.cmd("Step");
   if (tree.isLeaf) {
-    this.cmd(
-      "SetText",
-      this.messageID,
-      "Inserting " + insertValue + ".  Inserting into a leaf",
+    this.cmd("SetMessage",
+      "Found a leaf. Inserting " + insertValue + ".",
     );
+    this.cmd("Step");
     tree.numKeys++;
     this.cmd("SetNumElements", tree.graphicID, tree.numKeys);
     var insertIndex = tree.numKeys - 1;
@@ -613,9 +656,11 @@ BTree.prototype.insert = function (tree, insertValue) {
     tree.keys[insertIndex] = insertValue;
     this.cmd("SetText", tree.graphicID, tree.keys[insertIndex], insertIndex);
     this.cmd("SetHighlight", tree.graphicID, 0);
-    this.resizeTree();
     this.insertRepair(tree);
+    this.resizeTree();
   } else {
+    this.cmd("SetMessage", "Not a leaf. Find appropriate child to insert into.");
+    this.cmd("Step");
     var findIndex = 0;
     while (findIndex < tree.numKeys && tree.keys[findIndex] < insertValue) {
       findIndex++;
@@ -626,6 +671,14 @@ BTree.prototype.insert = function (tree, insertValue) {
       tree.children[findIndex].graphicID,
       1,
     );
+
+    if(findIndex == 0)
+      this.cmd("SetMessage", `${insertValue} is below ${tree.keys[0]}`);
+    else if(findIndex == tree.numKeys)
+      this.cmd("SetMessage", `${insertValue} is above ${tree.keys[findIndex - 1]}`);
+    else
+      this.cmd("SetMessage", `${insertValue} is between ${tree.keys[findIndex - 1]} and ${tree.keys[findIndex]}`);
+
     this.cmd("Step");
     this.cmd(
       "SetEdgeHighlight",
@@ -651,17 +704,14 @@ BTree.prototype.insertRepair = function (tree) {
 };
 
 BTree.prototype.split = function (tree) {
-  this.cmd(
-    "SetText",
-    this.messageID,
-    "Node now contains too many keys.  Splittig ...",
-  );
+  this.cmd("SetMessage", "Node is too big - split node.");
   this.cmd("SetHighlight", tree.graphicID, 1);
   this.cmd("Step");
   this.cmd("SetHighlight", tree.graphicID, 0);
   var rightNode = new BTreeNode(this.nextIndex++, tree.x + 100, tree.y);
   rightNode.numKeys = tree.numKeys - this.split_index - 1;
   var risingNode = tree.keys[this.split_index];
+  this.cmd("SetMessage", `Push middle value (${risingNode}) to parent`);
 
   if (tree.parent != null) {
     var currentParent = tree.parent;
@@ -700,6 +750,8 @@ BTree.prototype.split = function (tree) {
       currentParent.keys[i] = currentParent.keys[i - 1];
       this.cmd("SetText", currentParent.graphicID, currentParent.keys[i], i);
     }
+    // this.cmd("SetText", currentParent.graphicID, currentParent.keys[parentIndex], "");
+    // this.cmd("Step");
     currentParent.numKeys++;
     currentParent.keys[parentIndex] = risingNode;
     this.cmd("SetText", currentParent.graphicID, "", parentIndex);
@@ -722,6 +774,10 @@ BTree.prototype.split = function (tree) {
 
     currentParent.children[parentIndex + 1] = rightNode;
     rightNode.parent = currentParent;
+  } else {
+    
+    this.cmd("SetMessage", "Node is root - Push middle value into new root node.");
+    this.cmd("Step");
   }
 
   this.cmd(
@@ -844,15 +900,12 @@ BTree.prototype.split = function (tree) {
 
 BTree.prototype.deleteElement = function (deletedValue) {
   this.commands = new Array();
-  this.cmd("SetText", 0, "Deleting " + deletedValue);
-  this.cmd("Step");
-  this.cmd("SetText", 0, "");
+  this.cmd("SetMessage", "Deleting " + deletedValue + ". Find the value.");
   this.highlightID = this.nextIndex++;
-  this.cmd("SetText", 0, "");
   if (this.preemptiveSplit) {
     this.doDeleteNotEmpty(this.treeRoot, deletedValue);
   } else {
-    this.doDelete(this.treeRoot, deletedValue);
+    this.doDeleteEmpty(this.treeRoot, deletedValue);
   }
   if (this.treeRoot.numKeys == 0) {
     this.cmd("Step");
@@ -865,11 +918,27 @@ BTree.prototype.deleteElement = function (deletedValue) {
 };
 
 BTree.prototype.doDeleteNotEmpty = function (tree, val) {
+  console.log(tree, val)
   if (tree != null) {
     this.cmd("SetHighlight", tree.graphicID, 1);
     this.cmd("Step");
     var i;
     for (i = 0; i < tree.numKeys && tree.keys[i] < val; i++);
+    var foundIndex = i;
+    var found = i < tree.numKeys && tree.keys[i] == val;
+
+    console.log(i, tree.numKeys, tree.keys[i], val, found);
+
+    if(!found) {
+      if(foundIndex == 0)
+        this.cmd("SetMessage", `${val} is below ${tree.keys[0]}`);
+      else if(foundIndex == tree.numKeys)
+        this.cmd("SetMessage", `${val} is above ${tree.keys[foundIndex - 1]}`);
+      else
+        this.cmd("SetMessage", `${val} is between ${tree.keys[foundIndex - 1]} and ${tree.keys[foundIndex]}`);
+      this.cmd("Step");
+    }
+
     if (i == tree.numKeys) {
       if (!tree.isLeaf) {
         this.cmd(
@@ -878,6 +947,7 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
           tree.children[tree.numKeys].graphicID,
           1,
         );
+        this.cmd("SetMessage", `Descend to child.`);
         this.cmd("Step");
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd(
@@ -907,6 +977,7 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
       }
     } else if (tree.keys[i] > val) {
       if (!tree.isLeaf) {
+        this.cmd("SetMessage", `Descend to child.`);
         this.cmd(
           "SetEdgeHighlight",
           tree.graphicID,
@@ -925,11 +996,28 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
         if (tree.children[i].numKeys > this.min_keys) {
           this.doDeleteNotEmpty(tree.children[i], val);
         } else {
+          this.cmd("SetHighlight", tree.children[i].graphicID, 1);
+          this.cmd("SetMessage", `Found ${val}. But deleting would make node too small.`);
+          this.cmd("Step");
+          // console.log("---", i, tree.children[i].numKeys, tree.children[i])
+          // for (var j = i; j < tree.children[i].numKeys - 1; j++) {
+          //   tree.children[i].keys[j] = tree.children[i].keys[j + 1];
+          //   this.cmd("SetText", tree.children[i].graphicID, tree.children[i].keys[j], j);
+          // }
+          // tree.children[i].numKeys--;
+          // this.cmd("SetNumElements", tree.children[i].graphicID,tree.children[i].numKeys);
+          // this.cmd("Step");
+
+          this.cmd("SetHighlight", tree.children[i].graphicID, 0);
           if (tree.children[i + 1].numKeys > this.min_keys) {
             nextNode = this.stealFromRight(tree.children[i], i);
+            this.isRestarting = true;
+            this.cmd("SetMessage", `Now it is safe to delete ${val}. Restart delete in same node.`);
             this.doDeleteNotEmpty(nextNode, val);
           } else {
             nextNode = this.mergeRight(tree.children[i]);
+            this.isRestarting = true;
+            this.cmd("SetMessage", `Now it is safe to delete ${val}. Restart delete in same node.`);
             this.doDeleteNotEmpty(nextNode, val);
           }
         }
@@ -937,10 +1025,11 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
         this.cmd("SetHighlight", tree.graphicID, 0);
       }
     } else {
-      this.cmd("SetTextColor", tree.graphicID, "FF0000", i);
+      this.cmd("SetMessage", `Found ${val}. Deleting.`);
+      this.cmd("SetTextColor", tree.graphicID, Colors.HIGHLIGHT, i);
       this.cmd("Step");
       if (tree.isLeaf) {
-        this.cmd("SetTextColor", tree.graphicID, FOREGROUND_COLOR, i);
+        this.cmd("SetTextColor", tree.graphicID, Colors.BASE, i);
         for (var j = i; j < tree.numKeys - 1; j++) {
           tree.keys[j] = tree.keys[j + 1];
           this.cmd("SetText", tree.graphicID, tree.keys[j], j);
@@ -950,11 +1039,9 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
         this.cmd("SetNumElements", tree.graphicID, tree.numKeys);
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.resizeTree();
-        this.cmd("SetText", this.messageID, "");
+        this.cmd("SetMessage", "");
       } else {
-        this.cmd(
-          "SetText",
-          this.messageID,
+        this.cmd("SetMessage",
           "Checking to see if tree to left of element to delete \nhas an extra key",
         );
         this.cmd(
@@ -974,9 +1061,7 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
         var maxNode = tree.children[i];
 
         if (tree.children[i].numKeys == this.min_keys) {
-          this.cmd(
-            "SetText",
-            this.messageID,
+          this.cmd("SetMessage",
             "Tree to left of element to delete does not have an extra key.  \nLooking to the right ...",
           );
           this.cmd(
@@ -995,9 +1080,7 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
           // Trees to left and right of node to delete don't have enough keys
           //   Do a merge, and then recursively delete the element
           if (tree.children[i + 1].numKeys == this.min_keys) {
-            this.cmd(
-              "SetText",
-              this.messageID,
+            this.cmd("SetMessage",
               "Neither subtree has extra nodes.  Mergeing around the key to delete, \nand recursively deleting ...",
             );
             this.cmd("Step");
@@ -1006,9 +1089,7 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
             this.doDeleteNotEmpty(nextNode, val);
             return;
           } else {
-            this.cmd(
-              "SetText",
-              this.messageID,
+            this.cmd("SetMessage",
               "Tree to right of element to delete does have an extra key. \nFinding the smallest key in that subtree ...",
             );
             this.cmd("Step");
@@ -1068,12 +1149,10 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
 
             this.cmd("SetNumElements", minNode.graphicID, minNode.numKeys);
             this.resizeTree();
-            this.cmd("SetText", this.messageID, "");
+            this.cmd("SetMessage", "");
           }
         } else {
-          this.cmd(
-            "SetText",
-            this.messageID,
+          this.cmd("SetMessage",
             "Tree to left of element to delete does have \nan extra key. Finding the largest key in that subtree ...",
           );
           this.cmd("Step");
@@ -1116,45 +1195,39 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
 
           this.cmd("SetNumElements", maxNode.graphicID, maxNode.numKeys);
           this.resizeTree();
-          this.cmd("SetText", this.messageID, "");
+          this.cmd("SetMessage", "");
         }
       }
     }
   }
 };
 
-BTree.prototype.doDelete = function (tree, val) {
+BTree.prototype.doDeleteEmpty = function (tree, val) {
   if (tree != null) {
     this.cmd("SetHighlight", tree.graphicID, 1);
     this.cmd("Step");
-    var i;
-    for (i = 0; i < tree.numKeys && tree.keys[i] < val; i++);
-    if (i == tree.numKeys) {
-      if (!tree.isLeaf) {
-        this.cmd(
-          "SetEdgeHighlight",
-          tree.graphicID,
-          tree.children[tree.numKeys].graphicID,
-          1,
-        );
-        this.cmd("Step");
-        this.cmd("SetHighlight", tree.graphicID, 0);
-        this.cmd(
-          "SetEdgeHighlight",
-          tree.graphicID,
-          tree.children[tree.numKeys].graphicID,
-          0,
-        );
-        this.doDelete(tree.children[tree.numKeys], val);
-      } else {
-        this.cmd("SetHighlight", tree.graphicID, 0);
+
+    let found = false;
+    var foundIndex;
+    for (foundIndex = 0; foundIndex < tree.numKeys && tree.keys[foundIndex] <= val; foundIndex++) {
+      if (tree.keys[foundIndex] == val) {
+        found = true;
+        break;
       }
-    } else if (tree.keys[i] > val) {
+    }
+    
+    if (!found) {
       if (!tree.isLeaf) {
+        if(foundIndex == 0)
+          this.cmd("SetMessage", `${val} is below ${tree.keys[0]}`);
+        else if(foundIndex == tree.numKeys)
+          this.cmd("SetMessage", `${val} is above ${tree.keys[foundIndex - 1]}`);
+        else
+          this.cmd("SetMessage", `${val} is between ${tree.keys[foundIndex - 1]} and ${tree.keys[foundIndex]}`);
         this.cmd(
           "SetEdgeHighlight",
           tree.graphicID,
-          tree.children[i].graphicID,
+          tree.children[foundIndex].graphicID,
           1,
         );
         this.cmd("Step");
@@ -1162,18 +1235,23 @@ BTree.prototype.doDelete = function (tree, val) {
         this.cmd(
           "SetEdgeHighlight",
           tree.graphicID,
-          tree.children[i].graphicID,
+          tree.children[foundIndex].graphicID,
           0,
         );
-        this.doDelete(tree.children[i], val);
+        this.cmd("SetMessage", `Look for ${val} in child.`);
+        this.doDeleteEmpty(tree.children[foundIndex], val);
       } else {
+        this.cmd("SetMessage", `Value not found.`);
         this.cmd("SetHighlight", tree.graphicID, 0);
       }
     } else {
-      this.cmd("SetTextColor", tree.graphicID, "#FF0000", i);
+      this.cmd("SetMessage", `Found ${val}. Deleting.`);
+      this.cmd("SetHighlight", tree.graphicID, foundIndex);
+      this.cmd("SetTextColor", tree.graphicID, Colors.HIGHLIGHT, foundIndex);
       this.cmd("Step");
+      var i = foundIndex;
       if (tree.isLeaf) {
-        this.cmd("SetTextColor", tree.graphicID, FOREGROUND_COLOR, i);
+        this.cmd("SetTextColor", tree.graphicID, Colors.BASE, foundIndex);
         for (var j = i; j < tree.numKeys - 1; j++) {
           tree.keys[j] = tree.keys[j + 1];
           this.cmd("SetText", tree.graphicID, tree.keys[j], j);
@@ -1182,9 +1260,11 @@ BTree.prototype.doDelete = function (tree, val) {
         this.cmd("SetText", tree.graphicID, "", tree.numKeys);
         this.cmd("SetNumElements", tree.graphicID, tree.numKeys);
         this.cmd("SetHighlight", tree.graphicID, 0);
+        //this.cmd("Step");
         this.repairAfterDelete(tree);
       } else {
         var maxNode = tree.children[i];
+        this.cmd("SetMessage", `Find max value in subtree.`);
         while (!maxNode.isLeaf) {
           this.cmd("SetHighlight", maxNode.graphicID, 1);
           this.cmd("Step");
@@ -1219,7 +1299,6 @@ BTree.prototype.doDelete = function (tree, val) {
 };
 
 BTree.prototype.mergeRight = function (tree) {
-  this.cmd("SetText", this.messageID, "Merging node");
 
   var parentNode = tree.parent;
   var parentIndex = 0;
@@ -1232,6 +1311,7 @@ BTree.prototype.mergeRight = function (tree) {
   this.cmd("SetHighlight", tree.graphicID, 1);
   this.cmd("SetHighlight", parentNode.graphicID, 1);
   this.cmd("SetHighlight", rightSib.graphicID, 1);
+  this.cmd("SetMessage", `Merge ${tree.keys[0]} with ${rightSib.keys[0]}.`);
 
   this.cmd("Step");
   this.cmd(
@@ -1322,8 +1402,12 @@ BTree.prototype.mergeRight = function (tree) {
     this.getLabelX(tree, fromParentIndex),
     tree.y,
   );
-
+  this.resizeTree();
+  this.resizeWidths();
   this.cmd("Step");
+  this.resizeTree();
+  this.resizeWidths();
+
   // resizeTree();
   this.cmd("Delete", this.moveLabel1ID);
   this.cmd(
@@ -1333,7 +1417,7 @@ BTree.prototype.mergeRight = function (tree) {
     fromParentIndex,
   );
 
-  this.cmd("SetText", this.messageID, "");
+  this.cmd("SetMessage", "");
   return tree;
 };
 
@@ -1343,7 +1427,7 @@ BTree.prototype.stealFromRight = function (tree, parentIndex) {
 
   this.cmd("SetNumElements", tree.graphicID, tree.numKeys + 1);
 
-  this.cmd("SetText", this.messageID, "Stealing from right sibling");
+  this.cmd("SetMessage", "Stealing from right sibling via parent.");
 
   var rightSib = parentNode.children[parentIndex + 1];
   tree.numKeys++;
@@ -1443,7 +1527,7 @@ BTree.prototype.stealFromRight = function (tree, parentIndex) {
   rightSib.numKeys--;
   this.cmd("SetNumElements", rightSib.graphicID, rightSib.numKeys);
   this.resizeTree();
-  this.cmd("SetText", this.messageID, "");
+  this.cmd("SetMessage", "");
   return tree;
 };
 
@@ -1452,10 +1536,8 @@ BTree.prototype.stealFromLeft = function (tree, parentIndex) {
   // Steal from left sibling
   tree.numKeys++;
   this.cmd("SetNumElements", tree.graphicID, tree.numKeys);
-  this.cmd(
-    "SetText",
-    this.messageID,
-    "Node has too few keys.  Stealing from left sibling.",
+  this.cmd("SetMessage",
+    "Node has too few keys.  Stealing from left sibling via parent.",
   );
 
   for (i = tree.numKeys - 1; i > 0; i--) {
@@ -1495,6 +1577,7 @@ BTree.prototype.stealFromLeft = function (tree, parentIndex) {
     parentNode.y,
   );
   this.cmd("Move", tmpLabel2, this.getLabelX(tree, 0), tree.y);
+  this.resizeTree();
 
   this.cmd("Step");
   this.cmd("Delete", tmpLabel1);
@@ -1549,12 +1632,14 @@ BTree.prototype.stealFromLeft = function (tree, parentIndex) {
   leftSib.numKeys--;
   this.cmd("SetNumElements", leftSib.graphicID, leftSib.numKeys);
   this.resizeTree();
-  this.cmd("SetText", this.messageID, "");
+  this.cmd("SetMessage", "");
   return tree;
 };
 
 BTree.prototype.repairAfterDelete = function (tree) {
   if (tree.numKeys < this.min_keys) {
+    this.cmd("SetMessage", "Resulting node is too small.");
+    this.cmd("Step");
     if (tree.parent == null) {
       if (tree.numKeys == 0) {
         this.cmd("Step");
@@ -1582,10 +1667,13 @@ BTree.prototype.repairAfterDelete = function (tree) {
         this.stealFromRight(tree, parentIndex);
       } else if (parentIndex == 0) {
         // Merge with right sibling
+        this.cmd("SetMessage", "Merging node with right sibling");
         var nextNode = this.mergeRight(tree);
         this.repairAfterDelete(nextNode.parent);
       } else {
         // Merge with left sibling
+        
+        this.cmd("SetMessage", "Merging node with left sibling");
         nextNode = this.mergeRight(parentNode.children[parentIndex - 1]);
         this.repairAfterDelete(nextNode.parent);
       }

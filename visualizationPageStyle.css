@@ -13,7 +13,7 @@ body {
   color: #000000;
 }
 
-.VisualizationMainPage #algoControlSection {
+#algoControlSection {
   background: var(--controlBackground);
   color: #000000;
 }
@@ -39,23 +39,30 @@ canvas {
   row-gap: 5px;
 }
 
-#mainContent {
+#generalAnimationControls > h1 {
+  font-size: 1rem;
+  margin: 0;
+}
+ 
+#animationSurround {
   display: flex;
   flex-direction: column;
   height: 100vh;
 }
 
 
-#mainContent > svg {
+#animationSurround > svg {
   flex: 1;
+  min-height: 150px;
 }
 
-#mainContent > canvas {
+#animationSurround > canvas {
   flex: 0;
 }
 
 #algoControlSection {
   font-size: 0.8rem;
+  order: 1;
 }
 
 #AlgorithmSpecificControls {
@@ -70,12 +77,18 @@ canvas {
 
 #AlgorithmSpecificControls > * {
   flex: 1;
+  justify-content: center;
 }
 
 #AlgorithmSpecificControls hr {
   min-width: 90%;
 }
 
+svg {
+  cursor:move;
+  max-width: 800px;
+  min-height:200px;
+}
 
 #algoControlSection {
   container-name: sidebar;
@@ -90,16 +103,14 @@ canvas {
     resize: horizontal;
     width: 200px;
     scrollbar-width: thin;
+    order: 0;
   }
-  #mainContent {
+  #animationSurround {
     flex-direction: row;
   }
+  
 }
 
-svg {
-  max-width: 800px;
-  cursor:move;
-}
 
 svg circle {
   shape-rendering: geometricPrecision;
@@ -134,8 +145,6 @@ svg text {
 .stepButtons * {
   flex: 1;
 }
-
-
 
 @container sidebar (width < 200px) {
   #algoControlSection .controlGroup {

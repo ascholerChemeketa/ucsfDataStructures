@@ -91,6 +91,10 @@ AnimatedLinkedList.prototype.init = function (
   this.currentHeightDif = 6;
   this.maxHeightDiff = 5;
   this.minHeightDiff = 3;
+  
+  this.svgRect = null;
+  this.svgLinkBox = null;
+  this.svgLabels = [];
 
   for (var i = 0; i < this.numLabels; i++) {
     this.labels[i] = "";
@@ -190,6 +194,8 @@ AnimatedLinkedList.prototype.getTailPointerAttachPos = function (
   fromY,
   anchor,
 ) {
+  //return [this.centerX(), this.centerY()]
+  
   if (this.vertical && this.linkPositionEnd) {
     return [this.x, this.y + this.h / 2.0];
   } else if (this.vertical && !this.linkPositionEnd) {
@@ -202,7 +208,11 @@ AnimatedLinkedList.prototype.getTailPointerAttachPos = function (
   }
 };
 
-AnimatedLinkedList.prototype.getHeadPointerAttachPos = function (fromX, fromY) {
+AnimatedLinkedList.prototype.getHeadPointerAttachPos = function (fromX, fromY, anchorIndex) {
+  if(anchorIndex === 1) {
+    return [this.centerX(), this.top()]
+  }
+  //return [this.centerX(), this.centerY()]
   return this.getClosestCardinalPoint(fromX, fromY);
 };
 
@@ -230,6 +240,56 @@ AnimatedLinkedList.prototype.draw = function (context) {
 
   startX = this.left();
   startY = this.top();
+  
+
+  if (!this.svgRect) {
+    var svgns = "http://www.w3.org/2000/svg";
+    var rect = document.createElementNS(svgns, "rect");
+    rect.setAttributeNS(
+      null,
+      "style",
+      'fill: var(--svgFillColor); stroke: var(--svgColor);',
+    );
+    context.svg.getElementById("nodes").appendChild(rect);
+    this.svgRect = rect;
+    this.svgRect.setAttributeNS(null, "width", this.w);
+    this.svgRect.setAttributeNS(null, "height", this.h);
+    
+    var rect2 = document.createElementNS(svgns, "rect");
+    rect2.setAttributeNS(
+      null,
+      "style",
+      'fill: var(--svgFillColor); stroke: var(--svgColor);',
+    );
+    context.svg.getElementById("nodes").appendChild(rect2);
+    this.svgLinkBox = rect2;
+    if(this.vertical) {
+      this.svgLinkBox.setAttributeNS(null, "width", this.w);
+      this.svgLinkBox.setAttributeNS(null, "height", this.h * this.linkPercent);
+    } else {
+      this.svgLinkBox.setAttributeNS(null, "width", this.w * this.linkPercent);
+      this.svgLinkBox.setAttributeNS(null, "height", this.h);
+    }
+    
+    for (i = 0; i < this.numLabels; i++) {
+      var text = document.createElementNS(svgns, "text");
+      text.setAttributeNS(null, "dominant-baseline", "middle");
+      text.setAttributeNS(null, "text-anchor", "middle");
+      text.setAttributeNS(
+        null,
+        "style",
+        "fill: var(--svgColor); stroke: none; stroke-width: 1px;",
+      );
+      this.svgLabels.push(text);
+      this.svgRect.after(text);
+
+      text.addEventListener("click", () => {
+        let input = document.getElementById("inputField");
+        if(input)
+          input.value = text.textContent;
+      });
+    }
+  }
 
   if (this.highlighted) {
     context.strokeStyle = "#ff0000";
@@ -253,7 +313,21 @@ AnimatedLinkedList.prototype.draw = function (context) {
     context.closePath();
     context.stroke();
     context.fill();
+      this.svgRect.setAttributeNS(
+      null,
+      "style",
+      'fill: var(--svgFillColor); stroke: var(--svgColor--highlight); stroke-width: 3px;',
+    );
+  } else {
+    this.svgRect.setAttributeNS(
+      null,
+      "style",
+      'fill: var(--svgFillColor); stroke: var(--svgColor); stroke-width: 1px;',
+    );
   }
+  this.svgRect.setAttributeNS(null, "x", startX);
+  this.svgRect.setAttributeNS(null, "y", startY);
+
   context.strokeStyle = this.foregroundColor;
   context.fillStyle = this.backgroundColor;
 
@@ -330,6 +404,11 @@ AnimatedLinkedList.prototype.draw = function (context) {
     }
     context.closePath();
     context.stroke();
+
+    
+    this.svgLinkBox.setAttributeNS(null, "x", startX);
+    this.svgLinkBox.setAttributeNS(null, "y", startY);
+  
   } // (!vertical && !linkPositionEnd)
   else {
     startX = this.left() + this.w * this.linkPercent;
@@ -355,6 +434,10 @@ AnimatedLinkedList.prototype.draw = function (context) {
   for (i = 0; i < this.numLabels; i++) {
     context.fillStyle = this.labelColors[i];
     context.fillText(this.labels[i], this.labelPosX[i], this.labelPosY[i]);
+    
+    this.svgLabels[i].textContent = this.labels[i];
+    this.svgLabels[i].setAttributeNS(null, "x", this.labelPosX[i]);
+    this.svgLabels[i].setAttributeNS(null, "y", this.labelPosY[i]);
   }
 };
 
@@ -373,6 +456,20 @@ AnimatedLinkedList.prototype.getText = function (index) {
 AnimatedLinkedList.prototype.setText = function (newText, textIndex) {
   this.labels[textIndex] = newText;
   this.resetTextPosition();
+};
+
+AnimatedLinkedList.prototype.remove = function () {
+  if (this.svgRect) {
+    this.svgRect.remove();
+    this.svgRect = null;
+    
+    this.svgLinkBox.remove();
+    this.svgLinkBox = null;
+    for (let i = 0; i < this.numLabels; i++) {
+      this.svgLabels[i].remove();
+      this.svgLabels[i] = null;
+    }
+  }
 };
 
 AnimatedLinkedList.prototype.createUndoDelete = function () {

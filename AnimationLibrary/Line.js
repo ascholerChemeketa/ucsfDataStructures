@@ -80,6 +80,7 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
 
   this.setHighlight = function (highlightVal) {
     this.highlighted = highlightVal;
+    if(!this.svgLine) return;
     if (this.highlighted) {
       this.svgLine.setAttributeNS(
         null,
@@ -140,19 +141,14 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
     context.strokeStyle = color;
     context.fillStyle = color;
     context.lineWidth = pensize;
-    var fromPos = this.Node1.getTailPointerAttachPos(
-      this.Node2.x,
-      this.Node2.y,
-      this.anchorPoint,
-    );
-    var toPos = this.Node2.getHeadPointerAttachPos(this.Node1.x, this.Node1.y);
 
     var fromPos = this.Node1.getTailPointerAttachPos(
       this.Node2.x,
       this.Node2.y,
       this.anchorPoint,
     );
-    var toPos = this.Node2.getHeadPointerAttachPos(this.Node1.x, this.Node1.y);
+    var toPos = this.Node2.getHeadPointerAttachPos(this.Node1.x, this.Node1.y, 
+      this.anchorPoint);
 
     var deltaX = toPos[0] - fromPos[0];
     var deltaY = toPos[1] - fromPos[1];
@@ -167,10 +163,13 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
     context.quadraticCurveTo(controlX, controlY, toPos[0], toPos[1]);
     context.stroke();
 
-    this.svgLine.setAttributeNS(null, 'x1', fromPos[0]);
-    this.svgLine.setAttributeNS(null, 'y1', fromPos[1]);
-    this.svgLine.setAttributeNS(null, 'x2', toPos[0]);
-    this.svgLine.setAttributeNS(null, 'y2', toPos[1]);
+    let pathText = `M ${fromPos[0]} ${fromPos[1]} Q ${controlX} ${controlY} ${toPos[0]} ${toPos[1]}`
+
+    this.svgLine.setAttributeNS(null, 'd', pathText);
+    // this.svgLine.setAttributeNS(null, 'x1', fromPos[0]);
+    // this.svgLine.setAttributeNS(null, 'y1', fromPos[1]);
+    // this.svgLine.setAttributeNS(null, 'x2', toPos[0]);
+    // this.svgLine.setAttributeNS(null, 'y2', toPos[1]);
    // this.svgLine.setAttributeNS(null, 'marker-end', "url(#SVGTriangleMarker)");
     
 
@@ -230,7 +229,7 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
 
     if(!this.svgLine) {
       var svgns = "http://www.w3.org/2000/svg";
-      var line = document.createElementNS(svgns, 'line');
+      var line = document.createElementNS(svgns, 'path');
       line.setAttributeNS(null, 'style', 'fill: none; stroke: var(--svgColor); stroke-width: 1px;' );
       if(this.directed) 
         line.setAttributeNS(null, 'marker-end', "url(#SVGTriangleMarker)");

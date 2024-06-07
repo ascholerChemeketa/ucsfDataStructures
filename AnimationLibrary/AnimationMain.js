@@ -33,7 +33,8 @@ import { EventListener } from "./CustomEvents.js";
 import { ObjectManager } from "./ObjectManager.js";
 import { UndoConnect } from "./Line.js";
 import { controlKey } from "../AlgorithmLibrary/Algorithm.js";
-import * as Undo from "./UndoFunctions.js";
+import * as Undo from "./UndoFunctions.js"; 
+
 
 // Utility funciton to read a cookie
 function getCookie(cookieName) {
@@ -233,8 +234,29 @@ function speedChange(speed) {
   setCookie("VisualizationSpeed", String(speed));
 }
 
-function addGeneralControls(objectManager, canvas) {
-  var controlBar = document.getElementById("generalAnimationControls");
+function makeDiv(id, classes, parent) {
+  var element = document.createElement("div");
+  element.setAttribute("id", id);
+  if(classes != "")
+    element.setAttribute("class", classes);
+  parent.appendChild(element);
+  return element;
+}
+
+function addGeneralControls(objectManager, targetElement, title) {
+  if (targetElement == null) {
+    targetElement = document.body;
+  }
+
+  let animationDiv = makeDiv("animationSurround", "", targetElement);
+  let algoControlSection = makeDiv("algoControlSection", "", animationDiv);
+
+  var controlBar = makeDiv("generalAnimationControls", "", algoControlSection);
+  makeDiv("AlgorithmSpecificControls", "", algoControlSection);
+
+  let titleEl = document.createElement("h1");
+  titleEl.innerText = title;
+  controlBar.appendChild(titleEl);
 
   var stepButtons = document.createElement("div");
   stepButtons.classList.add("stepButtons");
@@ -278,9 +300,10 @@ function addGeneralControls(objectManager, canvas) {
   zoomSelect.setAttribute("id", "zoomLevel");
   zoomSelect.setAttribute("name", "zoomLevel");
   zoomSelect.innerHTML = `
+    <option value="4" ${zoom == 2 ? "selected" : ""}>0.25x</option>
     <option value="2" ${zoom == 2 ? "selected" : ""}>0.5x</option>
     <option value="1" ${zoom == 1 ? "selected" : ""}>1x</option>
-    <option value="0.75" ${zoom == 0.75 ? "selected" : ""}>1.33x</option>
+    <option value="0.75" ${zoom == 0.75 ? "selected" : ""}>1.5x</option>
     <option value="0.5" ${zoom == 0.5 ? "selected" : ""}>2x</option>`;
 
   zoomSelect.addEventListener("change", (e) => {
@@ -296,12 +319,50 @@ function addGeneralControls(objectManager, canvas) {
   controlBar.appendChild(msgBox);
 }
 
-export function initCanvas(canvas) {
+export function initAnimationManager(opts) {
+  const canvas = document.createElement("canvas");
+  let targetElement = opts.target || null;
+  let centered = opts.centered || false;
+  let am = initCanvas(canvas, targetElement, opts.title, centered);
+
+  if(opts.zoom) {
+    am.setZoom(opts.zoom);
+  }
+
+  let desiredHeight = opts.height || 350;
+
+  if(opts.singleMode) {
+    am.setSingleMode(true);
+    desiredHeight = opts.heightSingleMode;
+  }
+
+  if(innerWidth < 450) {
+    if(opts.singleMode)
+      desiredHeight = opts.heightMobileSingle || opts.heightMobile || 400;
+    else
+      desiredHeight = opts.heightMobile || 400;
+  }
+
+  am.requestHeight(desiredHeight);
+
+  return am;
+}
+
+export function initCanvas(canvas, targetElement=null, title="", centered = false) {
+  //Dynamically add css file
+  let link = document.createElement('link')
+  link.rel = 'stylesheet'
+  let curURL = import.meta.url;
+  link.href = curURL.slice(0, curURL.lastIndexOf('/')) + '/entry.css';
+  document.head.appendChild(link)
+
   canvas.style.width = canvas.width + "px";
   canvas.style.height = canvas.height + "px";
-  objectManager = new ObjectManager(canvas);
+
+  objectManager = new ObjectManager(canvas, centered);
+  
   animationManager = new AnimationManager(objectManager, canvas);
-  addGeneralControls(objectManager, canvas);
+  addGeneralControls(objectManager, targetElement, title);
 
   var controlBar = document.getElementById("algoControlSection");
   controlBar.after(objectManager.svg);
@@ -401,6 +462,7 @@ function AnimationManager(objectManager, canvas) {
   };
   
   this.requestHeight = function (newHeight) {
+    if(!window.frameElement) return;
     const data = { subject: 'lti.frameResize', message_id: window.frameElement.id, height: newHeight }
     window.parent.postMessage(data, '*')
   }
@@ -435,6 +497,7 @@ function AnimationManager(objectManager, canvas) {
     } else if (clr.substring(0, 2) == "0x") {
       return "#" + clr.substring(2);
     }
+    return clr;
   };
 
   this.changeSize = function () {
@@ -496,13 +559,13 @@ function AnimationManager(objectManager, canvas) {
       } else if (nextCommand[0].toUpperCase() == "CONNECT") {
         if (nextCommand.length > 7) {
           this.animatedObjects.connectEdge(
-            parseInt(nextCommand[1]),
-            parseInt(nextCommand[2]),
-            this.parseColor(nextCommand[3]),
-            parseFloat(nextCommand[4]),
-            this.parseBool(nextCommand[5]),
-            nextCommand[6],
-            parseInt(nextCommand[7]),
+            parseInt(nextCommand[1]),  //from
+            parseInt(nextCommand[2]),  //to
+            this.parseColor(nextCommand[3]),  //color
+            parseFloat(nextCommand[4]),       //curve
+            this.parseBool(nextCommand[5]),   //directed
+            nextCommand[6],                   //label
+            parseInt(nextCommand[7]),         //connectionPoint
           );
         } else if (nextCommand.length > 6) {
           this.animatedObjects.connectEdge(
@@ -821,14 +884,14 @@ function AnimationManager(objectManager, canvas) {
       } else if (nextCommand[0].toUpperCase() == "CREATELINKEDLIST") {
         if (nextCommand.length == 11) {
           this.animatedObjects.addLinkedListObject(
-            parseInt(nextCommand[1]),
-            nextCommand[2],
-            parseInt(nextCommand[3]),
-            parseInt(nextCommand[4]),
-            parseFloat(nextCommand[7]),
-            this.parseBool(nextCommand[8]),
-            this.parseBool(nextCommand[9]),
-            parseInt(nextCommand[10]),
+            parseInt(nextCommand[1]),  //id
+            nextCommand[2],   //node label
+            parseInt(nextCommand[3]),  //w
+            parseInt(nextCommand[4]),   //h
+            parseFloat(nextCommand[7]),  //link percent
+            this.parseBool(nextCommand[8]), //vertical orientation
+            this.parseBool(nextCommand[9]),  //linkat end
+            parseInt(nextCommand[10]),  //num labels
             "#FFFFFF",
             "#000000",
           );
@@ -1171,14 +1234,13 @@ function AnimationManager(objectManager, canvas) {
       undoBlock[i].undoInitialStep(this.animatedObjects);
     }
     this.doingUndo = false;
-    
-    //In single mode, never actually finish undoing
-    if(this.singleMode) {
-      return this.undoAnimationStepIndices.length !== 0;
-    }
 
     // If we are at the final end of the animation ...
     if (this.undoAnimationStepIndices.length == 0) {
+      //In single mode, never actually finish undoing
+      if(this.singleMode) {
+        return false;
+      }
       this.awaitingStep = false;
       this.currentlyAnimating = false;
       this.undoAnimationStepIndices = this.undoAnimationStepIndicesStack.pop();

@@ -4,11 +4,12 @@
   "description": "https://www.cs.usfca.edu/~galles/visualization/source.html",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "nodemon ./esbuildconfig.js"
+    "build": "nodemon -e css,js ./esbuildconfig.js"
   },
   "dependencies": {
     "esbuild": "^0.20.1",
     "glob": "^10.3.10",
+    "lebab": "^3.2.4",
     "prettier": "^3.2.5"
   },
   "nodemonConfig": {

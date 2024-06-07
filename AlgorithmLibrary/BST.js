@@ -25,35 +25,40 @@
 // or implied, of the University of San Francisco
 
 // Constants.
-import { initCanvas, doPlayPause } from "../AnimationLibrary/AnimationMain.js";
+import { initAnimationManager, doPlayPause } from "../AnimationLibrary/AnimationMain.js";
 import {
   Algorithm,
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
 
-BST.LINK_COLOR = "#007700";
-BST.HIGHLIGHT_CIRCLE_COLOR = "#007700";
-BST.FOREGROUND_COLOR = "#007700";
-BST.BACKGROUND_COLOR = "#EEFFEE";
-BST.PRINT_COLOR = BST.FOREGROUND_COLOR;
+// BST.LINK_COLOR = "#007700";
+// BST.HIGHLIGHT_CIRCLE_COLOR = "#007700";
+// BST.FOREGROUND_COLOR = "#007700";
+// BST.BACKGROUND_COLOR = "#EEFFEE";
+// BST.PRINT_COLOR = BST.FOREGROUND_COLOR;
 
 BST.WIDTH_DELTA = 50;
 BST.HEIGHT_DELTA = 50;
-BST.STARTING_Y = 30;
+BST.STARTING_Y = 40;
 
 BST.FIRST_PRINT_POS_X = 50;
 BST.PRINT_VERTICAL_GAP = 20;
 BST.PRINT_HORIZONTAL_GAP = 50;
 
-export function BST(opts) { 
-  if(!opts) opts = {};
+export function BST(opts = {}) { 
+  if(!opts.title) opts.title = opts.title || "Binary Search Tree";
+  opts.centered = true;
 
-  let canvas = document.createElement("canvas");
-  this.addControls();
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
 
-  let am = initCanvas(canvas);
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
+
+  this.addControls();
 
   if(opts.initialData) {
     for (let d of opts.initialData) {
@@ -62,17 +67,6 @@ export function BST(opts) {
     }
     am.clearHistory();
     am.animatedObjects.draw();
-  }
-
-  if(opts.singleMode) {
-    am.setSingleMode(true);
-    am.requestHeight(250);
-  } else {
-    am.requestHeight(350);
-  }
-
-  if(opts.zoom) {
-    am.setZoom(opts.zoom);
   }
 }
 
@@ -90,9 +84,14 @@ BST.prototype.init = function (am, w, h) {
   fn.call(this, am);
   this.nextIndex = 0;
   this.commands = [];
-  //this.cmd("CreateLabel", 0, "", 20, 10, 0);
-  this.cmd("CreateRectangle", 0, "root", 50, 20, this.startingX - 100, BST.STARTING_Y - 20);
-  this.nextIndex = 1;
+  this.rootIndex = 0;
+
+  this.valuesList = [];
+
+  this.cmd("CreateRectangle", this.nextIndex++, "", 50, 25, this.startingX - 70, BST.STARTING_Y - 10);
+  this.cmd("SetNull", this.rootIndex, 1);
+	this.cmd("CreateLabel", this.nextIndex++, "root", this.startingX - 120, BST.STARTING_Y - 10);
+
   this.animationManager.StartNewAnimation(this.commands);
   this.animationManager.skipForward();
   this.animationManager.clearHistory();
@@ -114,6 +113,11 @@ BST.prototype.init = function (am, w, h) {
 BST.prototype.addControls = function () {
   addSeparatorToAlgorithmBar();
   this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+  this.inputField.onkeydown = this.returnSubmit(  
+    this.inputField,
+    this.insertCallback.bind(this),
+    6,
+  );
 
   this.insertButton = addControlToAlgorithmBar("Button", "Insert");
   this.insertButton.onclick = this.insertCallback.bind(this);
@@ -123,6 +127,9 @@ BST.prototype.addControls = function () {
 
   this.findButton = addControlToAlgorithmBar("Button", "Find");
   this.findButton.onclick = this.findCallback.bind(this);
+
+  this.clearButton = addControlToAlgorithmBar("Button", "Clear");
+  this.clearButton.onclick = this.clearCallback.bind(this);
 
   addSeparatorToAlgorithmBar();
 
@@ -137,7 +144,7 @@ BST.prototype.addControls = function () {
 };
 
 BST.prototype.reset = function () {
-  this.nextIndex = 1;
+  this.nextIndex = 2;
   this.treeRoot = null;
 };
 
@@ -148,6 +155,7 @@ BST.prototype.insertCallback = function (event) {
   if (insertedValue != "") {
     // set text value
     this.inputField.value = "";
+    this.valuesList.push(insertedValue);
     this.implementAction(this.insertElement.bind(this), insertedValue);
   }
 };
@@ -156,6 +164,7 @@ BST.prototype.deleteCallback = function (event) {
   var deletedValue = this.inputField.value;
   if (deletedValue != "") {
     deletedValue = this.normalizeNumber(deletedValue, 4);
+    this.valuesList.splice(this.valuesList.indexOf(deletedValue), 1);
     this.inputField.value = "";
     this.implementAction(this.deleteElement.bind(this), deletedValue);
   }
@@ -166,6 +175,34 @@ BST.prototype.print = function (order) {
     order = "In";
   }
   this.implementAction(this.printTree.bind(this, order));
+};
+
+BST.prototype.clearCallback = function (event) {
+  this.implementAction(this.clearData.bind(this), "");
+};
+
+BST.prototype.clearData = function () {
+  if (this.treeRoot == null)
+  return;
+  this.commands = new Array();
+  
+  function clearTree(tree, handler) {
+    if (tree != null) {
+      if (tree.left != null) {
+        clearTree(tree.left, handler);
+      }
+      if (tree.right != null) {
+        clearTree(tree.right, handler);
+      }
+    }
+    handler.cmd("Delete", tree.graphicID);
+  }
+
+  clearTree(this.treeRoot, this);
+  this.treeRoot = null;
+  this.cmd("SetNull", this.rootIndex, 1);
+  this.cmd("SetMessage", "");
+  return this.commands;
 };
 
 BST.prototype.printTree = function (order) {
@@ -353,6 +390,8 @@ BST.prototype.insertElement = function (insertedValue) {
       `Root is null. Inserting ${insertedValue} as the root`,
     );
     this.cmd("Step");
+    
+    this.cmd("SetNull", this.rootIndex, 0);
 
     this.cmd("Connect", 0, this.nextIndex, BST.LINK_COLOR);
     //this.cmd("SetHighlight", this.nextIndex, 1);
@@ -490,6 +529,8 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           tree.parent.right = null;
         } else {
           this.treeRoot = null;
+          this.cmd("SetNull", this.rootIndex, 1);
+          this.cmd("Disconnect", 0, tree.graphicID);
         }
         this.resizeTree();
         this.cmd("Step");
@@ -746,10 +787,3 @@ BST.prototype.enableUI = function (event) {
     i.disabled = false;
   }
 };
-
-var currentAlg;
-
-function init() {
-  var animManag = initCanvas(canvas);
-  currentAlg = new BST(animManag, canvas.width, canvas.height);
-}

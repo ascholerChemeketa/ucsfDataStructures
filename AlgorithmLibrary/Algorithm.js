@@ -86,6 +86,29 @@ function addRadioButtonGroupToAlgorithmBar(buttonNames, groupName) {
   return buttonList;
 }
 
+function addSelectToAlgorithmBar(label, name, id) {
+  var element = document.createElement("select");
+  element.setAttribute("value", name);
+  element.id = id;
+  
+  let parent = document.getElementById("AlgorithmSpecificControls");
+  if(label) {
+    var labelEl = document.createElement("label");
+    labelEl.innerHTML = label;
+    labelEl.id = id + "Label";
+    labelEl.setAttribute("for", id);
+
+    let div = document.createElement("div");
+    div.className = "controlGroup";
+    parent.appendChild(div);
+    parent = div;
+    parent.appendChild(labelEl);
+  }
+
+  parent.appendChild(element);
+  return element;
+}
+
 function addControlToAlgorithmBar(type, name, id, label) {
   var element = document.createElement("input");
   element.setAttribute("type", type);
@@ -359,4 +382,5 @@ export {
   addCheckboxToAlgorithmBar,
   addSeparatorToAlgorithmBar,
   addRadioButtonGroupToAlgorithmBar,
+  addSelectToAlgorithmBar,
 };

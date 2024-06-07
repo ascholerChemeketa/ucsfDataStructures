@@ -24,45 +24,61 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { initAnimationManager } from "../AnimationLibrary/AnimationMain.js";
 import {
   Algorithm,
   addControlToAlgorithmBar,
+  addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
 
 var LINKED_LIST_START_X = 100;
-var LINKED_LIST_START_Y = 200;
-var LINKED_LIST_ELEM_WIDTH = 70;
-var LINKED_LIST_ELEM_HEIGHT = 30;
+var LINKED_LIST_START_Y = 150;
+var LINKED_LIST_ELEM_WIDTH = 50;
+var LINKED_LIST_ELEM_HEIGHT = 25;
 
 var LINKED_LIST_INSERT_X = 250;
 var LINKED_LIST_INSERT_Y = 50;
 
-var LINKED_LIST_ELEMS_PER_LINE = 8;
-var LINKED_LIST_ELEM_SPACING = 100;
+var LINKED_LIST_ELEMS_PER_LINE = 10;
+var LINKED_LIST_ELEM_SPACING = 70;
 var LINKED_LIST_LINE_SPACING = 100;
 
-var TOP_POS_X = 180;
-var TOP_POS_Y = 100;
-var TOP_LABEL_X = 130;
-var TOP_LABEL_Y = 100;
+var TOP_POS_X = 70;
+var TOP_POS_Y = 50;
+var TOP_LABEL_X = TOP_POS_X;
+var TOP_LABEL_Y = 25;
 
-var TOP_ELEM_WIDTH = 30;
-var TOP_ELEM_HEIGHT = 30;
+var TOP_ELEM_WIDTH = 40;
+var TOP_ELEM_HEIGHT = 25;
 
-var TAIL_POS_X = 180;
-var TAIL_LABEL_X = 130;
+var TAIL_POS_X = TOP_POS_X + TOP_ELEM_WIDTH * 2;
+var TAIL_LABEL_X = TAIL_POS_X;
 
-var PUSH_LABEL_X = 50;
-var PUSH_LABEL_Y = 30;
-var PUSH_ELEMENT_X = 120;
-var PUSH_ELEMENT_Y = 30;
+var PUSH_LABEL_X = TAIL_POS_X + TOP_ELEM_WIDTH * 3;
+var PUSH_LABEL_Y = 25;
+var PUSH_ELEMENT_X = PUSH_LABEL_X;
+var PUSH_ELEMENT_Y = 50;
 
 var SIZE = 32;
 
-export function QueueLL(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+export function QueueLL(opts = {}) {
+  if(!opts.title) opts.title = opts.title || "Queue (Linked List)";
+  opts.heightSingleMode = 250;
+  opts.height = 300;
+  opts.heightMobile = 450;
+
+  let am = initAnimationManager(opts);
+  this.init(am, 800, 400);
+
+  if(opts.initialData) {
+    for (let d of opts.initialData) {
+      this.implementAction(this.enqueue.bind(this), d);
+      am.skipForward();
+    }
+    am.clearHistory();
+    am.animatedObjects.draw();
+  }
+  
 }
 
 QueueLL.prototype = new Algorithm();
@@ -74,23 +90,36 @@ QueueLL.prototype.init = function (am, w, h) {
   this.addControls();
   this.nextIndex = 0;
   this.commands = [];
-  this.tail_pos_y = h - LINKED_LIST_ELEM_HEIGHT;
+  this.tail_pos_y = h/2 - LINKED_LIST_ELEM_HEIGHT;
   this.tail_label_y = this.tail_pos_y;
   this.setup();
   this.initialIndex = this.nextIndex;
+  
+  this.doEnqueue = function (val) {
+    this.implementAction( this.enqueue.bind(this), val);
+  };
+  this.doDequeue = function () {
+    this.implementAction( this.dequeue.bind(this) );
+  };
+
+  this.createdNodeCount = 0;
 };
 
 QueueLL.prototype.addControls = function () {
+  addSeparatorToAlgorithmBar();
   this.controls = [];
-  this.enqueueField = addControlToAlgorithmBar("Text", "");
-  this.enqueueField.onkeydown = this.returnSubmit(
-    this.enqueueField,
+  
+  this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+  this.controls.push(this.inputField);
+
+  this.inputField.onkeydown = this.returnSubmit(  
+    this.inputField,
     this.enqueueCallback.bind(this),
     6,
   );
+
   this.enqueueButton = addControlToAlgorithmBar("Button", "Enqueue");
   this.enqueueButton.onclick = this.enqueueCallback.bind(this);
-  this.controls.push(this.enqueueField);
   this.controls.push(this.enqueueButton);
 
   this.dequeueButton = addControlToAlgorithmBar("Button", "Dequeue");
@@ -145,7 +174,7 @@ QueueLL.prototype.setup = function () {
     this.tailLabelID,
     "Tail",
     TAIL_LABEL_X,
-    this.tail_label_y,
+    TOP_LABEL_Y,
   );
   this.cmd(
     "CreateRectangle",
@@ -154,7 +183,7 @@ QueueLL.prototype.setup = function () {
     TOP_ELEM_WIDTH,
     TOP_ELEM_HEIGHT,
     TAIL_POS_X,
-    this.tail_pos_y,
+    TOP_POS_Y,
   );
   this.cmd("SetNull", this.tailID, 1);
 
@@ -185,9 +214,9 @@ QueueLL.prototype.reset = function () {
 };
 
 QueueLL.prototype.enqueueCallback = function (event) {
-  if (this.top < SIZE && this.enqueueField.value != "") {
-    var pushVal = this.enqueueField.value;
-    this.enqueueField.value = "";
+  if (this.top < SIZE && this.inputField.value != "") {
+    var pushVal = this.inputField.value;
+    this.inputField.value = "";
     this.implementAction(this.enqueue.bind(this), pushVal);
   }
 };
@@ -208,6 +237,8 @@ QueueLL.prototype.enqueue = function (elemToPush) {
   this.arrayData[this.top] = elemToPush;
 
   this.cmd("SetText", this.leftoverLabelID, "");
+  
+  this.createdNodeCount++;
 
   for (var i = this.top; i > 0; i--) {
     this.arrayData[i] = this.arrayData[i - 1];
@@ -216,63 +247,74 @@ QueueLL.prototype.enqueue = function (elemToPush) {
   this.arrayData[0] = elemToPush;
   this.linkedListElemID[0] = this.nextIndex++;
 
-  var labPushID = this.nextIndex++;
-  var labPushValID = this.nextIndex++;
-  this.cmd(
-    "CreateLinkedList",
-    this.linkedListElemID[0],
-    "",
-    LINKED_LIST_ELEM_WIDTH,
-    LINKED_LIST_ELEM_HEIGHT,
-    LINKED_LIST_INSERT_X,
-    LINKED_LIST_INSERT_Y,
-    0.25,
-    0,
-    1,
-    1,
-  );
+  //var labPushID = this.nextIndex++;
+  this.cmd("SetMessage", "Enqueuing Value: " + elemToPush);
+  // this.cmd(
+  //   "CreateLabel",
+  //   labPushID,
+  //   "Enqueuing Value: ",
+  //   PUSH_LABEL_X,
+  //   PUSH_LABEL_Y,
+  // );
+  // this.cmd(
+  //   "CreateLabel",
+  //   labPushValID,
+  //   elemToPush,
+  //   PUSH_ELEMENT_X,
+  //   PUSH_ELEMENT_Y,
+  // );
 
+  // this.cmd("Step");
+
+  // this.cmd("Move", labPushValID, LINKED_LIST_INSERT_X, LINKED_LIST_INSERT_Y);
+
+ this.cmd("Step");
+ //var labPushValID = this.nextIndex++;
+ this.cmd(
+   "CreateLinkedList",
+   this.linkedListElemID[0],
+   "",
+   LINKED_LIST_ELEM_WIDTH,
+   LINKED_LIST_ELEM_HEIGHT,
+   LINKED_LIST_START_X + LINKED_LIST_ELEM_SPACING * ((this.createdNodeCount - 1) % LINKED_LIST_ELEMS_PER_LINE),
+   LINKED_LIST_START_Y + (this.createdNodeCount - 1) % 2 * 15 + Math.floor((this.createdNodeCount - 1) / LINKED_LIST_ELEMS_PER_LINE) * LINKED_LIST_LINE_SPACING,
+   //LINKED_LIST_INSERT_X,
+   //LINKED_LIST_INSERT_Y,
+   0.25,
+   0,
+   1,
+   1,
+ );
+
+
+ this.cmd("SetMessage", "Make a node with value");
   this.cmd("SetNull", this.linkedListElemID[0], 1);
-  this.cmd(
-    "CreateLabel",
-    labPushID,
-    "Enqueuing Value: ",
-    PUSH_LABEL_X,
-    PUSH_LABEL_Y,
-  );
-  this.cmd(
-    "CreateLabel",
-    labPushValID,
-    elemToPush,
-    PUSH_ELEMENT_X,
-    PUSH_ELEMENT_Y,
-  );
-
-  this.cmd("Step");
-
-  this.cmd("Move", labPushValID, LINKED_LIST_INSERT_X, LINKED_LIST_INSERT_Y);
-
-  this.cmd("Step");
   this.cmd("SetText", this.linkedListElemID[0], elemToPush);
-  this.cmd("Delete", labPushValID);
+  this.cmd("Step");
+ // this.cmd("Delete", labPushValID);
+
 
   if (this.top == 0) {
     this.cmd("SetNull", this.headID, 0);
     this.cmd("SetNull", this.tailID, 0);
-    this.cmd("connect", this.headID, this.linkedListElemID[this.top]);
-    this.cmd("connect", this.tailID, this.linkedListElemID[this.top]);
+    this.cmd("connect", this.headID, this.linkedListElemID[this.top], "#000000", 0.1);
+    this.cmd("SetMessage", "Queue is empty, head and tail point to this node.");
   } else {
     this.cmd("SetNull", this.linkedListElemID[1], 0);
-    this.cmd("Connect", this.linkedListElemID[1], this.linkedListElemID[0]);
+    this.cmd("Connect", this.linkedListElemID[1], this.linkedListElemID[0], "#000000", 0.1);
+    this.cmd("SetMessage", "Set tail->next to point to new node.");
     this.cmd("Step");
     this.cmd("Disconnect", this.tailID, this.linkedListElemID[1]);
+    this.cmd("SetMessage", "Update tail pointer to new node.");
   }
-  this.cmd("Connect", this.tailID, this.linkedListElemID[0]);
+  this.cmd("connect", this.tailID, this.linkedListElemID[0], "#000000", -0.1, true, "", 1);
 
   this.cmd("Step");
   this.top = this.top + 1;
-  this.resetLinkedListPositions();
-  this.cmd("Delete", labPushID);
+  //this.resetLinkedListPositions();
+  // this.cmd("Delete", labPushID);
+  this.cmd("SetMessage", "");
+
   this.cmd("Step");
 
   return this.commands;
@@ -286,11 +328,14 @@ QueueLL.prototype.dequeue = function (ignored) {
 
   this.cmd("SetText", this.leftoverLabelID, "");
 
+  this.cmd("SetMessage", "Dequeuing first value");
+  this.cmd("Step");
+
   this.cmd(
     "CreateLabel",
     labPopID,
     "Dequeued Value: ",
-    PUSH_LABEL_X,
+    PUSH_LABEL_X + 20,
     PUSH_LABEL_Y,
   );
   this.cmd(
@@ -301,40 +346,51 @@ QueueLL.prototype.dequeue = function (ignored) {
     LINKED_LIST_START_Y,
   );
 
-  this.cmd("Move", labPopValID, PUSH_ELEMENT_X, PUSH_ELEMENT_Y);
+  this.cmd("Move", labPopValID, PUSH_ELEMENT_X + 20, PUSH_ELEMENT_Y);
   this.cmd("Step");
-  this.cmd("Disconnect", this.headID, this.linkedListElemID[this.top - 1]);
+  
 
   if (this.top == 1) {
+    this.cmd("SetMessage", "Head == tail, so that was last value.");
+    this.cmd("Step");
+    this.cmd("SetMessage", "Head and tail both become null.");
     this.cmd("SetNull", this.headID, 1);
     this.cmd("SetNull", this.tailID, 1);
+    this.cmd("Disconnect", this.headID, this.linkedListElemID[this.top - 1]);
     this.cmd("Disconnect", this.tailID, this.linkedListElemID[this.top - 1]);
   } else {
-    this.cmd("Connect", this.headID, this.linkedListElemID[this.top - 2]);
+    this.cmd("SetMessage", "Advance head.");
+    this.cmd("Disconnect", this.headID, this.linkedListElemID[this.top - 1]);
+    this.cmd("Connect", this.headID, this.linkedListElemID[this.top - 2], "#000000", 0.1);
   }
   this.cmd("Step");
+  this.cmd("SetMessage", "Delete old head node.");
   this.cmd("Delete", this.linkedListElemID[this.top - 1]);
   this.top = this.top - 1;
-  this.resetLinkedListPositions();
+  //this.resetLinkedListPositions();
+  this.cmd("Step");
 
   this.cmd("Delete", labPopValID);
   this.cmd("Delete", labPopID);
-  this.cmd(
-    "SetText",
-    this.leftoverLabelID,
-    "Dequeued Value: " + this.arrayData[this.top],
-  );
+  this.cmd("SetMessage", "Dequeued Value: " + this.arrayData[this.top]);
+  this.cmd("Step");
 
   return this.commands;
 };
 
-QueueLL.prototype.clearAll = function () {
+QueueLL.prototype.clearData = function () {
   this.commands = new Array();
+  
+  this.cmd("SetNull", this.tailID, 1);
+  this.cmd("SetNull", this.headID, 1);
+  this.cmd("Disconnect", this.headID, this.linkedListElemID[this.top - 1]);
+  this.cmd("Disconnect", this.tailID, this.linkedListElemID[0]);
   for (var i = 0; i < this.top; i++) {
     this.cmd("Delete", this.linkedListElemID[i]);
   }
+  this.cmd("SetMessage", "");
+  this.createdNodeCount = 0;
   this.top = 0;
-  this.cmd("SetNull", this.headID, 1);
   return this.commands;
 };
 

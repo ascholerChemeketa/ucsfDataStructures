@@ -10,36 +10,18 @@
 
   <body class="VisualizationMainPage">
     <div id="container">
-      <div id="header">
-        <h1>B-Trees</h1>
-      </div>
 
-      <div id="mainContent">
-        <div id="algoControlSection">
-          <!-- Table for buttons to control specific animation (insert/find/etc) -->
-          <!-- (filled in by javascript code specific to the animtion) -->
-          <table id="AlgorithmSpecificControls"></table>
-        </div>
-
-        <!-- Drawing canvas where all animation is done.  Note:  can be resized in code -->
-
-        <canvas id="canvas" width="1000" height="500"></canvas>
-
-        <div id="generalAnimationControlSection">
-          <!-- Table for buttons to control general animation (play/pause/undo/etc) ->
-				 <!-- (filled in by javascript code, specifically AnimationMain.js)  -->
-
-          <table id="GeneralAnimationControls"></table>
-        </div>
-      </div>
-      <!-- mainContent -->
-
-      <div id="footer">
-        <p><a href="Algorithms.html">Algorithm Visualizations</a></p>
-      </div>
       <script type="module">
-        import { BTree } from "./dist/entry.js";
-        new BTree(canvas);
+        import { BTree, RandomGenerator } from "./dist/entry.js";
+        
+        let data = [];
+        let rng = new RandomGenerator(46);
+        data = rng.getInts(1, 500, 20);
+        let anim = new BTree({title: "BTree demo", maxDegree: 4, preemptiveSplit: true, initialData: data});
+
+        //anim.doDelete(303);
+        //anim.doFind(48);
+        //anim.doPrint();
       </script>
     </div>
     <!-- container -->

@@ -41,6 +41,8 @@ export var AnimatedRectangle = function (
 ) {
   this.w = wth;
   this.h = hgt;
+  this.x = 0;
+  this.y = 0;
   this.xJustify = xJust;
   this.yJustify = yJust;
   this.label = val;
@@ -63,6 +65,7 @@ AnimatedRectangle.prototype.constructor = AnimatedRectangle;
 
 AnimatedRectangle.prototype.setNull = function (np) {
   this.nullPointer = np;
+  //this.draw();
 };
 
 AnimatedRectangle.prototype.getNull = function () {
@@ -147,6 +150,13 @@ AnimatedRectangle.prototype.right = function () {
 };
 
 AnimatedRectangle.prototype.getHeadPointerAttachPos = function (fromX, fromY) {
+  //return [this.left(), this.centerY()]
+  return this.getClosestCardinalPoint(fromX, fromY);
+};
+
+AnimatedRectangle.prototype.getTailPointerAttachPos = function (fromX, fromY) {
+  return [this.centerX(), this.centerY()]
+  //return [this.x + this.w / 2.0, this.y + this.h / 2.0]
   return this.getClosestCardinalPoint(fromX, fromY);
 };
 
@@ -171,8 +181,13 @@ AnimatedRectangle.prototype.draw = function (context) {
   if (!this.addedToScene) {
     return;
   }
-  context.globalAlpha = this.alpha;
 
+  let svgJustify = 'middle';
+  if(this.xJustify == "left")
+    svgJustify = 'start';
+  else if(this.xJustify == "right")
+    svgJustify = 'end';
+  
   if (!this.svgRect) {
     var svgns = "http://www.w3.org/2000/svg";
     var rect = document.createElementNS(svgns, "rect");
@@ -185,13 +200,10 @@ AnimatedRectangle.prototype.draw = function (context) {
     this.svgRect = rect;
     this.svgRect.setAttributeNS(null, "width", this.w);
     this.svgRect.setAttributeNS(null, "height", this.h);
-    this.svgRect.setAttributeNS(null, "rx", 2);
-    this.svgRect.setAttributeNS(null, "ry", 2);
-
 
     var text = document.createElementNS(svgns, "text");
     text.setAttributeNS(null, "dominant-baseline", "middle");
-    text.setAttributeNS(null, "text-anchor", "middle");
+    text.setAttributeNS(null, "text-anchor", svgJustify);
     text.setAttributeNS(
       null,
       "style",
@@ -200,18 +212,11 @@ AnimatedRectangle.prototype.draw = function (context) {
     this.svgText = text;
     this.svgRect.after(text);
   }
-  this.svgRect.setAttributeNS(null, "x", this.x);
-  this.svgRect.setAttributeNS(null, "y", this.y);
-
-  this.svgText.setAttributeNS(null, "x", this.x + this.w / 2.0);
-  this.svgText.setAttributeNS(null, "y", this.y + this.h / 2.0 + 1);
-  this.svgText.textContent = this.label;
 
   var startX;
   var startY;
   var labelPosX;
   var labelPosY;
-
 
   if (this.xJustify == "left") {
     startX = this.x;
@@ -234,6 +239,19 @@ AnimatedRectangle.prototype.draw = function (context) {
     labelPosY = this.y - this.h / 2.0;
   }
 
+  this.svgRect.setAttributeNS(null, "x", startX);
+  this.svgRect.setAttributeNS(null, "y", startY);
+
+
+  this.svgText.setAttributeNS(null, "x", labelPosX);
+  this.svgText.setAttributeNS(null, "y", labelPosY + 1);
+
+  if(this.nullPointer)
+    this.svgText.textContent = "null";
+  else
+    this.svgText.textContent = this.label;
+
+  context.globalAlpha = this.alpha;
   context.lineWidth = 1;
 
   if (this.highlighted) {

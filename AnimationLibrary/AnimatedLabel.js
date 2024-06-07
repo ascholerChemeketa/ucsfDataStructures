@@ -67,8 +67,6 @@ AnimatedLabel.prototype.draw = function (ctx) {
   if (!this.addedToScene) {
     return;
   }
-
-
   if (!this.svgText) {
     var svgns = "http://www.w3.org/2000/svg";
     var text = document.createElementNS(svgns, "text");
@@ -77,13 +75,13 @@ AnimatedLabel.prototype.draw = function (ctx) {
     text.setAttributeNS(
       null,
       "style",
-      "fill: currentColor; stroke: none; stroke-width: 1px;",
+      "fill: var(--svgColor); stroke: none; stroke-width: 1px;",
     );
     text.setAttribute("pointer-events", "none");
     ctx.svg.getElementById("nodes").appendChild(text);
     this.svgText = text;
-
   }
+
   this.svgText.setAttributeNS(null, "x", this.x);
   this.svgText.setAttributeNS(null, "y", this.y + 1);
   this.svgText.textContent = this.label;
@@ -121,13 +119,28 @@ AnimatedLabel.prototype.draw = function (ctx) {
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
   }
+
   if (this.highlighted) {
     ctx.strokeStyle = "#ffaaaa";
     ctx.fillStyle = "#ff0000";
     ctx.lineWidth = this.highlightDiff;
     ctx.strokeText(this.label, this.x, this.y);
     //ctx.fillText(this.label, this.x, this.y);
+    this.svgText.setAttributeNS(
+      null,
+      "style",
+      "fill: var(--svgColor--highlight);"
+    );
+      
+  } else {
+    this.svgText.setAttributeNS(
+      null,
+      "style",
+      "fill: var(--svgColor);"
+    );
   }
+
+
   ctx.strokeStyle = this.labelColor;
   ctx.fillStyle = this.labelColor;
   ctx.lineWidth = 1;
