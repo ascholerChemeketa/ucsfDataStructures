@@ -157,6 +157,9 @@ BTree.prototype.addControls = function () {
   this.clearButton.onclick = this.clearCallback.bind(this);
   this.controls.push(this.clearButton);
 
+  this.insertRandomButton = addControlToAlgorithmBar("Button", "Insert X Random");
+  this.insertRandomButton.onclick = this.insertRandomCallback.bind(this);
+
   addSeparatorToAlgorithmBar();
 
   var degreeSelect = addSelectToAlgorithmBar("Degree", "degree", "degree");
@@ -227,6 +230,19 @@ BTree.prototype.insertCallback = function (event) {
     this.implementAction(this.insertElement.bind(this), insertedValue);
   }
 };
+
+
+BTree.prototype.insertRandomCallback = function (event) {
+  var numToInsert = this.inputField.value;
+  for (let i = 0; i < numToInsert; i++) {
+    const insertedValue = Math.floor(1 + Math.random() * 999);
+    this.implementAction(this.insertElement.bind(this), insertedValue);
+    this.animationManager.skipForward();
+  }
+  this.animationManager.clearHistory();
+  this.animationManager.animatedObjects.draw();
+};
+
 
 BTree.prototype.deleteCallback = function (event) {
   var deletedValue = this.inputField.value;

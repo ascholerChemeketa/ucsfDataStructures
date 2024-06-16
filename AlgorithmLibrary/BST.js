@@ -87,7 +87,6 @@ BST.prototype.init = function (am, w, h) {
   this.rootIndex = 0;
 
   this.valuesList = [];
-
   this.cmd("CreateRectangle", this.nextIndex++, "", 50, 25, this.startingX - 70, BST.STARTING_Y - 10);
   this.cmd("SetNull", this.rootIndex, 1);
 	this.cmd("CreateLabel", this.nextIndex++, "root", this.startingX - 120, BST.STARTING_Y - 10);
@@ -130,6 +129,9 @@ BST.prototype.addControls = function () {
 
   this.clearButton = addControlToAlgorithmBar("Button", "Clear");
   this.clearButton.onclick = this.clearCallback.bind(this);
+
+  this.insertRandomButton = addControlToAlgorithmBar("Button", "Insert X Random");
+  this.insertRandomButton.onclick = this.insertRandomCallback.bind(this);
 
   addSeparatorToAlgorithmBar();
 
@@ -204,6 +206,19 @@ BST.prototype.clearData = function () {
   this.cmd("SetMessage", "");
   return this.commands;
 };
+
+
+BST.prototype.insertRandomCallback = function (event) {
+  var numToInsert = this.inputField.value;
+  for (let i = 0; i < numToInsert; i++) {
+    const insertedValue = Math.floor(1 + Math.random() * 999);
+    this.implementAction(this.insertElement.bind(this), insertedValue);
+    this.animationManager.skipForward();
+  }
+  this.animationManager.clearHistory();
+  this.animationManager.animatedObjects.draw();
+};
+
 
 BST.prototype.printTree = function (order) {
   this.commands = [];
