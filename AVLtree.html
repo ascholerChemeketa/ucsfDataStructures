@@ -1,48 +1,22 @@
 <!doctype html>
 <html>
   <head>
-    <title>AVL Tree Visualzation</title>
-
-    <!-- css sheet for how the page is laid out -->
-
-    <link rel="stylesheet" href="visualizationPageStyle.css" />
+    <title>AVL Tree Visualization</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
 
-  <body onload="" class="VisualizationMainPage">
-    <div id="container">
-      <div id="header">
-        <h1>AVL Tree</h1>
-      </div>
+  <body>
+    <script type="module">
+      import { AVL } from "./dist/entry.js";
 
-      <div id="mainContent">
-        <div id="algoControlSection">
-          <!-- Table for buttons to control specific animation (insert/find/etc) -->
-          <!-- (filled in by javascript code specific to the animtion) -->
-          <table id="AlgorithmSpecificControls"></table>
-        </div>
+      //let anim = new AVL();  //empty
 
-        <!-- Drawing canvas where all animation is done.  Note:  can be resized in code -->
+    let anim = new AVL({initialData: [200, 100], zoom: "1x", title: "AVL - Insert 80", singleMode: false});
 
-        <canvas id="canvas" width="1000" height="500"></canvas>
-
-        <div id="generalAnimationControlSection">
-          <!-- Table for buttons to control general animation (play/pause/undo/etc) ->
-					<!-- (filled in by javascript code, specifically AnimationMain.js)  -->
-
-          <table id="GeneralAnimationControls"></table>
-        </div>
-      </div>
-      <!-- mainContent -->
-
-      <div id="footer">
-        <p><a href="Algorithms.html">Algorithm Visualizations</a></p>
-      </div>
-
-      <script type="module">
-        import { AVL } from "./dist/entry.js";
-        new AVL(canvas, [1, 34, 15, 6]);
-      </script>
-    </div>
-    <!-- container -->
+      anim.doInsert(150);
+      //anim.doDelete(100);
+      //anim.doFind(100);
+      //anim.doPrint("In");
+    </script>
   </body>
 </html>
