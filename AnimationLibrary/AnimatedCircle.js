@@ -39,7 +39,7 @@ export var AnimatedCircle = function (objectID, objectLabel) {
   this.highlightIndex = -1;
   /*	this.foregroundColor  = '#007700';
 	this.backgroundColor  = '#EEFFEE';
- */
+  */
 
   this.svgCircle = null;
   this.svgText = null;
@@ -97,17 +97,20 @@ AnimatedCircle.prototype.setHighlightIndex = function (hlIndex) {
 AnimatedCircle.prototype.setHighlight = function (value) {
   this.highlighted = value;
   if(!this.svgCircle)return;
+  console.log(this.foregroundColor)
+  let fillColor = this.foregroundColor ? this.foregroundColor : 'var(--svgFillColor)';
+
   if (this.highlighted) {
     this.svgCircle.setAttributeNS(
       null,
       "style",
-      'fill: var(--svgFillColor); stroke: var(--svgColor--highlight); stroke-width: 3px;',
+      `fill: ${fillColor}; stroke: var(--svgColor--highlight); stroke-width: 3px;`,
     );
   } else
     this.svgCircle.setAttributeNS(
       null,
       "style",
-      'fill: var(--svgFillColor); stroke: var(--svgColor); stroke-width: 1px;',
+      `fill: ${fillColor}; stroke: var(--svgColor); stroke-width: 1px;`,
     );
 };
 
@@ -118,10 +121,12 @@ AnimatedCircle.prototype.draw = function (ctx) {
   if (!this.svgCircle) {
     var svgns = "http://www.w3.org/2000/svg";
     var circle = document.createElementNS(svgns, "circle");
+    
+    let fillColor = this.foregroundColor ? this.foregroundColor : 'var(--svgFillColor)';
     circle.setAttributeNS(
       null,
       "style",
-      'fill: var(--svgFillColor); stroke: var(--svgColor)',
+      `fill: ${fillColor}; stroke: var(--svgColor)`,
     );
     circle.setAttribute("pointer-events", "visible");
     circle.setAttributeNS(null, "r", this.radius);

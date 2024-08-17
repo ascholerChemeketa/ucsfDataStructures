@@ -1,22 +1,24 @@
 <!doctype html>
 <html>
-  <head>
-    <title>AVL Tree Visualization</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  </head>
 
-  <body>
-    <script type="module">
-      import { AVL } from "./dist/entry.js";
+<head>
+  <title>AVL Tree Visualization</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
 
-      //let anim = new AVL();  //empty
+<body>
+  <script type="module">
+    import { AVL } from "./dist/entry.js";
 
-    let anim = new AVL({initialData: [200, 100], zoom: "1x", title: "AVL - Insert 80", singleMode: false});
+    //let anim = new AVL();  //empty
 
-      anim.doInsert(150);
-      //anim.doDelete(100);
-      //anim.doFind(100);
-      //anim.doPrint("In");
-    </script>
-  </body>
+    let anim = new AVL({ initialData: [200, 100, 250, 150, 275, 175, 50, 75, 220, 260, 25], zoom: "1x", title: "AVL - Insert 80", singleMode: false });
+
+    //anim.doInsert(150);
+    //anim.doDelete(260);
+    //anim.doFind(100);
+    //anim.doPrint("In");
+  </script>
+</body>
+
 </html>

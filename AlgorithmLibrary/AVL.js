@@ -40,7 +40,7 @@ import {
 // }
 
 export function AVL(opts = {}) {
-  if (!opts.title) opts.title = opts.title || "Binary Search Tree";
+  if (!opts.title) opts.title = opts.title || "AVL Tree";
   opts.centered = true;
 
   opts.heightSingleMode = 250;
@@ -67,8 +67,8 @@ AVL.prototype = new Algorithm();
 AVL.prototype.constructor = AVL;
 AVL.superclass = Algorithm.prototype;
 
-AVL.HIGHLIGHT_LABEL_COLOR = "#FF0000";
-AVL.HIGHLIGHT_LINK_COLOR = "#FF0000";
+AVL.HIGHLIGHT_LABEL_COLOR = "#FFFF00";
+AVL.HIGHLIGHT_LINK_COLOR = "#FFFF00";
 
 // AVL.HIGHLIGHT_COLOR = "#007700";
 // AVL.HEIGHT_LABEL_COLOR = "#007700";
@@ -83,17 +83,12 @@ AVL.WIDTH_DELTA = 50;
 AVL.HEIGHT_DELTA = 50;
 AVL.STARTING_Y = 50;
 
-AVL.FIRST_PRINT_POS_X = 50;
-AVL.PRINT_VERTICAL_GAP = 20;
-AVL.PRINT_HORIZONTAL_GAP = 50;
 AVL.EXPLANITORY_TEXT_X = 10;
 AVL.EXPLANITORY_TEXT_Y = 10;
 
 AVL.prototype.init = function (am, w, h) {
   var sc = AVL.superclass;
   var fn = sc.init;
-  this.first_print_pos_y = h - 2 * AVL.PRINT_VERTICAL_GAP;
-  this.print_max = w - 10;
 
   fn.call(this, am, w, h);
   this.startingX = w / 2;
@@ -153,7 +148,7 @@ AVL.prototype.addControls = function () {
 };
 
 AVL.prototype.reset = function () {
-  this.nextIndex = 1;
+  this.nextIndex = 2;
   this.treeRoot = null;
 };
 
@@ -187,7 +182,7 @@ AVL.prototype.findCallback = function (event) {
 };
 
 AVL.prototype.printCallback = function (event) {
-  this.implementAction(this.printTree.bind(this), "");
+  this.implementAction(this.printTree.bind(this), "In");
 };
 
 AVL.prototype.clearCallback = function (event) {
@@ -209,6 +204,7 @@ AVL.prototype.clearData = function () {
       }
     }
     handler.cmd("Delete", tree.graphicID);
+    handler.cmd("Delete", tree.heightLabelID);
   }
 
   clearTree(this.treeRoot, this);
@@ -230,74 +226,125 @@ AVL.prototype.insertRandomCallback = function (event) {
   this.animationManager.animatedObjects.draw();
 };
 
+AVL.prototype.printLeft = function (tree, order) {
+  if (tree.left != null) {
+    this.cmd("SetMessage", tree.data + " has left child, visit it...");
+    this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 1);
+    this.cmd("Step");
+    this.cmd("SetHighlight", tree.graphicID, 0);
+    this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 0);
+    this.printTreeRec(tree.left, order);
+    this.cmd("SetHighlight", tree.graphicID, 1);
+  } else {
+    this.cmd("SetMessage", tree.data + " has no left child");
+    this.cmd("Step");
+  }
+};
+AVL.prototype.printRight = function (tree, order) {
+  if (tree.right != null) {
+    this.cmd("SetMessage", tree.data + " has right child, visit it...");
+    this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 1);
+    this.cmd("Step");
+    this.cmd("SetHighlight", tree.graphicID, 0);
+    this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 0);
+    this.printTreeRec(tree.right, order);
+    this.cmd("SetHighlight", tree.graphicID, 1);
+  } else {
+    this.cmd("SetMessage", tree.data + " has no right child");
+    this.cmd("Step");
+  }
+};
+
+AVL.prototype.printSelf = function (tree) {
+  if (this.printOutput.length > 0) {
+    this.printOutput += ", ";
+  }
+  this.printOutput += tree.data;
+  this.cmd(
+    "SetMessage",
+    "Print " + tree.data + "\nCurrent output: " + this.printOutput,
+  );
+  this.cmd("Step");
+};
 
 AVL.prototype.sizeChanged = function (newWidth, newHeight) {
   this.startingX = newWidth / 2;
 };
 
-AVL.prototype.printTree = function (unused) {
+AVL.prototype.printTree = function (order) {
   this.commands = [];
+  this.printOutput = "";
 
   if (this.treeRoot != null) {
-    this.highlightID = this.nextIndex++;
-    var firstLabel = this.nextIndex;
-    this.cmd(
-      "CreateHighlightCircle",
-      this.highlightID,
-      AVL.HIGHLIGHT_COLOR,
-      this.treeRoot.x,
-      this.treeRoot.y,
-    );
-    this.xPosOfNextLabel = AVL.FIRST_PRINT_POS_X;
-    this.yPosOfNextLabel = this.first_print_pos_y;
-    this.printTreeRec(this.treeRoot);
-    this.cmd("Delete", this.highlightID);
+    this.cmd("SetMessage", "Starting from root");
+    this.cmd("SetHighlight", this.treeRoot.graphicID, 1);
     this.cmd("Step");
-    for (var i = firstLabel; i < this.nextIndex; i++) this.cmd("Delete", i);
-    this.nextIndex = this.highlightID; /// Reuse objects.  Not necessary.
+
+    this.cmd("SetHighlight", this.treeRoot.graphicID, 0);
+    this.printTreeRec(this.treeRoot, order);
+
+    this.cmd("SetMessage", "Final output: " + this.printOutput);
   }
   return this.commands;
 };
 
-AVL.prototype.printTreeRec = function (tree) {
-  this.cmd("Step");
-  if (tree.left != null) {
-    this.cmd("Move", this.highlightID, tree.left.x, tree.left.y);
-    this.printTreeRec(tree.left);
-    this.cmd("Move", this.highlightID, tree.x, tree.y);
-    this.cmd("Step");
-  }
-  var nextLabelID = this.nextIndex++;
-  this.cmd("CreateLabel", nextLabelID, tree.data, tree.x, tree.y);
-  this.cmd("SetForegroundColor", nextLabelID, AVL.PRINT_COLOR);
-  this.cmd("Move", nextLabelID, this.xPosOfNextLabel, this.yPosOfNextLabel);
-  this.cmd("Step");
+AVL.prototype.printTreeRec = function (tree, order) {
+  this.cmd("SetHighlight", tree.graphicID, 1);
 
-  this.xPosOfNextLabel += AVL.PRINT_HORIZONTAL_GAP;
-  if (this.xPosOfNextLabel > this.print_max) {
-    this.xPosOfNextLabel = AVL.FIRST_PRINT_POS_X;
-    this.yPosOfNextLabel += AVL.PRINT_VERTICAL_GAP;
+  if (order == "Pre") {
+    this.printSelf(tree);
+    this.printLeft(tree, order);
+    this.printRight(tree, order);
+  } else if (order == "Post") {
+    this.printLeft(tree, order);
+    this.printRight(tree, order);
+    this.printSelf(tree);
+  } else {
+    this.printLeft(tree, order);
+    this.printSelf(tree);
+    this.printRight(tree, order);
   }
-  if (tree.right != null) {
-    this.cmd("Move", this.highlightID, tree.right.x, tree.right.y);
-    this.printTreeRec(tree.right);
-    this.cmd("Move", this.highlightID, tree.x, tree.y);
-    this.cmd("Step");
-  }
-  return;
+
+  this.cmd("SetMessage", "Done with " + tree.data + " return to parent");
+  this.cmd("SetHighlight", tree.graphicID, 0);
+  this.cmd("Step");
 };
+
+//   this.commands = [];
+
+//   if (this.treeRoot != null) {
+//     this.cmd("SetMessage", "Starting from root");
+//     this.highlightID = this.nextIndex++;
+//     this.cmd("Step");
+//     var firstLabel = this.nextIndex;
+//     this.cmd(
+//       "CreateHighlightCircle",
+//       this.highlightID,
+//       AVL.HIGHLIGHT_COLOR,
+//       this.treeRoot.x,
+//       this.treeRoot.y,
+//     );
+//     this.xPosOfNextLabel = AVL.FIRST_PRINT_POS_X;
+//     this.yPosOfNextLabel = this.first_print_pos_y;
+//     this.printTreeRec(this.treeRoot);
+//     this.cmd("Delete", this.highlightID);
+//     this.cmd("Step");
+//     for (var i = firstLabel; i < this.nextIndex; i++) this.cmd("Delete", i);
+//     this.nextIndex = this.highlightID; /// Reuse objects.  Not necessary.
+//   }
+//   return this.commands;
+// };
 
 AVL.prototype.findElement = function (findValue) {
   this.commands = [];
 
   this.highlightID = this.nextIndex++;
-
-  this.doFind(this.treeRoot, findValue);
+  this.findHelp(this.treeRoot, findValue);
 
   return this.commands;
 };
 
-AVL.prototype.doFind = function (tree, value) {
+AVL.prototype.findHelp = function (tree, value) {
   this.cmd("SetMessage", "Searchiing for " + value);
   if (tree != null) {
     this.cmd("SetHighlight", tree.graphicID, 1);
@@ -341,7 +388,7 @@ AVL.prototype.doFind = function (tree, value) {
           this.cmd("Step");
           this.cmd("Delete", this.highlightID);
         }
-        this.doFind(tree.left, value);
+        this.findHelp(tree.left, value);
       } else {
         this.cmd(
           "SetMessage",
@@ -367,7 +414,7 @@ AVL.prototype.doFind = function (tree, value) {
           this.cmd("Step");
           this.cmd("Delete", this.highlightID);
         }
-        this.doFind(tree.right, value);
+        this.findHelp(tree.right, value);
       }
     }
   } else {
@@ -461,7 +508,11 @@ AVL.prototype.singleRotateRight = function (tree) {
 
   this.cmd("SetMessage", `Single Rotation of ${A.data}`);
   this.cmd("SetEdgeHighlight", B.graphicID, A.graphicID, 1);
+  
+  this.setHighlights([A.graphicID, B.graphicID], 1);
   this.cmd("Step");
+  
+  this.setHighlights([A.graphicID, B.graphicID], 0);
 
   if (t2 != null) {
     this.cmd("Disconnect", A.graphicID, t2.graphicID);
@@ -501,7 +552,11 @@ AVL.prototype.singleRotateLeft = function (tree) {
 
   this.cmd("SetMessage", `Single Rotation of ${B.data}`);
   this.cmd("SetEdgeHighlight", A.graphicID, B.graphicID, 1);
+  
+  this.setHighlights([A.graphicID, B.graphicID], 1);
   this.cmd("Step");
+  
+  this.setHighlights([A.graphicID, B.graphicID], 0);
 
   if (t2 != null) {
     this.cmd("Disconnect", B.graphicID, t2.graphicID);
@@ -562,20 +617,31 @@ AVL.prototype.doubleRotateRight = function (tree) {
   var t2 = B.left;
   var t3 = B.right;
   var t4 = C.right;
-  this.cmd("SetMessage", `Zig-Zag Rotate. ${C.data}'s left subtree is too tall and the left child's right subtree is taller than its left.  Rotate ${B.data} twice.`);
+  this.cmd("SetMessage", `Unbalanced by 2. ${C.data}'s left subtree is too tall and the left child's right subtree is taller than its left.  Rotate ${B.data} twice. Zig-zag rotation.`);
 
 
+  this.setHighlights([A.graphicID, B.graphicID, C.graphicID], 1);
   this.cmd("SetEdgeHighlight", C.graphicID, A.graphicID, 1);
   this.cmd("SetEdgeHighlight", A.graphicID, B.graphicID, 1);
 
   this.cmd("Step");
 
+
+  this.setHighlights([A.graphicID, B.graphicID, C.graphicID], 0);
   this.cmd("SetEdgeHighlight", C.graphicID, A.graphicID, 0);
   this.cmd("SetEdgeHighlight", A.graphicID, B.graphicID, 0);
 
   this.singleRotateLeft(A);
+  this.cmd("SetMessage", `First half of zig-zag complete. Now do second rotation.`);
+  this.cmd("Step");
   this.singleRotateRight(C);
 };
+
+AVL.prototype.setHighlights = function (elementList, value = 1) {
+  for(let l of elementList) {
+    this.cmd("SetHighlight", l, value)
+  }
+}
 
 AVL.prototype.doubleRotateLeft = function (tree) {
   var A = tree;
@@ -585,17 +651,21 @@ AVL.prototype.doubleRotateLeft = function (tree) {
   var t2 = B.left;
   var t3 = B.right;
   var t4 = C.right;
-  this.cmd("SetMessage", `Zig-Zag Rotate. ${A.data}'s right subtree is too tall and the right child's left subtree is taller than its right.  Rotate ${B.data} twice.`);
+  this.cmd("SetMessage", `Unbalanced by 2. ${A.data}'s right subtree is too tall and the right child's left subtree is taller than its right.  Rotate ${B.data} twice. Zig-zag rotation.`);
 
+  this.setHighlights([A.graphicID, B.graphicID, C.graphicID], 1);
   this.cmd("SetEdgeHighlight", A.graphicID, C.graphicID, 1);
   this.cmd("SetEdgeHighlight", C.graphicID, B.graphicID, 1);
 
   this.cmd("Step");
 
+  this.setHighlights([A.graphicID, B.graphicID, C.graphicID], 0);
   this.cmd("SetEdgeHighlight", A.graphicID, C.graphicID, 0);
   this.cmd("SetEdgeHighlight", C.graphicID, B.graphicID, 0);
 
   this.singleRotateRight(C);
+  this.cmd("SetMessage", `First half of zig-zag complete. Now do second rotation.`);
+  this.cmd("Step");
   this.singleRotateLeft(A);
 };
 
@@ -702,7 +772,7 @@ AVL.prototype.insert = function (elem, tree) {
         (tree.right == null && tree.left.height > 1)
       ) {
         if (elem.data < tree.left.data) {
-          this.cmd("SetMessage", `Single rotation. ${tree.data}'s left subtree is too tall and the left child's left subtree is taller than its right.`);
+          this.cmd("SetMessage", `Unbalanced by 2. ${tree.data}'s left subtree is too tall and the left child's left subtree is taller than its right. Single rotation.`);
           this.cmd("Step");
           this.singleRotateRight(tree);
         } else {
@@ -796,7 +866,7 @@ AVL.prototype.insert = function (elem, tree) {
         (tree.left == null && tree.right.height > 1)
       ) {
         if (elem.data >= tree.right.data) {
-          this.cmd("SetMessage", `Single rotation. ${tree.data}'s right subtree is too tall and the right child's right subtree is taller than its left.`);
+          this.cmd("SetMessage", `Unbalanced by 2. ${tree.data}'s right subtree is too tall and the right child's right subtree is taller than its left. Single rotation.`);
           this.cmd("Step");
           this.singleRotateLeft(tree);
         } else {
@@ -819,11 +889,12 @@ AVL.prototype.deleteElement = function (deletedValue) {
 };
 
 AVL.prototype.treeDelete = function (tree, valueToDelete) {
-  var leftchild = false;
   if (tree != null) {
-    if (tree.parent != null) {
-      leftchild = tree.parent.left == tree;
-    }
+    let isRoot = tree.parent == null;
+    var isLeftChild = !isRoot && tree.parent.left == tree;
+    let isRightChild = !isRoot && tree.parent.right == tree;
+
+    //Find location
     this.cmd("SetHighlight", tree.graphicID, 1);
     if (valueToDelete < tree.data) {
       this.cmd(
@@ -849,12 +920,14 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
         this.cmd("SetMessage", "Node to delete is a leaf.  Delete it.");
         this.cmd("Delete", tree.graphicID);
         this.cmd("Delete", tree.heightLabelID);
-        if (leftchild && tree.parent != null) {
+        if (isLeftChild && tree.parent != null) {
           tree.parent.left = null;
         } else if (tree.parent != null) {
           tree.parent.right = null;
         } else {
           this.treeRoot = null;
+          this.cmd("SetNull", this.rootIndex, 1);
+          this.cmd("Disconnect", 0, tree.graphicID);
         }
         this.resizeTree();
         this.cmd("Step");
@@ -874,7 +947,7 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
           this.cmd("Step");
           this.cmd("Delete", tree.graphicID);
           this.cmd("Delete", tree.heightLabelID);
-          if (leftchild) {
+          if (isLeftChild) {
             tree.parent.left = tree.right;
           } else {
             tree.parent.right = tree.right;
@@ -903,7 +976,7 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
           this.cmd("Step");
           this.cmd("Delete", tree.graphicID);
           this.cmd("Delete", tree.heightLabelID);
-          if (leftchild) {
+          if (isLeftChild) {
             tree.parent.left = tree.left;
           } else {
             tree.parent.right = tree.left;
@@ -1012,15 +1085,24 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
           );
         }
 
+        //Done with primary delete, now check parents for problems
+
         while (tmp != tree) {
           var tmpPar = tmp.parent;
+          
+          // this.cmd("SetMessage", "Unwinding recursion and updating heights.");
+          // this.cmd("Step");
           // TODO:  Add extra animation here?
           if (this.getHeight(tmp.left) - this.getHeight(tmp.right) > 1) {
             if (
               this.getHeight(tmp.left.right) > this.getHeight(tmp.left.left)
             ) {
+              this.cmd("SetMessage", `Unbalanced by 2. ${tmp.data}'s left subtree is too tall and the left child's right subtree is taller than its left.  Rotate ${tmp.left.right.data} twice. Zig-zag rotation.`);
               this.doubleRotateRight(tmp);
+              this.cmd("Step");
             } else {
+              this.cmd("SetMessage", `Unbalanced by 2. ${tmp.data}'s left subtree is too tall and the left child's left subtree is taller than its right. Single rotation.`);
+              this.cmd("Step");
               this.singleRotateRight(tmp);
             }
           }
@@ -1091,6 +1173,7 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
         }
       }
     } else if (valueToDelete < tree.data) {
+      //Go left
       if (tree.left != null) {
         this.cmd(
           "CreateHighlightCircle",
@@ -1147,6 +1230,7 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
         );
       }
     } else {
+      //Go right
       if (tree.right != null) {
         this.cmd(
           "CreateHighlightCircle",
@@ -1202,7 +1286,7 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
         );
       }
     }
-  } else {
+  } else {  // tree == null
     this.cmd(
       "SetMessage",
       "Elemet " + valueToDelete + " not found, could not delete",

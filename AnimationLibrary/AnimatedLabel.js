@@ -34,7 +34,7 @@ export function AnimatedLabel(id, val, center, initialWidth) {
   this.objectID = id;
   this.alpha = 1.0;
   this.addedToScene = true;
-  this.labelColor = "#000000";
+  //this.labelColor = "#000000";
   this.textWidth = 0;
   if (initialWidth != undefined) {
     this.textWidth = initialWidth;
@@ -64,6 +64,9 @@ AnimatedLabel.prototype.centered = function () {
 };
 
 AnimatedLabel.prototype.draw = function (ctx) {
+  console.log(this.labelColor)
+  let labelColor = this.labelColor ? this.labelColor : 'var(--svgColor)';
+    
   if (!this.addedToScene) {
     return;
   }
@@ -75,7 +78,7 @@ AnimatedLabel.prototype.draw = function (ctx) {
     text.setAttributeNS(
       null,
       "style",
-      "fill: var(--svgColor); stroke: none; stroke-width: 1px;",
+      `fill: ${this.labelColor}; stroke: none; stroke-width: 1px; font-size: 80%;`,
     );
     text.setAttribute("pointer-events", "none");
     ctx.svg.getElementById("nodes").appendChild(text);
@@ -136,7 +139,7 @@ AnimatedLabel.prototype.draw = function (ctx) {
     this.svgText.setAttributeNS(
       null,
       "style",
-      "fill: var(--svgColor);"
+      `fill: ${this.labelColor}; stroke: none; stroke-width: 1px;`
     );
   }
 
