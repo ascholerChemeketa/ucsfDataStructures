@@ -1,47 +1,26 @@
 <!doctype html>
 <html>
-  <head>
-    <title>Red/Black Tree Visualization</title>
 
-    <!-- css sheet for how the page is laid out -->
+<head>
+  <title>Red/Black Tree Visualization</title>
 
-    <link rel="stylesheet" href="visualizationPageStyle.css" />
-  </head>
+  <!-- css sheet for how the page is laid out -->
 
-  <body class="VisualizationMainPage">
-    <div id="container">
-      <div id="header">
-        <h1>Red/Black Tree</h1>
-      </div>
+  <link rel="stylesheet" href="visualizationPageStyle.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
 
-      <div id="mainContent">
-        <div id="algoControlSection">
-          <!-- Table for buttons to control specific animation (insert/find/etc) -->
-          <!-- (filled in by javascript code specific to the animtion) -->
-          <table id="AlgorithmSpecificControls"></table>
-        </div>
+<body>
+  <script type="module">
+    import { RedBlack } from "./dist/entry.js";
 
-        <!-- Drawing canvas where all animation is done.  Note:  can be resized in code -->
+    let anim = new RedBlack({ initialData: [250, 225, 275, 260, 180, 235, 230], zoom: "1x", title: "Red Black", singleMode: false });
 
-        <canvas id="canvas" width="1000" height="500"></canvas>
+    //anim.doInsert(265);
+    //anim.doDelete(260);
+    //anim.doFind(100);
+    //anim.doPrint("In");
+  </script>
+</body>
 
-        <div id="generalAnimationControlSection">
-          <!-- Table for buttons to control general animation (play/pause/undo/etc) ->
-					<!-- (filled in by javascript code, specifically AnimationMain.js)  -->
-
-          <table id="GeneralAnimationControls"></table>
-        </div>
-      </div>
-      <!-- mainContent -->
-
-      <div id="footer">
-        <p><a href="Algorithms.html">Algorithm Visualizations</a></p>
-      </div>
-      <script type="module">
-        import { BPlusTree } from "./dist/entry.js";
-        new BPlusTree(canvas);
-      </script>
-    </div>
-    <!-- container -->
-  </body>
 </html>

@@ -38,7 +38,7 @@ export { QueueLL } from "./AlgorithmLibrary/QueueLL.js";
 // export { RecQueens } from "./AlgorithmLibrary/RecQueens.js";
 // export { RecReverse } from "./AlgorithmLibrary/RecReverse.js";
 // export { Recursive } from "./AlgorithmLibrary/Recursive.js";
-// export { RedBlack } from "./AlgorithmLibrary/RedBlack.js";
+export { RedBlack } from "./AlgorithmLibrary/RedBlack.js";
 // export { RotateScale2D } from "./AlgorithmLibrary/RotateScale2D.js";
 // export { RotateScale3D } from "./AlgorithmLibrary/RotateScale3D.js";
 // export { RotateTranslate2D } from "./AlgorithmLibrary/RotateTranslate2D.js";
