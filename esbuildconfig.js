@@ -5,11 +5,13 @@ esbuild
   .build({
     //inject: glob.sync('AnimationLibrary/*.js'),
     //inject: glob.sync('AnimationLibrary/AVL.js'),
+    //entryPoints: ["visualizationPageStyle.css"],
     entryPoints: ["entry.js"],
     bundle: true,
     sourcemap: true,
     minify: false,
     //outdir: 'dist/',
+    //outfile: "dist/visualizationPageStyle.css",
     outfile: "dist/entry.js",
     //platform: 'neutral',
     format: "esm",

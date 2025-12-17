@@ -1,4 +1,4 @@
-import "./visualizationPageStyle.css"; 
+import "./visualizationPageStyle.css";
 export { RandomGenerator } from "./AnimationLibrary/Utils.js";
 export { AVL } from "./AlgorithmLibrary/AVL.js";
 // export { BFS } from "./AlgorithmLibrary/BFS.js";

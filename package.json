@@ -4,7 +4,8 @@
   "description": "https://www.cs.usfca.edu/~galles/visualization/source.html",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "nodemon -e css,js ./esbuildconfig.js"
+    "build": "node ./esbuildconfig.js",
+    "watch": "nodemon -e css,js ./esbuildconfig.js"
   },
   "dependencies": {
     "esbuild": "^0.20.1",
