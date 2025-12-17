@@ -37,9 +37,8 @@ export var AnimatedCircle = function (objectID, objectLabel) {
   this.alpha = 1.0;
   this.addedToScene = true;
   this.highlightIndex = -1;
-  /*	this.foregroundColor  = '#007700';
-	this.backgroundColor  = '#EEFFEE';
-  */
+  this.foregroundColor  = 'var(--svgColor)';
+	this.backgroundColor  = '#FFF0';
 
   this.svgCircle = null;
   this.svgText = null;
@@ -94,39 +93,73 @@ AnimatedCircle.prototype.setHighlightIndex = function (hlIndex) {
   //this.draw(null)
 };
 
+AnimatedCircle.prototype.updateCircle = function () {
+  if (!this.addedToScene) {
+    console.log(this.id + " not added to scene");
+    return;
+  }
+
+  if(!this.svgCircle) return;
+  
+  let bg = this.backgroundColor;
+  let fg = this.highlighted ? 'var(--svgColor--highlight)' : this.foregroundColor;
+  let sw = this.highlighted ? 3 : 1;
+
+  this.svgCircle.setAttributeNS(
+    null,
+    "style",
+    `fill: ${bg}; stroke: ${fg}; stroke-width: ${sw}px;`
+  );
+  
+  if(this.svgText)
+    this.svgText.setAttributeNS(
+    null,
+    "style",
+    `fill: ${fg}; stroke: none; stroke-width: 1px;`,
+  );
+}
+
+
 AnimatedCircle.prototype.setHighlight = function (value) {
   this.highlighted = value;
-  if(!this.svgCircle)return;
-  console.log(this.foregroundColor)
-  let fillColor = this.foregroundColor ? this.foregroundColor : 'var(--svgFillColor)';
 
-  if (this.highlighted) {
-    this.svgCircle.setAttributeNS(
-      null,
-      "style",
-      `fill: ${fillColor}; stroke: var(--svgColor--highlight); stroke-width: 3px;`,
-    );
-  } else
-    this.svgCircle.setAttributeNS(
-      null,
-      "style",
-      `fill: ${fillColor}; stroke: var(--svgColor); stroke-width: 1px;`,
-    );
+  this.updateCircle();
+};
+
+
+AnimatedCircle.prototype.setBackgroundColor = function (newColor) {
+  AnimatedObject.prototype.setBackgroundColor.call(this, newColor);
+  this.updateCircle();
+};
+
+AnimatedCircle.prototype.setForegroundColor = function (newColor) {
+  AnimatedObject.prototype.setForegroundColor.call(this, newColor);
+  this.updateCircle();
+};
+
+
+AnimatedCircle.prototype.getSVGComponent = function () {
+  return this.svgCircle;
 };
 
 
 AnimatedCircle.prototype.draw = function (ctx) {
+  if (!this.addedToScene) {
+    console.log(this.id + " not added to scene");
+  }
+
   ctx.globalAlpha = this.alpha;
 
   if (!this.svgCircle) {
     var svgns = "http://www.w3.org/2000/svg";
     var circle = document.createElementNS(svgns, "circle");
     
-    let fillColor = this.foregroundColor ? this.foregroundColor : 'var(--svgFillColor)';
+    let fg = this.foregroundColor;
+    let bg = this.backgroundColor;
     circle.setAttributeNS(
       null,
       "style",
-      `fill: ${fillColor}; stroke: var(--svgColor)`,
+      `fill: ${bg}; stroke: ${fg};`,
     );
     circle.setAttribute("pointer-events", "visible");
     circle.setAttributeNS(null, "r", this.radius);
@@ -138,26 +171,30 @@ AnimatedCircle.prototype.draw = function (ctx) {
       if(input)
         input.value = this.label;
     });
-
   }
   this.svgCircle.setAttributeNS(null, "cx", this.x);
   this.svgCircle.setAttributeNS(null, "cy", this.y);
 
-  ctx.fillStyle = this.backgroundColor;
-  ctx.strokeStyle = this.foregroundColor;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, true);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.textAlign = "center";
+  if(!this.addedToScene)
+    this.svgCircle.setAttributeNS(null, "display", "none");
+  else
+    this.svgCircle.setAttributeNS(null, "display", "block");
 
-  let cssStyle = window.getComputedStyle(ctx.canvas);
-  ctx.font = cssStyle.font;
-  ctx.textBaseline = "middle";
-  ctx.lineWidth = 1;
-  ctx.fillStyle = this.foregroundColor;
+  // ctx.fillStyle = this.backgroundColor;
+  // ctx.strokeStyle = this.foregroundColor;
+  // ctx.lineWidth = 1;
+  // ctx.beginPath();
+  // ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, true);
+  // ctx.closePath();
+  // ctx.fill();
+  // ctx.stroke();
+  // ctx.textAlign = "center";
+
+  // let cssStyle = window.getComputedStyle(ctx.canvas);
+  // ctx.font = cssStyle.font;
+  // ctx.textBaseline = "middle";
+  // ctx.lineWidth = 1;
+  // ctx.fillStyle = this.foregroundColor;
 
   var strList = this.label.split("\n");
   if (strList.length == 1) {
@@ -199,6 +236,7 @@ AnimatedCircle.prototype.draw = function (ctx) {
       );
     } else {
       if (!this.svgText) {
+        let fg = this.foregroundColor;
         var svgns = "http://www.w3.org/2000/svg";
         var text = document.createElementNS(svgns, "text");
         text.setAttributeNS(null, "dominant-baseline", "middle");
@@ -206,7 +244,7 @@ AnimatedCircle.prototype.draw = function (ctx) {
         text.setAttributeNS(
           null,
           "style",
-          "fill: var(--svgColor); stroke: none; stroke-width: 1px;",
+          `fill: ${fg}; stroke: none; stroke-width: 1px;`,
         );
         text.setAttribute("pointer-events", "none");
         this.svgText = text;

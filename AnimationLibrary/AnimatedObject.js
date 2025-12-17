@@ -29,14 +29,14 @@ export function AnimatedObject() {
 }
 
 AnimatedObject.prototype.init = function () {
-  this.backgroundColor = "#FFFFFF";
-  this.foregroundColor = "#000000";
+  this.backgroundColor = "#000F";
+  this.foregroundColor = "var(--svgColor)";
   this.highlighted = false;
   this.objectID = -1;
   this.layer = 0;
   this.addedToScene = true;
   this.label = "";
-  this.labelColor = "#000000";
+  this.labelColor = "var(--svgColor)";
   this.alpha = 1.0;
   this.x = 0;
   this.y = 0;
@@ -54,6 +54,7 @@ AnimatedObject.prototype.setBackgroundColor = function (newColor) {
 
 AnimatedObject.prototype.setForegroundColor = function (newColor) {
   this.foregroundColor = newColor;
+  this.labelColor = newColor;
 };
 
 AnimatedObject.prototype.setNull = function () {};
@@ -70,11 +71,6 @@ AnimatedObject.prototype.setAlpha = function (newAlpha) {
 
 AnimatedObject.prototype.getAlpha = function () {
   return this.alpha;
-};
-
-AnimatedObject.prototype.setForegroundColor = function (newColor) {
-  this.foregroundColor = newColor;
-  this.labelColor = newColor;
 };
 
 AnimatedObject.prototype.getHighlight = function () {

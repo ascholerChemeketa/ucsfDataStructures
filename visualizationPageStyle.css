@@ -162,7 +162,11 @@ svg text {
 }
 
 :root {
-  --svgColor: rgb(85, 115, 176);
+  --svgColor: rgb(61, 89, 146);
+  --svgColor--red: rgb(231, 36, 36);
+  --svgColor--redback: rgb(255, 233, 233);
+  --svgColor--black: rgb(0, 0 ,0);
+  --svgColor--blackback: rgb(227, 227, 227);
   --svgColor--highlight: rgb(231, 36, 36);
   --svgColor--althighlight: rgb(111, 0, 130);
   --svgFillColor: white;

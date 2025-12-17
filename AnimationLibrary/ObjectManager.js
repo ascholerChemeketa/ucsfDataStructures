@@ -138,8 +138,10 @@ function makeSVG(centered) {
       </marker>
     </defs>
     <g id="allElements">
-      <g id="nodes" />
-      <g id="edges" />
+      <g id="layer_0">
+        <g id="nodes" />
+        <g id="edges" />
+      </g>
     </g>
   </svg>`;
   let svg = new DOMParser().parseFromString(s, "text/xml").documentElement;
@@ -385,6 +387,9 @@ export function ObjectManager(canvas, centered = false) {
       if (this.Nodes[i] != null && this.Nodes[i] != undefined) {
         this.Nodes[i].addedToScene =
           this.activeLayers[this.Nodes[i].layer] == true;
+
+        //let nodes update themselves
+        this.Nodes[i].draw(this.ctx);
       }
     }
 
@@ -393,6 +398,10 @@ export function ObjectManager(canvas, centered = false) {
         edge.addedToScene =
           this.activeLayers[edge.Node1.layer] == true &&
           this.activeLayers[edge.Node2.layer] == true;
+
+          
+        //let edges update themselves
+        edge.draw(this.ctx);
       }
     }
 
@@ -415,7 +424,41 @@ export function ObjectManager(canvas, centered = false) {
       if (this.activeLayers[layer]) {
         this.Nodes[objectID].addedToScene = true;
       } else {
-        this.Nodes[objectID].addedToScene = false;
+        // this.Nodes[objectID].addedToScene = false;
+      }
+
+      let svgElement = this.Nodes[objectID].getSVGComponent();
+      console.log(this.Nodes[objectID])
+      console.log(layer)
+      console.log(svgElement)
+      if( svgElement ) {
+        svgElement.parentNode.removeChild(svgElement);
+      }
+      
+      if(this.svg.getElementById(`layer_${layer}`) == null) {
+        let root = this.svg.getElementById("allElements");
+        let newLayer = null;
+        for(let i = 0; i < root.children.length; i++) {
+          let layerNum = parseInt(root.children[i].id.split("_")[1]);
+          if(layerNum > layer) {
+            newLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            newLayer.id = `layer_${layer}`;
+            root.insertBefore(newLayer, root.children[i]);
+            break;
+          }
+        }
+        if(newLayer == null) {
+          newLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          newLayer.id = `layer_${layer}`;
+          root.appendChild(newLayer);
+        }
+        let newNodes = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        newNodes.id = `layer_${layer}_nodes`;
+        newLayer.appendChild(newNodes);
+      }
+
+      if( svgElement ) {
+        this.svg.getElementById(`layer_${layer}`).appendChild(svgElement);
       }
 
       if (this.Edges.has(objectID)) {

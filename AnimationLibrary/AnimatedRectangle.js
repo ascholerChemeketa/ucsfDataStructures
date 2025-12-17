@@ -38,6 +38,7 @@ export var AnimatedRectangle = function (
   yJust,
   fillColor,
   edgeColor,
+  inBack = false
 ) {
   this.w = wth;
   this.h = hgt;
@@ -58,6 +59,8 @@ export var AnimatedRectangle = function (
   this.addedToScene = true;
   this.svgRect = null;
   this.svgText = null;
+
+  this.inBack = inBack;
 };
 
 AnimatedRectangle.prototype = new AnimatedObject();
@@ -81,6 +84,11 @@ AnimatedRectangle.prototype.remove = function () {
     this.svgText.remove();
     this.svgText = null;
   }
+};
+
+
+AnimatedRectangle.prototype.getSVGComponent = function () {
+  return this.svgRect;
 };
 
 AnimatedRectangle.prototype.left = function () {
@@ -196,7 +204,12 @@ AnimatedRectangle.prototype.draw = function (context) {
       "style",
       'fill: var(--svgFillColor); stroke: var(--svgColor);',
     );
-    context.svg.getElementById("nodes").appendChild(rect);
+
+    if(this.layer !== 0)
+      context.svg.getElementById(`layer_${this.layer}`).appendChild(rect);
+    else
+      context.svg.getElementById("nodes").appendChild(rect);
+
     this.svgRect = rect;
     this.svgRect.setAttributeNS(null, "width", this.w);
     this.svgRect.setAttributeNS(null, "height", this.h);

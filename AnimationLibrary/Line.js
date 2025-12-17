@@ -40,6 +40,9 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
   this.Node2 = n2;
   this.Dirty = false;
   this.directed = d;
+  //for now only allow var() css colors
+  if(color === undefined || color === null || color.slice(0, 4) !== "var(") 
+    color = "var(--svgColor)";
   this.edgeColor = color;
   this.edgeLabel = weight;
   this.highlighted = false;
@@ -73,6 +76,11 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
     }
   };
 
+
+  this.getSVGComponent = function () {
+    return this.svgLine;
+  };
+
   this.setColor = function (newColor) {
     this.edgeColor = newColor;
     this.Dirty = true;
@@ -95,7 +103,7 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
       this.svgLine.setAttributeNS(
         null,
         "style",
-        "stroke: var(--svgColor);"
+        `stroke: ${this.edgeColor};`
       );
       
       if(this.directed)
@@ -221,16 +229,12 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
   };
 
   this.draw = function (ctx) {
-    if (!this.addedToScene) {
-      return;
-    }
     ctx.globalAlpha = this.alpha;
-
 
     if(!this.svgLine) {
       var svgns = "http://www.w3.org/2000/svg";
       var line = document.createElementNS(svgns, 'path');
-      line.setAttributeNS(null, 'style', 'fill: none; stroke: var(--svgColor); stroke-width: 1px;' );
+      line.setAttributeNS(null, 'style', `fill: none; stroke: ${this.edgeColor}; stroke-width: 1px;` );
       if(this.directed) 
         line.setAttributeNS(null, 'marker-end', "url(#SVGTriangleMarker)");
       this.svgLine = line;
@@ -240,9 +244,13 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
         console.log("LABEL NOT IMPLEMENTED")
       }
     }
-
     if (this.highlighted) this.drawArrow(this.highlightDiff, "#FF0000", ctx);
     else this.drawArrow(1, this.edgeColor, ctx);
+
+    if(!this.addedToScene)
+      this.svgLine.setAttributeNS(null, "display", "none");
+    else
+      this.svgLine.setAttributeNS(null, "display", "block");
   };
 }
 

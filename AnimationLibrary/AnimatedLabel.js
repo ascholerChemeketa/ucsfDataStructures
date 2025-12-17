@@ -63,6 +63,10 @@ AnimatedLabel.prototype.centered = function () {
   return this.centering;
 };
 
+AnimatedLabel.prototype.getSVGComponent = function () {
+  return this.svgText;
+};
+
 AnimatedLabel.prototype.draw = function (ctx) {
   console.log(this.labelColor)
   let labelColor = this.labelColor ? this.labelColor : 'var(--svgColor)';

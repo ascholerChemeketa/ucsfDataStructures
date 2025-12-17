@@ -68,7 +68,7 @@ AVL.prototype.constructor = AVL;
 AVL.superclass = Algorithm.prototype;
 
 AVL.HIGHLIGHT_LABEL_COLOR = "#FFFF00";
-AVL.HIGHLIGHT_LINK_COLOR = "#FFFF00";
+AVL.HIGHLIGHT_LINK_COLOR = "var(--svgColor)";
 
 // AVL.HIGHLIGHT_COLOR = "#007700";
 // AVL.HEIGHT_LABEL_COLOR = "#007700";
