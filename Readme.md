@@ -2,12 +2,43 @@
 
 This is a fork of David Galles' JavaScript visualization library for data structures and algorithms. The original library can be found at:
 
-https://www.cs.usfca.edu/~galles/visualization/
+<https://www.cs.usfca.edu/~galles/visualization/>
 
 Significant UI modifications have been made to the original library, and some algorithms have been added or removed.
 
 Algorithms that have not been updated to use the new animation system have been moved to the `AlgorithmLibrary/Legacy` directory.
 
+Below are links to animations that are updated and (mostly) working.
+
+## Use
+
+The [Github pages](https://ascholerchemeketa.github.io/ucsfDataStructures/) version of this repository is only intended for demonstration purposes.
+
+If you are planning on making use of the animations for a course or project, it is recommended that you clone the repository
+and serve your own copies of the files. <https://github.com/ascholerChemeketa/ucsfDataStructures>
+
+Most of the animations can be configured with initial data and can be configured to start a particular operation (e.g. insert, delete, search).
+
+```html
+  <script type="module">
+    import { RedBlack } from "./dist/entry.js";
+
+    let anim = new RedBlack({ initialData: [250, 225, 275, 260, 180, 235, 230], title: "Red Black Insertion" });
+    anim.doInsert(265);  // queue up an insertion animation for 265
+    // Following would invisibly finish the 265 insertion and queue up a subsequent operation
+    // anim.animationManager.skipForward();  // skip to end of animation
+    // anim.animationManager.clearHistory();  // clear history
+    // anim.doInsert(25);  // prepare a new animation
+  </script>
+```
+
+For what is possible in a given animation, see the source code for that animation. Look for `doX` function bindings.
+
+## Animations
+
+If you are viewing this on Github, switch to Github pages to see the animations instead of the source code.
+
+[Github pages](https://ascholerchemeketa.github.io/ucsfDataStructures/)
 
 - [AVLtree.html](AVLtree.html)
 - [BFS.html](BFS.html)
