@@ -86,7 +86,7 @@ canvas {
 
 svg {
   cursor:move;
-  max-width: 800px;
+  /* max-width: 800px; */
   min-height:200px;
 }
 
@@ -142,8 +142,25 @@ svg text {
   flex-wrap: wrap;
 }
 
+.autoplayRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .stepButtons * {
   flex: 1;
+}
+
+#stepForwardButton:enabled {
+  background-color: #f0fbdb;
+}
+#skipForwardButton:enabled {
+  background-color: #f0fbdb;
+}
+
+.radioButtonGroup {
+  min-width: 100%;
 }
 
 @container sidebar (width < 200px) {

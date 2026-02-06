@@ -95,7 +95,7 @@ BTree.prototype.init = function (am, w, h) {
   BTree.superclass.init.call(this, am, w, h);
   this.nextIndex = 0;
 
-  this.starting_x = w / 2;
+  this.starting_x = 100;
 
   this.addControls(); 
 
@@ -117,11 +117,23 @@ BTree.prototype.init = function (am, w, h) {
   this.xPosOfNextLabel = 100;
   this.yPosOfNextLabel = 200;
   
-  this.doEnqueue = function (val) {
-    this.implementAction( this.enqueue.bind(this), val);
+
+  // Programmatic bindings
+  this.doInsert = function (val) {
+    this.implementAction(this.insertElement.bind(this), val);
   };
-  this.doDequeue = function () {
-    this.implementAction( this.dequeue.bind(this) );
+  this.doRemove = function (val) {
+    this.implementAction(this.deleteElement.bind(this), val);
+  };
+
+  this.doInsertRandom = function(count = 10, maxValue = 999) {
+    for (let i = 0; i < count; i++) {
+      const insertedValue = Math.floor(1 + Math.random() * maxValue);
+      this.implementAction(this.insertElement.bind(this), insertedValue);
+      this.animationManager.skipForward();
+    }
+    this.animationManager.clearHistory();
+    this.animationManager.animatedObjects.draw();
   };
 };
 
@@ -141,7 +153,7 @@ BTree.prototype.addControls = function () {
   this.insertButton.onclick = this.insertCallback.bind(this);
   this.controls.push(this.insertButton);
 
-  this.deleteButton = addControlToAlgorithmBar("Button", "Delete");
+  this.deleteButton = addControlToAlgorithmBar("Button", "Remove");
   this.deleteButton.onclick = this.deleteCallback.bind(this);
   this.controls.push(this.deleteButton);
 
@@ -157,8 +169,9 @@ BTree.prototype.addControls = function () {
   this.clearButton.onclick = this.clearCallback.bind(this);
   this.controls.push(this.clearButton);
 
-  this.insertRandomButton = addControlToAlgorithmBar("Button", "Insert X Random");
+  this.insertRandomButton = addControlToAlgorithmBar("Button", "Insert Random Values");
   this.insertRandomButton.onclick = this.insertRandomCallback.bind(this);
+  this.controls.push(this.insertRandomButton);
 
   addSeparatorToAlgorithmBar();
 
@@ -223,17 +236,30 @@ BTree.prototype.maxDegreeChangedHandler = function (newMaxDegree, event) {
 };
 
 BTree.prototype.insertCallback = function (event) {
-  var insertedValue;
+  console.log(this.inputField.value)
+  console.log(this.inputField.value.trim() != "")
+  if (this.inputField.value.trim() != "") {
+    console.log("Have a value to insert");
+      var insertedValue;
   insertedValue = this.normalizeNumber(this.inputField.value, 4);
-  if (insertedValue != "") {
     this.inputField.value = "";
     this.implementAction(this.insertElement.bind(this), insertedValue);
+  } else {  
+    console.log("Need a value to insert");
+      let handler = function() {
+        this.commands = new Array();
+        this.commands.push(this.cmd("SetMessage", "Need a value to insert"));
+        return this.commands;
+      }.bind(this);
+      this.implementAction(handler, null);
+      this.animationManager.skipForward();
+    
   }
 };
 
 
 BTree.prototype.insertRandomCallback = function (event) {
-  var numToInsert = this.inputField.value;
+  var numToInsert = 10; // this.inputField.value;
   for (let i = 0; i < numToInsert; i++) {
     const insertedValue = Math.floor(1 + Math.random() * 999);
     this.implementAction(this.insertElement.bind(this), insertedValue);
@@ -1057,162 +1083,99 @@ BTree.prototype.doDeleteNotEmpty = function (tree, val) {
         this.resizeTree();
         this.cmd("SetMessage", "");
       } else {
-        this.cmd("SetMessage",
-          "Checking to see if tree to left of element to delete \nhas an extra key",
-        );
+        // Always prefer successor: smallest key from right subtree
+        var leftChild = tree.children[i];
+        var rightChild = tree.children[i + 1];
+
+        // If right child is at min and left is also at min, merge around key then delete
+        if (rightChild.numKeys == this.min_keys && leftChild.numKeys == this.min_keys) {
+          this.cmd("SetMessage",
+            "Both adjacent subtrees have minimum keys. Merging around key and deleting recursively ...",
+          );
+          this.cmd("Step");
+          this.cmd("SetTextColor", tree.graphicID, FOREGROUND_COLOR, i);
+          var nextNode = this.mergeRight(leftChild);
+          this.doDeleteNotEmpty(nextNode, val);
+          return;
+        }
+
+        // If right child is at min but left has extra, borrow from left into right via parent
+        if (rightChild.numKeys == this.min_keys && leftChild.numKeys > this.min_keys) {
+          this.cmd("SetMessage", "Right child has minimum keys. Borrowing from left sibling via parent.");
+          this.stealFromLeft(rightChild, i + 1);
+        }
+
+        this.cmd("SetMessage", "Finding the smallest key in right subtree ...");
         this.cmd(
           "SetEdgeHighlight",
           tree.graphicID,
-          tree.children[i].graphicID,
+          rightChild.graphicID,
           1,
         );
-
         this.cmd("Step");
         this.cmd(
           "SetEdgeHighlight",
           tree.graphicID,
-          tree.children[i].graphicID,
+          rightChild.graphicID,
           0,
         );
-        var maxNode = tree.children[i];
 
-        if (tree.children[i].numKeys == this.min_keys) {
-          this.cmd("SetMessage",
-            "Tree to left of element to delete does not have an extra key.  \nLooking to the right ...",
-          );
-          this.cmd(
-            "SetEdgeHighlight",
-            tree.graphicID,
-            tree.children[i + 1].graphicID,
-            1,
-          );
+        var minNode = rightChild;
+        while (!minNode.isLeaf) {
+          this.cmd("SetHighlight", minNode.graphicID, 1);
           this.cmd("Step");
-          this.cmd(
-            "SetEdgeHighlight",
-            tree.graphicID,
-            tree.children[i + 1].graphicID,
-            0,
-          );
-          // Trees to left and right of node to delete don't have enough keys
-          //   Do a merge, and then recursively delete the element
-          if (tree.children[i + 1].numKeys == this.min_keys) {
-            this.cmd("SetMessage",
-              "Neither subtree has extra nodes.  Mergeing around the key to delete, \nand recursively deleting ...",
-            );
-            this.cmd("Step");
-            this.cmd("SetTextColor", tree.graphicID, FOREGROUND_COLOR, i);
-            nextNode = this.mergeRight(tree.children[i]);
-            this.doDeleteNotEmpty(nextNode, val);
-            return;
-          } else {
-            this.cmd("SetMessage",
-              "Tree to right of element to delete does have an extra key. \nFinding the smallest key in that subtree ...",
-            );
-            this.cmd("Step");
-
-            var minNode = tree.children[i + 1];
-            while (!minNode.isLeaf) {
-              this.cmd("SetHighlight", minNode.graphicID, 1);
-              this.cmd("Step");
-              this.cmd("SetHighlight", minNode.graphicID, 0);
-              if (minNode.children[0].numKeys == this.min_keys) {
-                if (minNode.children[1].numKeys == this.min_keys) {
-                  minNode = this.mergeRight(minNode.children[0]);
-                } else {
-                  minNode = this.stealFromRight(minNode.children[0], 0);
-                }
-              } else {
-                minNode = minNode.children[0];
-              }
-            }
-
-            this.cmd("SetHighlight", minNode.graphicID, 1);
-            tree.keys[i] = minNode.keys[0];
-            this.cmd("SetTextColor", tree.graphicID, FOREGROUND_COLOR, i);
-            this.cmd("SetText", tree.graphicID, "", i);
-            this.cmd("SetText", minNode.graphicID, "", 0);
-
-            this.cmd(
-              "CreateLabel",
-              this.moveLabel1ID,
-              minNode.keys[0],
-              this.getLabelX(minNode, 0),
-              minNode.y,
-            );
-            this.cmd(
-              "Move",
-              this.moveLabel1ID,
-              this.getLabelX(tree, i),
-              tree.y,
-            );
-            this.cmd("Step");
-            this.cmd("Delete", this.moveLabel1ID);
-            this.cmd("SetText", tree.graphicID, tree.keys[i], i);
-            for (i = 1; i < minNode.numKeys; i++) {
-              minNode.keys[i - 1] = minNode.keys[i];
-              this.cmd(
-                "SetText",
-                minNode.graphicID,
-                minNode.keys[i - 1],
-                i - 1,
-              );
-            }
-            this.cmd("SetText", minNode.graphicID, "", minNode.numKeys - 1);
-
-            minNode.numKeys--;
-            this.cmd("SetHighlight", minNode.graphicID, 0);
-            this.cmd("SetHighlight", tree.graphicID, 0);
-
-            this.cmd("SetNumElements", minNode.graphicID, minNode.numKeys);
-            this.resizeTree();
-            this.cmd("SetMessage", "");
-          }
-        } else {
-          this.cmd("SetMessage",
-            "Tree to left of element to delete does have \nan extra key. Finding the largest key in that subtree ...",
-          );
-          this.cmd("Step");
-          while (!maxNode.isLeaf) {
-            this.cmd("SetHighlight", maxNode.graphicID, 1);
-            this.cmd("Step");
-            this.cmd("SetHighlight", maxNode.graphicID, 0);
-            if (maxNode.children[maxNode.numKeys].numKeys == this.min_keys) {
-              if (maxNode.children[maxNode.numKeys - 1] > this.min_keys) {
-                maxNode = this.stealFromLeft(
-                  maxNode.children[maxNode.numKeys],
-                  maxNode.numKeys,
-                );
-              } else {
-              }
-              maxNode = this.mergeRight(maxNode.children[maxNode.numKeys - 1]);
+          this.cmd("SetHighlight", minNode.graphicID, 0);
+          if (minNode.children[0].numKeys == this.min_keys) {
+            if (minNode.children[1].numKeys == this.min_keys) {
+              minNode = this.mergeRight(minNode.children[0]);
             } else {
-              maxNode = maxNode.children[maxNode.numKeys];
+              minNode = this.stealFromRight(minNode.children[0], 0);
             }
+          } else {
+            minNode = minNode.children[0];
           }
-          this.cmd("SetHighlight", maxNode.graphicID, 1);
-          tree.keys[i] = maxNode.keys[maxNode.numKeys - 1];
-          this.cmd("SetTextColor", tree.graphicID, FOREGROUND_COLOR, i);
-          this.cmd("SetText", tree.graphicID, "", i);
-          this.cmd("SetText", maxNode.graphicID, "", maxNode.numKeys - 1);
-          this.cmd(
-            "CreateLabel",
-            this.moveLabel1ID,
-            tree.keys[i],
-            this.getLabelX(maxNode, maxNode.numKeys - 1),
-            maxNode.y,
-          );
-          this.cmd("Move", this.moveLabel1ID, this.getLabelX(tree, i), tree.y);
-          this.cmd("Step");
-          this.cmd("Delete", this.moveLabel1ID);
-          this.cmd("SetText", tree.graphicID, tree.keys[i], i);
-          maxNode.numKeys--;
-          this.cmd("SetHighlight", maxNode.graphicID, 0);
-          this.cmd("SetHighlight", tree.graphicID, 0);
-
-          this.cmd("SetNumElements", maxNode.graphicID, maxNode.numKeys);
-          this.resizeTree();
-          this.cmd("SetMessage", "");
         }
+
+        this.cmd("SetHighlight", minNode.graphicID, 1);
+        tree.keys[i] = minNode.keys[0];
+        this.cmd("SetTextColor", tree.graphicID, FOREGROUND_COLOR, i);
+        this.cmd("SetText", tree.graphicID, "", i);
+        this.cmd("SetText", minNode.graphicID, "", 0);
+
+        this.cmd(
+          "CreateLabel",
+          this.moveLabel1ID,
+          minNode.keys[0],
+          this.getLabelX(minNode, 0),
+          minNode.y,
+        );
+        this.cmd(
+          "Move",
+          this.moveLabel1ID,
+          this.getLabelX(tree, i),
+          tree.y,
+        );
+        this.cmd("Step");
+        this.cmd("Delete", this.moveLabel1ID);
+        this.cmd("SetText", tree.graphicID, tree.keys[i], i);
+        for (var k = 1; k < minNode.numKeys; k++) {
+          minNode.keys[k - 1] = minNode.keys[k];
+          this.cmd(
+            "SetText",
+            minNode.graphicID,
+            minNode.keys[k - 1],
+            k - 1,
+          );
+        }
+        this.cmd("SetText", minNode.graphicID, "", minNode.numKeys - 1);
+
+        minNode.numKeys--;
+        this.cmd("SetHighlight", minNode.graphicID, 0);
+        this.cmd("SetHighlight", tree.graphicID, 0);
+
+        this.cmd("SetNumElements", minNode.graphicID, minNode.numKeys);
+        this.resizeTree();
+        this.cmd("SetMessage", "");
       }
     }
   }
@@ -1279,36 +1242,43 @@ BTree.prototype.doDeleteEmpty = function (tree, val) {
         //this.cmd("Step");
         this.repairAfterDelete(tree);
       } else {
-        var maxNode = tree.children[i];
-        this.cmd("SetMessage", `Find max value in subtree.`);
-        while (!maxNode.isLeaf) {
-          this.cmd("SetHighlight", maxNode.graphicID, 1);
+        // Replace with successor: smallest key from right subtree
+        var rightChild = tree.children[i + 1];
+        this.cmd("SetMessage", `Find min value in right subtree.`);
+        while (!rightChild.isLeaf) {
+          this.cmd("SetHighlight", rightChild.graphicID, 1);
           this.cmd("Step");
-          this.cmd("SetHighlight", maxNode.graphicID, 0);
-          maxNode = maxNode.children[maxNode.numKeys];
+          this.cmd("SetHighlight", rightChild.graphicID, 0);
+          rightChild = rightChild.children[0];
         }
-        this.cmd("SetHighlight", maxNode.graphicID, 1);
-        tree.keys[i] = maxNode.keys[maxNode.numKeys - 1];
+        this.cmd("SetHighlight", rightChild.graphicID, 1);
+        tree.keys[i] = rightChild.keys[0];
         this.cmd("SetTextColor", tree.graphicID, FOREGROUND_COLOR, i);
         this.cmd("SetText", tree.graphicID, "", i);
-        this.cmd("SetText", maxNode.graphicID, "", maxNode.numKeys - 1);
+        this.cmd("SetText", rightChild.graphicID, "", 0);
         this.cmd(
           "CreateLabel",
           this.moveLabel1ID,
           tree.keys[i],
-          this.getLabelX(maxNode, maxNode.numKeys - 1),
-          maxNode.y,
+          this.getLabelX(rightChild, 0),
+          rightChild.y,
         );
         this.cmd("Move", this.moveLabel1ID, this.getLabelX(tree, i), tree.y);
         this.cmd("Step");
         this.cmd("Delete", this.moveLabel1ID);
         this.cmd("SetText", tree.graphicID, tree.keys[i], i);
-        maxNode.numKeys--;
-        this.cmd("SetHighlight", maxNode.graphicID, 0);
+        // Remove the used min key from rightChild
+        for (var j = 1; j < rightChild.numKeys; j++) {
+          rightChild.keys[j - 1] = rightChild.keys[j];
+          this.cmd("SetText", rightChild.graphicID, rightChild.keys[j - 1], j - 1);
+        }
+        rightChild.numKeys--;
+        this.cmd("SetText", rightChild.graphicID, "", rightChild.numKeys);
+        this.cmd("SetHighlight", rightChild.graphicID, 0);
         this.cmd("SetHighlight", tree.graphicID, 0);
 
-        this.cmd("SetNumElements", maxNode.graphicID, maxNode.numKeys);
-        this.repairAfterDelete(maxNode);
+        this.cmd("SetNumElements", rightChild.graphicID, rightChild.numKeys);
+        this.repairAfterDelete(rightChild);
       }
     }
   }

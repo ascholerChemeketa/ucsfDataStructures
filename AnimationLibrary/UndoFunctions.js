@@ -180,16 +180,17 @@ UndoSetAlpha.prototype.undoInitialStep = function (world) {
 // UndoSetNull
 ////////////////////////////////////////////////////////////
 
-export function UndoSetNull(id, nv) {
+export function UndoSetNull(id, nv, linkIndex) {
   this.objectID = id;
   this.nullVal = nv;
+  this.linkIndex = linkIndex;
 }
 
 UndoSetNull.prototype = new UndoBlock();
 UndoSetNull.prototype.constructor = UndoSetNull;
 
 UndoSetNull.prototype.undoInitialStep = function (world) {
-  world.setNull(this.objectID, this.nullVal);
+  world.setNull(this.objectID, this.nullVal, this.linkIndex);
 };
 
 ////////////////////////////////////////////////////////////

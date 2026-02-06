@@ -41,6 +41,7 @@ function addLabelToAlgorithmBar(labelName, labelId, labelTarget) {
 function addCheckboxToAlgorithmBar(boxLabel, id) {
   var element = document.createElement("input");
   element.setAttribute("type", "checkbox");
+  element.id = id;
   element.setAttribute("value", boxLabel);
 
   let parent = document.getElementById("AlgorithmSpecificControls");
@@ -63,29 +64,31 @@ function addCheckboxToAlgorithmBar(boxLabel, id) {
 
 function addRadioButtonGroupToAlgorithmBar(buttonNames, groupName) {
   var buttonList = [];
-  var newTable = document.createElement("table");
+  var newTable = document.createElement("div");
+  newTable.className = "radioButtonGroup";
 
   for (var i = 0; i < buttonNames.length; i++) {
-    var midLevel = document.createElement("tr");
-    var bottomLevel = document.createElement("td");
+    var midLevel = document.createElement("div");
+  midLevel.className = "radioButtonContainer";
 
     var button = document.createElement("input");
     button.setAttribute("type", "radio");
     button.setAttribute("name", groupName);
     button.setAttribute("value", buttonNames[i]);
-    bottomLevel.appendChild(button);
-    midLevel.appendChild(bottomLevel);
-    var txtNode = document.createTextNode(" " + buttonNames[i]);
-    bottomLevel.appendChild(txtNode);
+    button.setAttribute("id", `${groupName}-${i}`);
+    midLevel.appendChild(button);
+    var labelNode = document.createElement("label");
+    labelNode.setAttribute("for", `${groupName}-${i}`);
+    labelNode.innerHTML = " " + buttonNames[i];
+    midLevel.appendChild(labelNode);
+
     newTable.appendChild(midLevel);
     buttonList.push(button);
   }
 
-  var topLevelTableEntry = document.createElement("td");
-  topLevelTableEntry.appendChild(newTable);
 
   var controlBar = document.getElementById("AlgorithmSpecificControls");
-  controlBar.appendChild(topLevelTableEntry);
+  controlBar.appendChild(newTable);
 
   return buttonList;
 }
@@ -118,6 +121,11 @@ function addControlToAlgorithmBar(type, name, id, label) {
   element.setAttribute("type", type);
   element.setAttribute("value", name);
   element.id = id;
+
+  // Standard placeholder for the shared input field used by many visualizations.
+  if (type === "Text" && id === "inputField") {
+    element.setAttribute("placeholder", "Value to add/remove/etc...");
+  }
   
   let parent = document.getElementById("AlgorithmSpecificControls");
   if(label) {

@@ -24,7 +24,10 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import {
+  initAnimationManager,
+  initCanvas,
+} from "../AnimationLibrary/AnimationMain.js";
 import { Graph, VERTEX_INDEX_COLOR } from "./Graph.js";
 
 import {
@@ -36,20 +39,59 @@ var AUX_ARRAY_WIDTH = 25;
 var AUX_ARRAY_HEIGHT = 25;
 var AUX_ARRAY_START_Y = 50;
 
-var VISITED_START_X = 475;
-var PARENT_START_X = 400;
+var VISITED_START_X = 175;
+var PARENT_START_X = 250;
 
-var HIGHLIGHT_CIRCLE_COLOR = "#000000";
+var HIGHLIGHT_CIRCLE_COLOR = "#9c0303ff";
 var BFS_TREE_COLOR = "#0000FF";
 var BFS_QUEUE_HEAD_COLOR = "#0000FF";
 
 var QUEUE_START_X = 30;
-var QUEUE_START_Y = 50;
+var QUEUE_START_Y = 40;
 var QUEUE_SPACING = 30;
 
 export function BFS(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+  // New-style usage: `new BFS({ ...opts })` (preferred)
+  // Legacy usage: `new BFS(canvas)`
+  let am;
+  let w;
+  let h;
+
+  if (canvas && typeof canvas.getContext === "function") {
+    const legacyCanvas = canvas;
+    am = initCanvas(legacyCanvas, null, "Breadth-First Search", false, {
+      viewWidth: legacyCanvas.width,
+      viewHeight: legacyCanvas.height,
+    });
+    w = legacyCanvas.width;
+    h = legacyCanvas.height;
+  } else {
+    const opts = canvas || {};
+    const viewWidth =
+      Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
+        ? opts.viewWidth
+        : Number.isFinite(opts.width) && opts.width > 0
+          ? opts.width
+          : 1000;
+    const viewHeight =
+      Number.isFinite(opts.viewHeight) && opts.viewHeight > 0
+        ? opts.viewHeight
+        : Number.isFinite(opts.height) && opts.height > 0
+          ? opts.height
+          : 500;
+
+    am = initAnimationManager({
+      title: opts.title || "Breadth-First Search",
+      height: opts.height || viewHeight,
+      viewWidth,
+      viewHeight,
+      ...opts,
+    });
+    w = viewWidth;
+    h = viewHeight;
+  }
+
+  this.init(am, w, h);
 }
 
 BFS.prototype = new Graph();
@@ -59,6 +101,7 @@ BFS.superclass = Graph.prototype;
 BFS.prototype.addControls = function () {
   addLabelToAlgorithmBar("Start Vertex: ");
   this.startField = addControlToAlgorithmBar("Text", "");
+  this.startField.setAttribute("placeholder", "Vertex #");
   this.startField.onkeydown = this.returnSubmit(
     this.startField,
     this.startCallback.bind(this),
@@ -94,7 +137,7 @@ BFS.prototype.setup = function () {
     this.cmd(
       "CreateRectangle",
       this.visitedID[i],
-      "f",
+      "F",
       AUX_ARRAY_WIDTH,
       AUX_ARRAY_HEIGHT,
       VISITED_START_X,
@@ -172,6 +215,7 @@ BFS.prototype.startCallback = function (event) {
 
 BFS.prototype.doBFS = function (startVetex) {
   this.visited = new Array(this.size);
+  this.parent = new Array(this.size);
   this.commands = new Array();
   this.queue = new Array(this.size);
   var head = 0;
@@ -191,17 +235,19 @@ BFS.prototype.doBFS = function (startVetex) {
     this.cmd("SetText", this.visitedID[i], "f");
     this.cmd("SetText", this.parentID[i], "");
     this.visited[i] = false;
+    this.parent[i] = -1;
     queueID[i] = this.nextIndex++;
   }
   var vertex = parseInt(startVetex);
   this.visited[vertex] = true;
+  this.parent[vertex] = -1;
   this.queue[tail] = vertex;
   this.cmd(
     "CreateLabel",
     queueID[tail],
     vertex,
-    QUEUE_START_X + queueSize * QUEUE_SPACING,
-    QUEUE_START_Y,
+    QUEUE_START_X,
+    QUEUE_START_Y + queueSize * QUEUE_SPACING,
   );
   queueSize = queueSize + 1;
   tail = (tail + 1) % this.size;
@@ -235,13 +281,18 @@ BFS.prototype.doBFS = function (startVetex) {
 
     this.cmd("SetTextColor", queueID[head], BFS_QUEUE_HEAD_COLOR);
 
+    this.cmd("SetMessage", `Explore node at front of queue (${vertex}).`);
+    this.cmd("Step");
+
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[vertex][neighbor] > 0) {
         this.highlightEdge(vertex, neighbor, 1);
         this.cmd("SetHighlight", this.visitedID[neighbor], 1);
+        this.cmd("SetMessage", `Explore edge ${vertex} -> ${neighbor} (check whether ${neighbor} is unvisited).`);
         this.cmd("Step");
         if (!this.visited[neighbor]) {
           this.visited[neighbor] = true;
+          this.parent[neighbor] = vertex;
           this.cmd("SetText", this.visitedID[neighbor], "T");
           this.cmd("SetText", this.parentID[neighbor], vertex);
           this.highlightEdge(vertex, neighbor, 0);
@@ -264,14 +315,20 @@ BFS.prototype.doBFS = function (startVetex) {
             "CreateLabel",
             queueID[tail],
             neighbor,
-            QUEUE_START_X + queueSize * QUEUE_SPACING,
-            QUEUE_START_Y,
+            QUEUE_START_X,
+            QUEUE_START_Y + queueSize * QUEUE_SPACING,
           );
           tail = (tail + 1) % this.size;
           queueSize = queueSize + 1;
+          this.cmd(
+            "SetMessage",
+            `Discovered ${neighbor}; set parent to ${vertex}, add to BFS tree, and enqueue ${neighbor}.`,
+          );
         } else {
           this.highlightEdge(vertex, neighbor, 0);
+          this.cmd("SetMessage", `Neighbor ${neighbor} was already visited; ignore this edge.`);
         }
+        this.cmd("Step");
         this.cmd("SetHighlight", this.visitedID[neighbor], 0);
         this.cmd("Step");
       }
@@ -284,15 +341,30 @@ BFS.prototype.doBFS = function (startVetex) {
       this.cmd(
         "Move",
         queueID[nextQueueIndex],
-        QUEUE_START_X + i * QUEUE_SPACING,
-        QUEUE_START_Y,
+        QUEUE_START_X,
+        QUEUE_START_Y + i * QUEUE_SPACING,
       );
     }
 
     this.cmd("Delete", this.highlightCircleL);
     this.cmd("Delete", this.highlightCircleAM);
     this.cmd("Delete", this.highlightCircleAL);
+
+  this.cmd("SetMessage", "BFS complete. Search tree highlighted.");
+  for (i = 0; i < this.size; i++) {
+    if (this.parent[i] >= 0) {
+      this.highlightEdge(this.parent[i], i, 1);
+    }
   }
+  this.cmd("Step");
+    
+          this.cmd("SetMessage", `Done exploring ${vertex}.`);
+        this.cmd("Step");
+  }
+  
+    this.cmd("SetMessage", `Queue is empty. Done.`);
+    this.cmd("Step");
+
 
   return this.commands;
 };

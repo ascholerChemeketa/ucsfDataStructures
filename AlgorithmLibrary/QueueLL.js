@@ -110,6 +110,7 @@ QueueLL.prototype.addControls = function () {
   this.controls = [];
   
   this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+  this.inputField.setAttribute("placeholder", "Value to enqueue");
   this.controls.push(this.inputField);
 
   this.inputField.onkeydown = this.returnSubmit(  

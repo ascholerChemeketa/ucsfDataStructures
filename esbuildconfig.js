@@ -13,6 +13,8 @@ esbuild
     //outdir: 'dist/',
     //outfile: "dist/visualizationPageStyle.css",
     outfile: "dist/entry.js",
+    // outfile: "../rsbooks/welcomeprogramming/external/interactives/data-structures/entry.js",
+    // outfile: "../rsbooks/welcomeprogramming/published/welcomeprogramming/external/interactives/data-structures/entry.js",
     //platform: 'neutral',
     format: "esm",
   })

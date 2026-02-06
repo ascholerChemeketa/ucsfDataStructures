@@ -54,6 +54,7 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
   this.svgLine = null;
   this.svgText = null;
   this.svgArrow = null;
+  this.svgGroup = null;
 
   this.alpha = 1.0;
   this.color = function color() {
@@ -62,23 +63,19 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
 
   
   this.remove = function () {
-    if(this.svgLine) {
-      this.svgLine.remove();
-      this.svgLine = null;
+    if (this.svgGroup) {
+      this.svgGroup.remove();
+      this.svgGroup = null;
     }
-    if(this.svgText) {
-      this.svgText.remove();
-      this.svgText = null;
-    }
-    if(this.svgArrow) {
-      this.svgArrow.remove();
-      this.svgArrow = null;
-    }
+
+    this.svgLine = null;
+    this.svgText = null;
+    this.svgArrow = null;
   };
 
 
   this.getSVGComponent = function () {
-    return this.svgLine;
+    return this.svgGroup || this.svgLine;
   };
 
   this.setColor = function (newColor) {
@@ -93,8 +90,12 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
       this.svgLine.setAttributeNS(
         null,
         "style",
-        "stroke: var(--svgColor--highlight);"
+        "fill: none; stroke: var(--svgColor--highlight); stroke-width: 1px;"
       );
+
+      if (this.svgText) {
+        this.svgText.setAttributeNS(null, "style", "fill: var(--svgColor--highlight); stroke: none;");
+      }
       
       if(this.directed)
       this.svgLine.setAttributeNS(null, 'marker-end', "url(#SVGTriangleMarkerHighlight)");
@@ -103,8 +104,12 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
       this.svgLine.setAttributeNS(
         null,
         "style",
-        `stroke: ${this.edgeColor};`
+        `fill: none; stroke: ${this.edgeColor}; stroke-width: 1px;`
       );
+
+      if (this.svgText) {
+        this.svgText.setAttributeNS(null, "style", `fill: ${this.edgeColor}; stroke: none;`);
+      }
       
       if(this.directed)
       this.svgLine.setAttributeNS(null, 'marker-end', "url(#SVGTriangleMarker)");
@@ -201,6 +206,13 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
     context.textBaseline = "middle";
     context.fillText(this.edgeLabel, labelPosX, labelPosY);
 
+    // SVG label (primary renderer in this project)
+    if (this.svgText) {
+      this.svgText.setAttributeNS(null, "x", labelPosX);
+      this.svgText.setAttributeNS(null, "y", labelPosY);
+      this.svgText.textContent = String(this.edgeLabel);
+    }
+
     if (this.directed) {
       var xVec = controlX - toPos[0];
       var yVec = controlY - toPos[1];
@@ -233,24 +245,45 @@ export function Line(n1, n2, color, cv, d, weight, anchorIndex) {
 
     if(!this.svgLine) {
       var svgns = "http://www.w3.org/2000/svg";
-      var line = document.createElementNS(svgns, 'path');
-      line.setAttributeNS(null, 'style', `fill: none; stroke: ${this.edgeColor}; stroke-width: 1px;` );
-      if(this.directed) 
-        line.setAttributeNS(null, 'marker-end', "url(#SVGTriangleMarker)");
+      const group = document.createElementNS(svgns, "g");
+      ctx.svg.getElementById("edges").appendChild(group);
+      this.svgGroup = group;
+
+      var line = document.createElementNS(svgns, "path");
+      line.setAttributeNS(
+        null,
+        "style",
+        `fill: none; stroke: ${this.edgeColor}; stroke-width: 1px;`,
+      );
+      if (this.directed)
+        line.setAttributeNS(null, "marker-end", "url(#SVGTriangleMarker)");
+      group.appendChild(line);
       this.svgLine = line;
-      
-      ctx.svg.getElementById("edges").appendChild(line);
-      if(this.label && this.label.length > 0) {
-        console.log("LABEL NOT IMPLEMENTED")
+
+      const hasEdgeLabel =
+        this.edgeLabel !== undefined &&
+        this.edgeLabel !== null &&
+        String(this.edgeLabel) !== "";
+      if (hasEdgeLabel) {
+        const text = document.createElementNS(svgns, "text");
+        text.setAttributeNS(null, "dominant-baseline", "middle");
+        text.setAttributeNS(null, "text-anchor", "middle");
+        text.setAttributeNS(null, "style", `fill: ${this.edgeColor}; stroke: none;`);
+        text.setAttribute("pointer-events", "none");
+        group.appendChild(text);
+        this.svgText = text;
       }
     }
     if (this.highlighted) this.drawArrow(this.highlightDiff, "#FF0000", ctx);
     else this.drawArrow(1, this.edgeColor, ctx);
 
-    if(!this.addedToScene)
-      this.svgLine.setAttributeNS(null, "display", "none");
-    else
-      this.svgLine.setAttributeNS(null, "display", "block");
+    const display = this.addedToScene ? "block" : "none";
+    if (this.svgGroup) {
+      this.svgGroup.setAttributeNS(null, "display", display);
+    } else {
+      this.svgLine.setAttributeNS(null, "display", display);
+      if (this.svgText) this.svgText.setAttributeNS(null, "display", display);
+    }
   };
 }
 

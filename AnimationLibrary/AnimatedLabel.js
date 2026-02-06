@@ -40,6 +40,8 @@ export function AnimatedLabel(id, val, center, initialWidth) {
     this.textWidth = initialWidth;
   }
 
+  this.fontSizePercent = 100;
+
   this.leftWidth = -1;
   this.centerWidth = -1;
   this.highlightIndex = -1;
@@ -59,6 +61,13 @@ AnimatedLabel.prototype.remove = function () {
   }
 };
 
+AnimatedLabel.prototype.setFontSizePercent = function (fontSizePercent) {
+  const parsed = Number(fontSizePercent);
+  if (!Number.isFinite(parsed)) return;
+  // Keep it sane; this is a percent string in SVG.
+  this.fontSizePercent = Math.max(10, Math.min(200, parsed));
+};
+
 AnimatedLabel.prototype.centered = function () {
   return this.centering;
 };
@@ -68,26 +77,37 @@ AnimatedLabel.prototype.getSVGComponent = function () {
 };
 
 AnimatedLabel.prototype.draw = function (ctx) {
-  console.log(this.labelColor)
   let labelColor = this.labelColor ? this.labelColor : 'var(--svgColor)';
-    
+
+  // Important: when layers are toggled, ObjectManager calls draw() even for
+  // hidden objects. We must explicitly hide any existing SVG element.
   if (!this.addedToScene) {
+    if (this.svgText) {
+      this.svgText.setAttributeNS(null, "display", "none");
+    }
     return;
   }
   if (!this.svgText) {
     var svgns = "http://www.w3.org/2000/svg";
     var text = document.createElementNS(svgns, "text");
     text.setAttributeNS(null, "dominant-baseline", "middle");
-    text.setAttributeNS(null, "text-anchor", "middle");
-    text.setAttributeNS(
-      null,
-      "style",
-      `fill: ${this.labelColor}; stroke: none; stroke-width: 1px; font-size: 80%;`,
-    );
+    text.setAttributeNS(null, "text-anchor", this.centering ? "middle" : "start");
     text.setAttribute("pointer-events", "none");
     ctx.svg.getElementById("nodes").appendChild(text);
     this.svgText = text;
   }
+
+  this.svgText.setAttributeNS(null, "display", "block");
+
+  // Keep SVG alignment in sync in case centering changes.
+  this.svgText.setAttributeNS(null, "text-anchor", this.centering ? "middle" : "start");
+
+  // Keep style in sync (color and font size can vary per label).
+  this.svgText.setAttributeNS(
+    null,
+    "style",
+    `fill: ${labelColor}; stroke: none; stroke-width: 1px; font-size: ${this.fontSizePercent}%;`,
+  );
 
   this.svgText.setAttributeNS(null, "x", this.x);
   this.svgText.setAttributeNS(null, "y", this.y + 1);
@@ -136,14 +156,14 @@ AnimatedLabel.prototype.draw = function (ctx) {
     this.svgText.setAttributeNS(
       null,
       "style",
-      "fill: var(--svgColor--highlight);"
+      `fill: var(--svgColor--highlight); stroke: none; stroke-width: 1px; font-size: ${this.fontSizePercent}%;`,
     );
       
   } else {
     this.svgText.setAttributeNS(
       null,
       "style",
-      `fill: ${this.labelColor}; stroke: none; stroke-width: 1px;`
+      `fill: ${this.labelColor}; stroke: none; stroke-width: 1px; font-size: ${this.fontSizePercent}%;`,
     );
   }
 
@@ -286,6 +306,7 @@ AnimatedLabel.prototype.createUndoDelete = function () {
     this.labelColor,
     this.layer,
     this.highlightIndex,
+    this.fontSizePercent,
   );
 };
 
@@ -366,7 +387,7 @@ AnimatedLabel.prototype.setText = function (newText, textIndex, initialWidth) {
   }
 };
 
-function UndoDeleteLabel(id, lab, x, y, centered, color, l, hli) {
+function UndoDeleteLabel(id, lab, x, y, centered, color, l, hli, fontSizePercent) {
   this.objectID = id;
   this.posX = x;
   this.posY = y;
@@ -375,6 +396,7 @@ function UndoDeleteLabel(id, lab, x, y, centered, color, l, hli) {
   this.labelColor = color;
   this.layer = l;
   this.highlightIndex = hli;
+  this.fontSizePercent = fontSizePercent;
   this.dirty = true;
 }
 
@@ -382,7 +404,12 @@ UndoDeleteLabel.prototype = new UndoBlock();
 UndoDeleteLabel.prototype.constructor = UndoDeleteLabel;
 
 UndoDeleteLabel.prototype.undoInitialStep = function (world) {
-  world.addLabelObject(this.objectID, this.nodeLabel, this.labCentered);
+  world.addLabelObject(
+    this.objectID,
+    this.nodeLabel,
+    this.labCentered,
+    this.fontSizePercent,
+  );
   world.setNodePosition(this.objectID, this.posX, this.posY);
   world.setForegroundColor(this.objectID, this.labelColor);
   world.setLayer(this.objectID, this.layer);

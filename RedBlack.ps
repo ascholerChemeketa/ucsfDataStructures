@@ -31,7 +31,7 @@ AVL.prototype.addControls =  function()
 	this.insertButton.onclick = this.insertCallback.bind(this);
 	this.deleteField = addControlToAlgorithmBar("Text", "");
 	this.deleteField.onkeydown = this.returnSubmit(this.deleteField,  this.deleteCallback.bind(this), 4);
-	this.deleteButton = addControlToAlgorithmBar("Button", "Delete");
+	this.deleteButton = addControlToAlgorithmBar("Button", "Remove");
 	this.deleteButton.onclick = this.deleteCallback.bind(this);
 	this.findField = addControlToAlgorithmBar("Text", "");
 	this.findField.onkeydown = this.returnSubmit(this.findField,  this.findCallback.bind(this), 4);
@@ -854,7 +854,7 @@ AVL.prototype.treeDelete = function(tree, valueToDelete)
 				this.cmd("SetForegroundColor", labelID, BLUE);
 				tree.data = tmp.data;
 				this.cmd("Move", labelID, tree.x, tree.y);
-				this.cmd("SetText", 0, "Copy largest value of left subtree into node to delete.");									
+				this.cmd("SetText", 0, "Copy largest value of left subtree over value being removed.");									
 				
 				this.cmd("Step");
 				this.cmd("SetHighlight", tree.graphicID, 0);

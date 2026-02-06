@@ -38,7 +38,7 @@ export var AnimatedCircle = function (objectID, objectLabel) {
   this.addedToScene = true;
   this.highlightIndex = -1;
   this.foregroundColor  = 'var(--svgColor)';
-	this.backgroundColor  = '#FFF0';
+	this.backgroundColor  = 'rgba(255, 255, 255, 0)';
 
   this.svgCircle = null;
   this.svgText = null;
@@ -101,7 +101,7 @@ AnimatedCircle.prototype.updateCircle = function () {
 
   if(!this.svgCircle) return;
   
-  let bg = this.backgroundColor;
+  let bg = this.backgroundColor ? this.backgroundColor : 'var(--svgColor--background)';
   let fg = this.highlighted ? 'var(--svgColor--highlight)' : this.foregroundColor;
   let sw = this.highlighted ? 3 : 1;
 
@@ -175,10 +175,17 @@ AnimatedCircle.prototype.draw = function (ctx) {
   this.svgCircle.setAttributeNS(null, "cx", this.x);
   this.svgCircle.setAttributeNS(null, "cy", this.y);
 
-  if(!this.addedToScene)
+  if(!this.addedToScene) {
     this.svgCircle.setAttributeNS(null, "display", "none");
-  else
+    if (this.svgText) {
+      this.svgText.setAttributeNS(null, "display", "none");
+    }
+  } else {
     this.svgCircle.setAttributeNS(null, "display", "block");
+    if (this.svgText) {
+      this.svgText.setAttributeNS(null, "display", "block");
+    }
+  }
 
   // ctx.fillStyle = this.backgroundColor;
   // ctx.strokeStyle = this.foregroundColor;

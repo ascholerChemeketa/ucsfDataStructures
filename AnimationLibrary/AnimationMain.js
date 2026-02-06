@@ -36,6 +36,11 @@ import { controlKey } from "../AlgorithmLibrary/Algorithm.js";
 import * as Undo from "./UndoFunctions.js"; 
 
 
+// Super hacky fix for crap added by pages that these ge embedded into in PreTeXt
+document.querySelectorAll("div").forEach((el) => {
+  el.style.aspectRatio = "";
+});
+
 // Utility funciton to read a cookie
 function getCookie(cookieName) {
   var i, x, y;
@@ -72,6 +77,63 @@ var skipBackButton;
 var stepBackButton;
 var stepForwardButton;
 var skipForwardButton;
+var scrubSlider;
+
+var keyboardStepListenerInstalled = false;
+var ctrlWheelZoomListenerInstalled = false;
+var pinchZoomListenerInstalled = false;
+var ltiResizeListenerInstalled = false;
+
+var zoomHoverTrackingInstalled = false;
+var pendingZoomFocusClient = null;
+var lastHoverClient = null;
+
+var autoplayIntervalId = null;
+
+function installZoomHoverTracking(targetEl) {
+  if (zoomHoverTrackingInstalled) return;
+  zoomHoverTrackingInstalled = true;
+
+  const el = targetEl || window;
+
+  el.addEventListener("mousemove", (e) => {
+    lastHoverClient = { x: e.clientX, y: e.clientY };
+  });
+}
+
+function installLTIResizer() {
+  if (ltiResizeListenerInstalled) return;
+  ltiResizeListenerInstalled = true;
+  window.addEventListener('resize', () => {
+    // console.log('Window resized inside the iframe!');
+    if(!window.frameElement) return;
+    const height = window.innerWidth > 500 ? '100%' : '600px';
+    const data = { subject: 'lti.frameResize', message_id: window.frameElement.id, height: height }
+    window.parent.postMessage(data, '*')
+  });
+}
+
+function getZoomSelect() {
+  return document.getElementById("zoomLevel");
+}
+
+function stepZoomSelect(direction) {
+  const zoomSelect = getZoomSelect();
+  if (!zoomSelect || zoomSelect.disabled) return false;
+
+  const curIndex = zoomSelect.selectedIndex;
+  if (curIndex < 0) return false;
+
+  const nextIndex = Math.max(
+    0,
+    Math.min(curIndex + direction, zoomSelect.options.length - 1),
+  );
+  if (nextIndex === curIndex) return false;
+
+  zoomSelect.selectedIndex = nextIndex;
+  zoomSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
 
 var widthEntry;
 var heightEntry;
@@ -222,16 +284,53 @@ function addControlTo(element, parent, label) {
   return element;
 }
 
+const SPEED_LABELS = ["Off", "Slow", "Medium", "Fast", "Max"];
+const SPEED_LABEL_TO_VALUE = {
+  Off: "step",
+  Slow: 10,
+  Medium: 4,
+  Fast: 2,
+  Max: 1,
+};
+
+function normalizeSpeedLabel(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (s === "") return null;
+
+  // Back-compat: old storage used "step" or numeric values.
+  if (s.toLowerCase() === "step" || s.toLowerCase() === "off") {
+    return "Off";
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(s)) {
+    const n = parseFloat(s);
+    if (n === 10) return "Slow";
+    if (n === 4) return "Medium";
+    if (n === 2) return "Fast";
+    if (n === 1) return "Max";
+    return null;
+  }
+
+  // Case-insensitive match on labels
+  const lower = s.toLowerCase();
+  for (const label of SPEED_LABELS) {
+    if (label.toLowerCase() === lower) return label;
+  }
+  return null;
+}
+
 function speedChange(speed) {
-  if (speed === "step") {
+  const label = normalizeSpeedLabel(speed) ?? "Off";
+  const mapped = SPEED_LABEL_TO_VALUE[label] ?? "step";
+
+  if (mapped === "step") {
     animationManager.SetPaused(true);
     animationManager.SetSpeed(1);
   } else {
-    speed = parseFloat(speed);
     animationManager.SetPaused(false);
-    animationManager.SetSpeed(speed);
+    animationManager.SetSpeed(mapped);
   }
-  setCookie("VisualizationSpeed", String(speed));
 }
 
 function makeDiv(id, classes, parent) {
@@ -243,7 +342,7 @@ function makeDiv(id, classes, parent) {
   return element;
 }
 
-function addGeneralControls(objectManager, targetElement, title) {
+function addGeneralControls(objectManager, targetElement, title, opts = null) {
   if (targetElement == null) {
     targetElement = document.body;
   }
@@ -266,24 +365,69 @@ function addGeneralControls(objectManager, targetElement, title) {
   stepForwardButton = addControlTo(makeInput("Button", ">", "Step Forward", "stepForwardButton"), stepButtons);
   skipForwardButton = addControlTo(makeInput("Button", ">>", "Skip Forward", "skipForwardButton"), stepButtons);
 
-  var speed = getCookie("VisualizationSpeed");
-  if (!parseFloat(speed)){
-    speed = "step";
-  } else {
-    speed = parseFloat(speed);
-  }
-  speedChange(speed);
+  // Thin scrub slider under step buttons
+  scrubSlider = document.createElement("input");
+  scrubSlider.type = "range";
+  scrubSlider.id = "scrubSlider";
+  scrubSlider.min = "1";
+  scrubSlider.max = "0"; // will be set when animation loads
+  scrubSlider.value = "0";
+  scrubSlider.step = "1";
+  scrubSlider.disabled = true;
+  scrubSlider.style.width = "100%";
+  scrubSlider.style.marginTop = "6px";
+  scrubSlider.style.height = "4px";
+  scrubSlider.style.cursor = "pointer";
+  controlBar.appendChild(scrubSlider);
+
+  // Autoplay control (below step buttons)
+  // const autoplayRow = document.createElement("div");
+  // autoplayRow.className = "autoplayRow";
+  // controlBar.appendChild(autoplayRow);
+
+  // const autoplayCheckbox = document.createElement("input");
+  // autoplayCheckbox.type = "checkbox";
+  // autoplayCheckbox.id = "autoplayCheckbox";
+  // autoplayRow.appendChild(autoplayCheckbox);
+
+  // const autoplayLabel = document.createElement("label");
+  // autoplayLabel.setAttribute("for", autoplayCheckbox.id);
+  // autoplayLabel.textContent = "Autoplay";
+  // autoplayRow.appendChild(autoplayLabel);
+
+  // autoplayCheckbox.addEventListener("change", () => {
+  //   if (autoplayIntervalId != null) {
+  //     clearInterval(autoplayIntervalId);
+  //     autoplayIntervalId = null;
+  //   }
+
+  //   if (!autoplayCheckbox.checked) return;
+
+  //   autoplayIntervalId = setInterval(() => {
+  //     if (stepForwardButton && !stepForwardButton.disabled) {
+  //       stepForwardButton.click();
+  //     }
+  //   }, 2000);
+  // });
 
   var speedSelect = document.createElement("select");
   speedSelect.setAttribute("id", "animationSpeed");
   speedSelect.setAttribute("name", "animationSpeed");
 
   speedSelect.innerHTML = `
-    <option value="step" selected="selected">Off</option>
-    <option value="10">Slow</option>
-    <option value="4">Medium</option>
-    <option value="2">Fast</option>
-    <option value="1">Max</option>`;
+    <option value="Off">Off</option>
+    <option value="Slow">Slow</option>
+    <option value="Medium">Medium</option>
+    <option value="Fast">Fast</option>
+    <option value="Max">Max</option>`;
+
+  // Initialize speed from opts (highest priority), else default to "Off".
+  // (Speed selection is no longer persisted in cookies.)
+  const optsLabel = opts ? normalizeSpeedLabel(opts.speed) : null;
+  const initialLabel = optsLabel ?? "Off";
+
+  speedSelect.value = initialLabel;
+  speedChange(initialLabel);
 
   speedSelect.addEventListener("change", (e) => {
     speedChange(e.target.value);
@@ -291,8 +435,24 @@ function addGeneralControls(objectManager, targetElement, title) {
   addControlTo(speedSelect, controlBar, "Auto Step Speed");
 
   var zoom = getCookie("VisualizationZoom");
-  if (!parseFloat(zoom)) {
-    zoom = 1;
+  {
+    let parsed = parseFloat(zoom);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      parsed = 2;
+    }
+
+    // Keep UI + behavior consistent even if an old/unsupported zoom value is stored.
+    // Displayed "x" scale is inversely proportional to this numeric value (1x uses value 4).
+    const allowedZoomValues = [16, 8, 6, 4, 2.6666666667, 2, 1.3333333333];
+    const isAllowed = allowedZoomValues.some((v) => Math.abs(v - parsed) < 1e-9);
+    if (!isAllowed) {
+      parsed = allowedZoomValues.reduce(
+        (best, v) => (Math.abs(v - parsed) < Math.abs(best - parsed) ? v : best),
+        allowedZoomValues[0],
+      );
+    }
+
+    zoom = parsed;
   }
   objectManager.setZoom(zoom);
 
@@ -300,15 +460,40 @@ function addGeneralControls(objectManager, targetElement, title) {
   zoomSelect.setAttribute("id", "zoomLevel");
   zoomSelect.setAttribute("name", "zoomLevel");
   zoomSelect.innerHTML = `
-    <option value="4" ${zoom == 2 ? "selected" : ""}>0.25x</option>
-    <option value="2" ${zoom == 2 ? "selected" : ""}>0.5x</option>
-    <option value="1" ${zoom == 1 ? "selected" : ""}>1x</option>
-    <option value="0.75" ${zoom == 0.75 ? "selected" : ""}>1.5x</option>
-    <option value="0.5" ${zoom == 0.5 ? "selected" : ""}>2x</option>`;
+    <option value="16" ${zoom == 16 ? "selected" : ""}>0.25x</option>
+    <option value="8" ${zoom == 8 ? "selected" : ""}>0.5x</option>
+    <option value="6" ${zoom == 6 ? "selected" : ""}>0.75x</option>
+    <option value="4" ${zoom == 4 ? "selected" : ""}>1x</option>
+    <option value="2.6666666667" ${zoom == 2.6666666667 ? "selected" : ""}>1.5x</option>
+    <option value="2" ${zoom == 2 ? "selected" : ""}>2x</option>
+    <option value="1.3333333333" ${zoom == 1.3333333333 ? "selected" : ""}>3x</option>`;
 
   zoomSelect.addEventListener("change", (e) => {
     setCookie("VisualizationZoom", e.target.value);
-    objectManager.setZoom(e.target.value);
+
+    let focus = pendingZoomFocusClient;
+    pendingZoomFocusClient = null;
+
+    if (!focus && lastHoverClient && objectManager && objectManager.svg) {
+      const rect = objectManager.svg.getBoundingClientRect();
+      const inSvg =
+        rect.width > 0 &&
+        rect.height > 0 &&
+        lastHoverClient.x >= rect.left &&
+        lastHoverClient.x <= rect.right &&
+        lastHoverClient.y >= rect.top &&
+        lastHoverClient.y <= rect.bottom;
+
+      if (inSvg) {
+        focus = lastHoverClient;
+      }
+    }
+
+    if (focus) {
+      objectManager.setZoom(e.target.value, focus.x, focus.y);
+    } else {
+      objectManager.setZoom(e.target.value);
+    }
   });
   addControlTo(zoomSelect, controlBar, "Zoom");
 
@@ -317,13 +502,188 @@ function addGeneralControls(objectManager, targetElement, title) {
   msgBox.setAttribute("id", "message");
   msgBox.setAttribute("rows", "4");
   controlBar.appendChild(msgBox);
+
+  var resetButton = addControlTo(makeInput("Button", "Reset", "Reset", "resetButton"), controlBar);
+  resetButton.onclick = function () {
+    window.location.reload();
+  };
+}
+
+function applyAutoZoomForMinVisibleWidth(minVisibleWorldWidth) {
+  return;
+  if (!objectManager || !objectManager.svg) return;
+  const minWidth =
+    Number.isFinite(minVisibleWorldWidth) && minVisibleWorldWidth > 0
+      ? minVisibleWorldWidth
+      : 800;
+
+  const rect = objectManager.svg.getBoundingClientRect();
+  if (!rect || rect.width <= 0 || rect.height <= 0) return;
+
+  const baseW = objectManager.svgBaseViewWidth;
+  const baseH = objectManager.svgBaseViewHeight;
+  if (!Number.isFinite(baseW) || !Number.isFinite(baseH) || baseW <= 0 || baseH <= 0) {
+    return;
+  }
+
+  // With preserveAspectRatio="... slice", the visible world width is:
+  // visibleW(Z) = Z * min(baseW, rect.width * baseH / rect.height)
+  // where Z is objectManager.svgZoom.
+  const minTerm = Math.min(baseW, (rect.width * baseH) / rect.height);
+  if (!Number.isFinite(minTerm) || minTerm <= 0) return;
+
+  const requiredZoom = minWidth / minTerm;
+  if (!Number.isFinite(requiredZoom) || requiredZoom <= 0) return;
+
+  // Only zoom out (increase viewBox) when needed.
+  if (requiredZoom <= objectManager.svgZoom) return;
+
+  let chosenZoom = requiredZoom;
+  const zoomSelect = getZoomSelect();
+  if (zoomSelect && zoomSelect.options && zoomSelect.options.length > 0) {
+    const optionValues = Array.from(zoomSelect.options)
+      .map((o) => parseFloat(o.value))
+      .filter((v) => Number.isFinite(v) && v > 0)
+      .sort((a, b) => a - b);
+
+    if (optionValues.length > 0) {
+      chosenZoom = optionValues.find((v) => v >= requiredZoom) ?? optionValues[optionValues.length - 1];
+      zoomSelect.value = String(chosenZoom);
+    }
+  }
+
+  setCookie("VisualizationZoom", chosenZoom);
+  objectManager.setZoom(chosenZoom);
+}
+
+function installKeyboardStepControls() {
+  if (keyboardStepListenerInstalled) return;
+  keyboardStepListenerInstalled = true;
+
+  window.addEventListener("keydown", (e) => {
+    if (e.defaultPrevented) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    if (e.key === "ArrowLeft") {
+      if (stepBackButton && !stepBackButton.disabled) {
+        stepBackButton.click();
+        e.preventDefault();
+      }
+    } else if (e.key === "ArrowRight") {
+      if (stepForwardButton && !stepForwardButton.disabled) {
+        stepForwardButton.click();
+        e.preventDefault();
+      }
+    }
+  });
+}
+
+function installCtrlWheelZoomControls() {
+  if (ctrlWheelZoomListenerInstalled) return;
+  ctrlWheelZoomListenerInstalled = true;
+
+  window.addEventListener(
+    "wheel",
+    (e) => {
+      if (!e.ctrlKey) return;
+
+      // Ctrl+wheel normally zooms the browser page; we override that to control
+      // the visualization zoom selector.
+      e.preventDefault();
+
+      // In this UI, smaller numeric values (e.g., 0.5) mean "zoom in".
+      // Scroll up (deltaY < 0) => zoom in => move forward in the option list.
+      if (e.deltaY < 0) {
+        pendingZoomFocusClient = { x: e.clientX, y: e.clientY };
+        stepZoomSelect(+1);
+      } else if (e.deltaY > 0) {
+        pendingZoomFocusClient = { x: e.clientX, y: e.clientY };
+        stepZoomSelect(-1);
+      }
+    },
+    { passive: false },
+  );
+}
+
+function installPinchZoomControls(targetEl) {
+  if (pinchZoomListenerInstalled) return;
+  pinchZoomListenerInstalled = true;
+
+  let lastDistance = null;
+
+  function touchDistance(t1, t2) {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  const el = targetEl || window;
+
+  // Only respond to two-finger touches (pinch). This avoids interfering with
+  // one-finger drag logic on the SVG.
+  el.addEventListener(
+    "touchstart",
+    (e) => {
+      if (!e.touches || e.touches.length !== 2) return;
+      lastDistance = touchDistance(e.touches[0], e.touches[1]);
+    },
+    { passive: true },
+  );
+
+  el.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!e.touches || e.touches.length !== 2) {
+        lastDistance = null;
+        return;
+      }
+      if (lastDistance == null) {
+        lastDistance = touchDistance(e.touches[0], e.touches[1]);
+        return;
+      }
+
+      const dist = touchDistance(e.touches[0], e.touches[1]);
+
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+      // Discrete zoom selector: step when pinch changes enough.
+      const ZOOM_IN_THRESHOLD = 1.08;
+      const ZOOM_OUT_THRESHOLD = 0.92;
+
+      if (dist > lastDistance * ZOOM_IN_THRESHOLD) {
+        pendingZoomFocusClient = { x: midX, y: midY };
+        if (stepZoomSelect(+1)) {
+          e.preventDefault();
+        }
+        lastDistance = dist;
+      } else if (dist < lastDistance * ZOOM_OUT_THRESHOLD) {
+        pendingZoomFocusClient = { x: midX, y: midY };
+        if (stepZoomSelect(-1)) {
+          e.preventDefault();
+        }
+        lastDistance = dist;
+      }
+    },
+    { passive: false },
+  );
+
+  el.addEventListener(
+    "touchend",
+    (e) => {
+      if (!e.touches || e.touches.length < 2) {
+        lastDistance = null;
+      }
+    },
+    { passive: true },
+  );
 }
 
 export function initAnimationManager(opts) {
-  const canvas = document.createElement("canvas");
+  let canvas = opts.canvas || document.createElement("canvas");
   let targetElement = opts.target || null;
   let centered = opts.centered || false;
-  let am = initCanvas(canvas, targetElement, opts.title, centered);
+  let am = initCanvas(canvas, targetElement, opts.title, centered, opts);
 
   if(opts.zoom) {
     am.setZoom(opts.zoom);
@@ -348,7 +708,7 @@ export function initAnimationManager(opts) {
   return am;
 }
 
-export function initCanvas(canvas, targetElement=null, title="", centered = false) {
+export function initCanvas(canvas, targetElement=null, title="", centered = false, opts = null) {
   //Dynamically add css file
   let link = document.createElement('link')
   link.rel = 'stylesheet'
@@ -356,16 +716,36 @@ export function initCanvas(canvas, targetElement=null, title="", centered = fals
   link.href = curURL.slice(0, curURL.lastIndexOf('/')) + '/entry.css';
   document.head.appendChild(link)
 
+  // Establish a logical coordinate system for the SVG viewBox.
+  // ObjectManager uses canvas.width/height as the base viewBox size.
+  const desiredViewWidth = (opts && Number.isFinite(opts.viewWidth) && opts.viewWidth > 0)
+    ? opts.viewWidth
+    : ((opts && Number.isFinite(opts.width) && opts.width > 0) ? opts.width : 800);
+  const desiredViewHeight = (opts && Number.isFinite(opts.viewHeight) && opts.viewHeight > 0)
+    ? opts.viewHeight
+    : ((opts && Number.isFinite(opts.height) && opts.height > 0) ? opts.height : 400);
+
+  if (!Number.isFinite(canvas.width) || canvas.width <= 0) {
+    canvas.width = desiredViewWidth;
+  }
+  if (!Number.isFinite(canvas.height) || canvas.height <= 0) {
+    canvas.height = desiredViewHeight;
+  }
+
   canvas.style.width = canvas.width + "px";
   canvas.style.height = canvas.height + "px";
 
   objectManager = new ObjectManager(canvas, centered);
   
   animationManager = new AnimationManager(objectManager, canvas);
-  addGeneralControls(objectManager, targetElement, title);
+  addGeneralControls(objectManager, targetElement, title, opts);
 
   var controlBar = document.getElementById("algoControlSection");
   controlBar.after(objectManager.svg);
+
+  // After layout, adjust initial zoom so at least 800 logical px are visible.
+  // (This primarily helps narrow viewports where preserveAspectRatio="slice" crops width.)
+  requestAnimationFrame(() => applyAutoZoomForMinVisibleWidth(800));
 
   animationManager.addListener("AnimationReady", this, animReady);
   animationManager.addListener("AnimationStarted", this, animStarted);
@@ -388,6 +768,18 @@ export function initCanvas(canvas, targetElement=null, title="", centered = fals
   skipForwardButton.onclick =
     animationManager.skipForward.bind(animationManager);
 
+  // Attach slider to manager and enable scrubbing
+  animationManager.attachScrubSlider(scrubSlider);
+  scrubSlider.addEventListener("input", (e) => {
+    const target = parseInt(e.target.value);
+    animationManager.scrubToBlock(target);
+  });
+
+  installKeyboardStepControls();
+  installCtrlWheelZoomControls();
+  installPinchZoomControls(objectManager.svg);
+  installZoomHoverTracking(objectManager.svg);
+  installLTIResizer();
   return animationManager;
 }
 
@@ -412,6 +804,11 @@ function AnimationManager(objectManager, canvas) {
   // currentAnimation is an index into this array
   this.AnimationSteps = [];
   this.currentAnimation = 0;
+
+  // Scrub slider integration
+  this.scrubSlider = null;
+  this.totalBlocks = 0;
+  this.currentBlockIndex = 0;
 
   this.previousAnimationSteps = [];
 
@@ -462,9 +859,9 @@ function AnimationManager(objectManager, canvas) {
   };
   
   this.requestHeight = function (newHeight) {
-    if(!window.frameElement) return;
-    const data = { subject: 'lti.frameResize', message_id: window.frameElement.id, height: newHeight }
-    window.parent.postMessage(data, '*')
+    // if(!window.frameElement) return;
+    // const data = { subject: 'lti.frameResize', message_id: window.frameElement.id, height: newHeight }
+    // window.parent.postMessage(data, '*')
   }
 
   this.setZoom = function (newZoom) {
@@ -533,7 +930,9 @@ function AnimationManager(objectManager, canvas) {
       clearTimeout(timer);
       this.animatedObjects.update();
       this.animatedObjects.draw();
-
+      // Update scrub slider at end
+      this.currentBlockIndex = this.totalBlocks;
+      this.updateScrubUI();
       return;
     }
     this.undoAnimationStepIndices.push(this.currentAnimation);
@@ -791,6 +1190,7 @@ function AnimationManager(objectManager, canvas) {
         }
       } else if (nextCommand[0].toUpperCase() == "DELETE") {
         var objectID = parseInt(nextCommand[1]);
+        // console.log(`[Animation] Delete id=${objectID}`);
 
         var i;
         var removedEdges = this.animatedObjects.deleteIncident(objectID);
@@ -827,27 +1227,27 @@ function AnimationManager(objectManager, canvas) {
         
         this.animatedObjects.draw();
       } else if (nextCommand[0].toUpperCase() == "CREATELABEL") {
-        if (nextCommand.length == 6) {
-          this.animatedObjects.addLabelObject(
-            parseInt(nextCommand[1]),
-            nextCommand[2],
-            this.parseBool(nextCommand[5]),
-          );
-        } else {
-          this.animatedObjects.addLabelObject(
-            parseInt(nextCommand[1]),
-            nextCommand[2],
-            true,
-          );
-        }
+        const labelID = parseInt(nextCommand[1]);
+        const labelText = nextCommand[2];
+        const hasCentering = nextCommand.length >= 6;
+        const centering = hasCentering ? this.parseBool(nextCommand[5]) : true;
+        const hasFontSize = nextCommand.length >= 7;
+        const fontSizePercent = hasFontSize ? parseFloat(nextCommand[6]) : undefined;
+
+        this.animatedObjects.addLabelObject(
+          labelID,
+          labelText,
+          centering,
+          fontSizePercent,
+        );
         if (nextCommand.length >= 5) {
           this.animatedObjects.setNodePosition(
-            parseInt(nextCommand[1]),
+            labelID,
             parseFloat(nextCommand[3]),
             parseFloat(nextCommand[4]),
           );
         }
-        undoBlock.push(new Undo.UndoCreate(parseInt(nextCommand[1])));
+        undoBlock.push(new Undo.UndoCreate(labelID));
       } else if (nextCommand[0].toUpperCase() == "SETEDGECOLOR") {
         var from = parseInt(nextCommand[1]);
         var to = parseInt(nextCommand[2]);
@@ -882,7 +1282,10 @@ function AnimationManager(objectManager, canvas) {
         );
         //TODO: Add undo information here
       } else if (nextCommand[0].toUpperCase() == "CREATELINKEDLIST") {
-        if (nextCommand.length == 11) {
+        // console.log("[Animation] Processing CREATELINKEDLIST command" + nextCommand + "|||" + nextCommand.length);
+        if (nextCommand.length >= 11) {
+          const hasNumLinks = nextCommand.length >= 12;
+          const numLinks = hasNumLinks ? parseInt(nextCommand[11]) : 1;
           this.animatedObjects.addLinkedListObject(
             parseInt(nextCommand[1]),  //id
             nextCommand[2],   //node label
@@ -892,10 +1295,14 @@ function AnimationManager(objectManager, canvas) {
             this.parseBool(nextCommand[8]), //vertical orientation
             this.parseBool(nextCommand[9]),  //linkat end
             parseInt(nextCommand[10]),  //num labels
+            numLinks,
             "#FFFFFF",
             "#000000",
           );
+          // Log the creation details for debugging
+          // console.log(`[Animation] CreateLinkedList id=${parseInt(nextCommand[1])} label=${nextCommand[2]} w=${parseInt(nextCommand[3])} h=${parseInt(nextCommand[4])} linkPercent=${parseFloat(nextCommand[7])} vertical=${this.parseBool(nextCommand[8])} linkAtEnd=${this.parseBool(nextCommand[9])} numLabels=${parseInt(nextCommand[10])} numLinks=${numLinks}`);
         } else {
+
           this.animatedObjects.addLinkedListObject(
             parseInt(nextCommand[1]),
             nextCommand[2],
@@ -905,9 +1312,11 @@ function AnimationManager(objectManager, canvas) {
             true,
             false,
             1,
+            1,
             "#FFFFFF",
             "#000000",
           );
+          // console.log(`[Animation] CreateLinkedList id=${parseInt(nextCommand[1])} label=${nextCommand[2]} w=${parseInt(nextCommand[3])} h=${parseInt(nextCommand[4])} (defaults applied)`);
         }
         if (nextCommand.length > 6) {
           this.animatedObjects.setNodePosition(
@@ -915,15 +1324,18 @@ function AnimationManager(objectManager, canvas) {
             parseInt(nextCommand[5]),
             parseInt(nextCommand[6]),
           );
+          // console.log(`[Animation] SetNodePosition id=${parseInt(nextCommand[1])} x=${parseInt(nextCommand[5])} y=${parseInt(nextCommand[6])}`);
           undoBlock.push(new Undo.UndoCreate(parseInt(nextCommand[1])));
         }
       } else if (nextCommand[0].toUpperCase() == "SETNULL") {
-        var oldNull = this.animatedObjects.getNull(parseInt(nextCommand[1]));
-        this.animatedObjects.setNull(
-          parseInt(nextCommand[1]),
-          this.parseBool(nextCommand[2]),
-        );
-        undoBlock.push(new Undo.UndoSetNull(parseInt(nextCommand[1]), oldNull));
+        const objectID = parseInt(nextCommand[1]);
+        const newNull = this.parseBool(nextCommand[2]);
+        const hasIndex = nextCommand.length > 3;
+        const linkIndex = hasIndex ? parseInt(nextCommand[3]) : undefined;
+
+        var oldNull = this.animatedObjects.getNull(objectID, linkIndex);
+        this.animatedObjects.setNull(objectID, newNull, linkIndex);
+        undoBlock.push(new Undo.UndoSetNull(objectID, oldNull, linkIndex));
       } else if (nextCommand[0].toUpperCase() == "SETTEXTCOLOR") {
         if (nextCommand.length > 3) {
           oldColor = this.animatedObjects.getTextColor(
@@ -1045,7 +1457,17 @@ function AnimationManager(objectManager, canvas) {
       this.currFrame = this.animationBlockLength;
     }
 
+    // If this block had no animated movement, we still need to render the
+    // effects of instantaneous commands (Create/Connect/SetMessage/etc.).
+    // Otherwise, auto-stepping can advance past states the user never sees.
+    if (!anyAnimations) {
+      this.animatedObjects.draw();
+    }
+
     this.undoStack.push(undoBlock);
+    // Advance scrub slider to next block
+    this.currentBlockIndex = Math.min(this.currentBlockIndex + 1, this.totalBlocks);
+    this.updateScrubUI();
   };
 
   //  Start a new animation.  The input parameter commands is an array of strings,
@@ -1063,6 +1485,10 @@ function AnimationManager(objectManager, canvas) {
     }
     this.undoAnimationStepIndices = new Array();
     this.currentAnimation = 0;
+    // Recompute total blocks (number of STEP commands)
+    this.totalBlocks = this.computeTotalBlocks();
+    this.currentBlockIndex = 0;
+    this.updateScrubUI();
     this.startNextBlock();
     this.currentlyAnimating = true;
     this.fireEvent("AnimationStarted", "NoData");
@@ -1126,6 +1552,7 @@ function AnimationManager(objectManager, canvas) {
     clearTimeout(timer);
     this.animatedObjects.update();
     this.animatedObjects.draw();
+      document.getElementById("message").value = "";
   };
 
   this.skipBack = function () {
@@ -1170,6 +1597,8 @@ function AnimationManager(objectManager, canvas) {
         else
           this.fireEvent("AnimationReady", "NoData");
       }
+      this.currentBlockIndex = 0;
+      this.updateScrubUI();
     }
   };
 
@@ -1226,6 +1655,8 @@ function AnimationManager(objectManager, canvas) {
       clearTimeout(timer);
       this.animatedObjects.update();
       this.animatedObjects.draw();
+      this.currentBlockIndex = this.totalBlocks;
+      this.updateScrubUI();
     }
   };
 
@@ -1258,6 +1689,9 @@ function AnimationManager(objectManager, canvas) {
       this.animatedObjects.update();
       this.animatedObjects.draw();
 
+      // After full undo, reset scrub slider
+      this.currentBlockIndex = 0;
+      this.updateScrubUI();
       return false;
     }
     return true;
@@ -1289,6 +1723,9 @@ function AnimationManager(objectManager, canvas) {
         this.currFrame = this.animationBlockLength;
       }
       this.currentlyAnimating = true;
+      // Move scrub position back one block (will be finalized on finish)
+      this.currentBlockIndex = Math.max(this.currentBlockIndex - 1, 0);
+      this.updateScrubUI();
     }
   };
   this.setLayer = function (shown, layers) {
@@ -1365,6 +1802,101 @@ function AnimationManager(objectManager, canvas) {
         }
       }
       this.animatedObjects.update();
+      // Keep scrub slider in sync while animating
+      this.updateScrubUI();
+    }
+  };
+
+  // --- Scrub slider helpers ---
+  this.attachScrubSlider = function(sliderEl) {
+    this.scrubSlider = sliderEl;
+    this.updateScrubUI();
+  };
+
+  this.computeTotalBlocks = function() {
+    if (!this.AnimationSteps || !Array.isArray(this.AnimationSteps)) return 0;
+    let blocks = 0;
+    for (const step of this.AnimationSteps) {
+      const cmd = String(step).split("<;>")[0].toUpperCase();
+      if (cmd === "STEP") blocks++;
+    }
+    return blocks;
+  };
+
+  this.updateScrubUI = function() {
+    if (!this.scrubSlider) return;
+    const hasAnim = Array.isArray(this.AnimationSteps) && this.AnimationSteps.length > 0;
+    this.scrubSlider.disabled = !hasAnim;
+    this.scrubSlider.max = String(this.totalBlocks);
+    this.scrubSlider.value = String(Math.max(0, Math.min(this.currentBlockIndex, this.totalBlocks)));
+  };
+
+  this.scrubToBlock = function(targetBlockIndex) {
+    if (!Number.isFinite(targetBlockIndex)) return;
+    targetBlockIndex = Math.max(0, Math.min(targetBlockIndex, this.totalBlocks));
+
+    // If no animation loaded, nothing to do
+    if (!this.AnimationSteps || this.AnimationSteps.length === 0) return;
+
+    // Pause and stop timer to avoid race with update loop
+    clearTimeout(timer);
+    this.animationPaused = true;
+
+    if (targetBlockIndex === this.currentBlockIndex) {
+      this.updateScrubUI();
+      return;
+    }
+
+    // Seek backwards by undoing blocks
+    if (targetBlockIndex < this.currentBlockIndex) {
+      while (this.currentBlockIndex > targetBlockIndex && this.undoAnimationStepIndices && this.undoAnimationStepIndices.length > 0) {
+        this.undoLastBlock();
+        const undoBlock = this.undoStack.pop();
+        if (undoBlock) {
+          this.finishUndoBlock(undoBlock);
+        } else {
+          break;
+        }
+      }
+      this.updateScrubUI();
+      this.animatedObjects.update();
+      this.animatedObjects.draw();
+      return;
+    }
+
+    // Seek forwards by running blocks instantly
+    // Run blocks until reaching targetBlockIndex
+    while (this.currentBlockIndex < targetBlockIndex && this.currentAnimation < this.AnimationSteps.length) {
+      // Start and immediately finalize the next block
+      this.startNextBlock();
+      // Instantly finish movement for the block
+      this.currFrame = this.animationBlockLength;
+      // Apply end positions for movements in this.currentBlock
+      for (var i = 0; i < (this.currentBlock ? this.currentBlock.length : 0); i++) {
+        var objectID = this.currentBlock[i].objectID;
+        this.animatedObjects.setNodePosition(
+          objectID,
+          this.currentBlock[i].toX,
+          this.currentBlock[i].toY,
+        );
+      }
+      // Clear current block and update visuals
+      this.currentBlock = [];
+      this.animatedObjects.update();
+      this.animatedObjects.draw();
+    }
+
+    this.updateScrubUI();
+
+    // If scrubbed to the final block, ensure the animation fully completes.
+    // When paused and awaiting a step, silently advance one step to trigger end state.
+    // If still animating, fast-forward to finish remaining blocks.
+    if (targetBlockIndex === this.totalBlocks) {
+      if (this.awaitingStep) {
+        this.step();
+      } else if (this.currentlyAnimating) {
+        this.skipForward();
+      }
     }
   };
 }

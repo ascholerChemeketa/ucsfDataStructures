@@ -1,5 +1,3 @@
-
-
 export class Colors {
   static BASE = "var(--svgColor)";
   static HIGHLIGHT = "var(--svgColor--highlight)";

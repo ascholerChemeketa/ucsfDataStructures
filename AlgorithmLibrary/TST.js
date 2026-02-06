@@ -91,7 +91,7 @@ Ternary.prototype.addControls = function () {
     this.deleteCallback.bind(this),
     12,
   );
-  this.deleteButton = addControlToAlgorithmBar("Button", "Delete");
+  this.deleteButton = addControlToAlgorithmBar("Button", "Remove");
   this.deleteButton.onclick = this.deleteCallback.bind(this);
   this.findField = addControlToAlgorithmBar("Text", "");
   this.findField.onkeydown = this.returnSubmit(

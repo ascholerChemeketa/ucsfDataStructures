@@ -24,25 +24,87 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import {
+  initAnimationManager,
+  initCanvas,
+} from "../AnimationLibrary/AnimationMain.js";
 import { Algorithm, addControlToAlgorithmBar } from "./Algorithm.js";
 
-export function Heap(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+export function Heap(arg) {
+  // New-style usage: `new Heap({ ...opts })` (preferred)
+  // Legacy usage: `new Heap(canvas)`
+  let am;
+  // if (arg && typeof arg.getContext === "function") {
+  //   am = initCanvas(arg);
+  // } else {
+    const opts = arg || {};
+    am = initAnimationManager({
+      title: opts.title || "Min Heap",
+      height: opts.height || 500,
+      ...opts,
+    });
+  // }
+  this.init(am);
+  
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
+      this.implementAction(this.insertElement.bind(this), d);
+      am.skipForward();
+    }
+    am.clearHistory();
+    am.animatedObjects.draw();
+  }
 }
 
 Heap.prototype = new Algorithm();
 Heap.prototype.constructor = Heap;
 Heap.superclass = Algorithm.prototype;
 
-var ARRAY_SIZE = 32;
+var ARRAY_SIZE = 15;
 var ARRAY_ELEM_WIDTH = 30;
 var ARRAY_ELEM_HEIGHT = 25;
 var ARRAY_INITIAL_X = 30;
 
+// 0-based heap: indices 0..(HEAP_CAPACITY-1)
+var HEAP_CAPACITY = ARRAY_SIZE;
+
 var ARRAY_Y_POS = 50;
 var ARRAY_LABEL_Y_POS = 70;
+
+// Align the heap-tree root (index 0) under this array slot label.
+// (Array slots are labeled 0..(ARRAY_SIZE-1), so "5th element" here means the slot labeled 5.)
+var HEAP_ROOT_UNDER_ARRAY_INDEX = 7;
+
+function buildHeapXPositions(rootX) {
+  // 0-based heap indices: 0..30 => depths 0..4.
+  // Use offsets that keep the leftmost node >= 0 when rootX is ~180.
+  const offsetsByDepth = [0, 96, 48, 24, 12];
+  const xPositions = new Array(ARRAY_SIZE);
+  for (let i = 0; i < ARRAY_SIZE; i++) xPositions[i] = 0;
+
+  xPositions[0] = rootX;
+  for (let i = 1; i < HEAP_CAPACITY; i++) {
+    const parent = Math.floor((i - 1) / 2);
+    const depth = Math.floor(Math.log2(i + 1));
+    const offset = offsetsByDepth[depth] || 0;
+    // For 0-based heaps, left child is odd (2p+1) and right child is even (2p+2).
+    const isRight = i % 2 === 0;
+    xPositions[i] = xPositions[parent] + (isRight ? offset : -offset);
+  }
+  return xPositions;
+}
+
+function buildHeapYPositions() {
+  const yPositions = new Array(ARRAY_SIZE);
+  for (let i = 0; i < ARRAY_SIZE; i++) yPositions[i] = 0;
+
+  // Match the old levels: root=100, then +70 per depth.
+  for (let i = 0; i < HEAP_CAPACITY; i++) {
+    const depth = Math.floor(Math.log2(i + 1));
+    yPositions[i] = 120 + depth * 70;
+  }
+  return yPositions;
+}
 
 Heap.prototype.init = function (am) {
   var sc = Heap.superclass;
@@ -50,18 +112,22 @@ Heap.prototype.init = function (am) {
   fn.call(this, am);
   this.addControls();
   this.nextIndex = 0;
-  this.HeapXPositions = [
-    0, 450, 250, 650, 150, 350, 550, 750, 100, 200, 300, 400, 500, 600, 700,
-    800, 75, 125, 175, 225, 275, 325, 375, 425, 475, 525, 575, 625, 675, 725,
-    775, 825,
-  ];
-  this.HeapYPositions = [
-    0, 100, 170, 170, 240, 240, 240, 240, 310, 310, 310, 310, 310, 310, 310,
-    310, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
-    380, 380,
-  ];
+  const heapRootX = ARRAY_INITIAL_X + HEAP_ROOT_UNDER_ARRAY_INDEX * ARRAY_ELEM_WIDTH;
+  this.HeapXPositions = buildHeapXPositions(heapRootX);
+  this.HeapYPositions = buildHeapYPositions();
   this.commands = [];
   this.createArray();
+
+  // Programmatic action bindings (used by tests / external controllers)
+  this.doInsert = function (val) {
+    this.implementAction(this.insertElement.bind(this), val);
+  };
+  this.doRemove = function () {
+    this.implementAction(this.removeSmallest.bind(this), "");
+  };
+  this.doBuildHeap = function () {
+    this.implementAction(this.buildHeap.bind(this), "");
+  };
 
   /*this.nextIndex = 0;
 	this.this.commands = [];
@@ -73,6 +139,7 @@ Heap.prototype.init = function (am) {
 
 Heap.prototype.addControls = function () {
   this.insertField = addControlToAlgorithmBar("Text", "");
+  this.insertField.setAttribute("placeholder", "Value to insert");
   this.insertField.onkeydown = this.returnSubmit(
     this.insertField,
     this.insertCallback.bind(this),
@@ -123,14 +190,23 @@ Heap.prototype.createArray = function () {
     );
     this.cmd("SetForegroundColor", this.arrayLabels[i], "#0000FF");
   }
-  this.cmd("SetText", this.arrayRects[0], "-INF");
+  // 0-based heap: slot 0 holds the root value; no sentinel.
+  this.cmd("SetText", this.arrayRects[0], "");
   this.swapLabel1 = this.nextIndex++;
   this.swapLabel2 = this.nextIndex++;
   this.swapLabel3 = this.nextIndex++;
   this.swapLabel4 = this.nextIndex++;
   this.descriptLabel1 = this.nextIndex++;
   this.descriptLabel2 = this.nextIndex++;
-  this.cmd("CreateLabel", this.descriptLabel1, "", 20, 10, 0);
+  // Left-align status text with the left edge of the array (not centered on slot 0).
+  this.cmd(
+    "CreateLabel",
+    this.descriptLabel1,
+    "",
+    ARRAY_INITIAL_X - ARRAY_ELEM_WIDTH / 2,
+    10,
+    0,
+  );
   //this.cmd("CreateLabel", this.descriptLabel2, "", this.nextIndex, 40, 120, 0);
   this.animationManager.StartNewAnimation(this.commands);
   this.animationManager.skipForward();
@@ -155,11 +231,11 @@ Heap.prototype.clearCallback = function (event) {
 
 //TODO:  Make me undoable!!
 Heap.prototype.clear = function () {
-  while (this.currentHeapSize > 0) {
-    this.cmd("Delete", this.circleObjs[this.currentHeapSize]);
-    this.cmd("SetText", this.arrayRects[this.currentHeapSize], "");
-    this.currentHeapSize--;
+  for (let i = 0; i < this.currentHeapSize; i++) {
+    this.cmd("Delete", this.circleObjs[i]);
+    this.cmd("SetText", this.arrayRects[i], "");
   }
+  this.currentHeapSize = 0;
   return this.commands;
 };
 
@@ -237,25 +313,53 @@ Heap.prototype.setIndexHighlight = function (index, highlightVal) {
   this.cmd("SetHighlight", this.arrayRects[index], highlightVal);
 };
 
-Heap.prototype.pushDown = function (index) {
+Heap.prototype.pushDown = function (index, narrateComparisons) {
   var smallestIndex;
 
   while (true) {
-    if (index * 2 > this.currentHeapSize) {
+    const left = 2 * index + 1;
+    const right = 2 * index + 2;
+
+
+      if (narrateComparisons) {
+        this.cmd("SetMessage", "Heapifying down at index " + index);
+      this.setIndexHighlight(index, 1);
+        this.cmd("Step");
+      }
+      this.setIndexHighlight(index, 0);
+
+    if (left >= this.currentHeapSize) {
+      if (narrateComparisons) {
+        this.cmd("SetMessage", "No children: value is in its final location");
+        this.cmd("Step");
+      }
       return;
     }
 
-    smallestIndex = 2 * index;
+    smallestIndex = left;
 
-    if (index * 2 + 1 <= this.currentHeapSize) {
-      this.setIndexHighlight(2 * index, 1);
-      this.setIndexHighlight(2 * index + 1, 1);
-      this.cmd("Step");
-      this.setIndexHighlight(2 * index, 0);
-      this.setIndexHighlight(2 * index + 1, 0);
-      if (this.arrayData[2 * index + 1] < this.arrayData[2 * index]) {
-        smallestIndex = 2 * index + 1;
+    if (right < this.currentHeapSize) {
+      if (narrateComparisons) {
+        this.cmd(
+          "SetMessage",
+          "Compare left and right children to find the smaller child",
+        );
       }
+      this.setIndexHighlight(left, 1);
+      this.setIndexHighlight(right, 1);
+      this.cmd("Step");
+      this.setIndexHighlight(left, 0);
+      this.setIndexHighlight(right, 0);
+      if (Number(this.arrayData[right]) < Number(this.arrayData[left])) {
+        smallestIndex = right;
+      }
+    }
+
+    if (narrateComparisons) {
+      this.cmd(
+        "SetMessage",
+        "Compare the current value with the smaller child",
+      );
     }
     this.setIndexHighlight(index, 1);
     this.setIndexHighlight(smallestIndex, 1);
@@ -263,10 +367,22 @@ Heap.prototype.pushDown = function (index) {
     this.setIndexHighlight(index, 0);
     this.setIndexHighlight(smallestIndex, 0);
 
-    if (this.arrayData[smallestIndex] < this.arrayData[index]) {
+    if (Number(this.arrayData[smallestIndex]) < Number(this.arrayData[index])) {
+      if (narrateComparisons) {
+        this.cmd(
+          "SetMessage",
+          "Child is smaller than current: swap and continue pushing down",
+        );
+      }
       this.swap(smallestIndex, index);
       index = smallestIndex;
     } else {
+      if (narrateComparisons) {
+        this.cmd(
+          "SetMessage",
+          "Current value is <= its children: heap order restored",
+        );
+      }
       return;
     }
   }
@@ -275,6 +391,7 @@ Heap.prototype.pushDown = function (index) {
 Heap.prototype.removeSmallest = function (dummy) {
   this.commands = new Array();
   this.cmd("SetText", this.descriptLabel1, "");
+  this.cmd("SetMessage", "Remove smallest (min): check if heap is empty");
 
   if (this.currentHeapSize == 0) {
     this.cmd(
@@ -282,40 +399,50 @@ Heap.prototype.removeSmallest = function (dummy) {
       this.descriptLabel1,
       "Heap is empty, cannot remove smallest element",
     );
+    this.cmd("SetMessage", "Heap is empty; nothing to remove");
     return this.commands;
   }
 
-  this.cmd("SetText", this.descriptLabel1, "Removing element:");
-  this.cmd(
-    "CreateLabel",
-    this.descriptLabel2,
-    this.arrayData[1],
-    this.HeapXPositions[1],
-    this.HeapYPositions[1],
-    0,
-  );
-  this.cmd("SetText", this.circleObjs[1], "");
-  this.cmd("Move", this.descriptLabel2, 120, 40);
+  this.cmd("SetMessage", "Smallest element is at the root");
+  this.cmd("SetText", this.descriptLabel1, "Removing element:" + this.arrayData[0]);
+  // this.cmd(
+  //   "CreateLabel",
+  //   this.descriptLabel2,
+  //   this.arrayData[0],
+  //   this.HeapXPositions[0],
+  //   this.HeapYPositions[0],
+  //   0,
+  // );
+  // this.cmd("Move", this.descriptLabel2, 120, 40);
   this.cmd("Step");
-  this.cmd("Delete", this.descriptLabel2);
+  // this.cmd("Delete", this.descriptLabel2);
   this.cmd(
     "SetText",
     this.descriptLabel1,
-    "Removing element: " + this.arrayData[1],
+    "Removing element: " + this.arrayData[0],
   );
-  this.arrayData[1] = "";
   if (this.currentHeapSize > 1) {
-    this.cmd("SetText", this.arrayRects[1], "");
-    this.cmd("SetText", this.arrayRects[this.currentHeapSize], "");
-    this.swap(1, this.currentHeapSize);
-    this.cmd("Delete", this.circleObjs[this.currentHeapSize]);
+    const lastIndex = this.currentHeapSize - 1;
+    this.cmd("SetMessage", "Move last element to the root");
+    this.cmd("SetText", this.arrayRects[0], "");
+    this.cmd("SetText", this.arrayRects[lastIndex], "");
+    this.swap(0, lastIndex);
+    this.cmd("SetMessage", "Delete the old last node");
+    this.cmd("Delete", this.circleObjs[lastIndex]);
+    this.cmd("SetText", this.arrayRects[lastIndex], "");
+    this.arrayData[lastIndex] = "";
     this.currentHeapSize--;
-    this.pushDown(1);
+  this.cmd("Step");
+    this.cmd("SetMessage", "Push down to restore heap order");
+    this.pushDown(0, true);
   } else {
-    this.cmd("SetText", this.arrayRects[1], "");
-    this.cmd("Delete", this.circleObjs[this.currentHeapSize]);
+    this.cmd("SetMessage", "Heap had one element; delete it");
+    this.cmd("SetText", this.arrayRects[0], "");
+    this.cmd("Delete", this.circleObjs[0]);
+    this.arrayData[0] = "";
     this.currentHeapSize--;
   }
+  this.cmd("SetMessage", "");
   return this.commands;
 };
 
@@ -326,8 +453,9 @@ Heap.prototype.buildHeapCallback = function (event) {
 Heap.prototype.buildHeap = function (ignored) {
   this.commands = [];
   this.clear();
-  for (var i = 1; i < ARRAY_SIZE; i++) {
-    this.arrayData[i] = this.normalizeNumber(String(ARRAY_SIZE - i), 4);
+  for (var i = 0; i < HEAP_CAPACITY; i++) {
+    const randVal = Math.floor(Math.random() * 100) + 1;
+    this.arrayData[i] = this.normalizeNumber(String(randVal), 4);
     this.cmd(
       "CreateCircle",
       this.circleObjs[i],
@@ -336,18 +464,18 @@ Heap.prototype.buildHeap = function (ignored) {
       this.HeapYPositions[i],
     );
     this.cmd("SetText", this.arrayRects[i], this.arrayData[i]);
-    if (i > 1) {
+    if (i > 0) {
       this.cmd(
         "Connect",
-        this.circleObjs[Math.floor(i / 2)],
+        this.circleObjs[Math.floor((i - 1) / 2)],
         this.circleObjs[i],
       );
     }
   }
   this.cmd("Step");
-  this.currentHeapSize = ARRAY_SIZE - 1;
-  var nextElem = this.currentHeapSize;
-  while (nextElem > 0) {
+  this.currentHeapSize = HEAP_CAPACITY;
+  var nextElem = this.currentHeapSize - 1;
+  while (nextElem >= 0) {
     this.pushDown(nextElem);
     nextElem = nextElem - 1;
   }
@@ -357,11 +485,13 @@ Heap.prototype.buildHeap = function (ignored) {
 Heap.prototype.insertElement = function (insertedValue) {
   this.commands = new Array();
 
-  if (this.currentHeapSize >= ARRAY_SIZE - 1) {
+  if (this.currentHeapSize >= HEAP_CAPACITY) {
     this.cmd("SetText", this.descriptLabel1, "Heap Full!");
+    this.cmd("SetMessage", "Heap is full; cannot insert");
     return this.commands;
   }
 
+  this.cmd("SetMessage", "Insert: place new value at the next open spot");
   this.cmd(
     "SetText",
     this.descriptLabel1,
@@ -369,39 +499,44 @@ Heap.prototype.insertElement = function (insertedValue) {
   );
   this.cmd("Step");
   this.cmd("SetText", this.descriptLabel1, "Inserting Element: ");
+  const insertIndex = this.currentHeapSize;
   this.currentHeapSize++;
-  this.arrayData[this.currentHeapSize] = insertedValue;
+  this.arrayData[insertIndex] = insertedValue;
   this.cmd(
     "CreateCircle",
-    this.circleObjs[this.currentHeapSize],
+    this.circleObjs[insertIndex],
     "",
-    this.HeapXPositions[this.currentHeapSize],
-    this.HeapYPositions[this.currentHeapSize],
+    this.HeapXPositions[insertIndex],
+    this.HeapYPositions[insertIndex],
   );
   this.cmd("CreateLabel", this.descriptLabel2, insertedValue, 120, 45, 1);
-  if (this.currentHeapSize > 1) {
+  if (insertIndex > 0) {
+    // this.cmd("SetMessage", "Connect new node to its parent");
     this.cmd(
       "Connect",
-      this.circleObjs[Math.floor(this.currentHeapSize / 2)],
-      this.circleObjs[this.currentHeapSize],
+      this.circleObjs[Math.floor((insertIndex - 1) / 2)],
+      this.circleObjs[insertIndex],
     );
   }
+  this.cmd("SetText", this.arrayRects[insertIndex], insertedValue);
 
+  // this.cmd("SetMessage", "Move value label into the new node");
   this.cmd(
     "Move",
     this.descriptLabel2,
-    this.HeapXPositions[this.currentHeapSize],
-    this.HeapYPositions[this.currentHeapSize],
+    this.HeapXPositions[insertIndex],
+    this.HeapYPositions[insertIndex],
   );
   this.cmd("Step");
-  this.cmd("SetText", this.circleObjs[this.currentHeapSize], insertedValue);
+  this.cmd("SetText", this.circleObjs[insertIndex], insertedValue);
   this.cmd("delete", this.descriptLabel2);
-  this.cmd("SetText", this.arrayRects[this.currentHeapSize], insertedValue);
+  this.cmd("SetText", this.arrayRects[insertIndex], insertedValue);
 
-  var currentIndex = this.currentHeapSize;
-  var parentIndex = Math.floor(currentIndex / 2);
+  var currentIndex = insertIndex;
+  var parentIndex = Math.floor((currentIndex - 1) / 2);
 
-  if (currentIndex > 1) {
+  if (currentIndex > 0) {
+    this.cmd("SetMessage", "Compare with parent");
     this.setIndexHighlight(currentIndex, 1);
     this.setIndexHighlight(parentIndex, 1);
     this.cmd("Step");
@@ -410,13 +545,15 @@ Heap.prototype.insertElement = function (insertedValue) {
   }
 
   while (
-    currentIndex > 1 &&
-    this.arrayData[currentIndex] < this.arrayData[parentIndex]
+    currentIndex > 0 &&
+    Number(this.arrayData[currentIndex]) < Number(this.arrayData[parentIndex])
   ) {
+    this.cmd("SetMessage", "Swap with parent to restore heap order");
     this.swap(currentIndex, parentIndex);
     currentIndex = parentIndex;
-    parentIndex = Math.floor(parentIndex / 2);
-    if (currentIndex > 1) {
+    parentIndex = Math.floor((parentIndex - 1) / 2);
+    if (currentIndex > 0) {
+      this.cmd("SetMessage", "Compare with parent");
       this.setIndexHighlight(currentIndex, 1);
       this.setIndexHighlight(parentIndex, 1);
       this.cmd("Step");
@@ -425,6 +562,7 @@ Heap.prototype.insertElement = function (insertedValue) {
     }
   }
   this.cmd("SetText", this.descriptLabel1, "");
+  this.cmd("SetMessage", "Insertion complete");
 
   return this.commands;
 };
@@ -445,9 +583,3 @@ Heap.prototype.enableUI = function (event) {
   this.buildHeapButton.disabled = false;
 };
 
-var currentAlg;
-
-function init() {
-  var animManag = initCanvas(canvas);
-  currentAlg = new Heap(animManag, canvas.width, canvas.height);
-}

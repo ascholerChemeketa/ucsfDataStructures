@@ -118,7 +118,7 @@ BPlusTree.prototype.addControls = function () {
   );
   this.controls.push(this.deleteField);
 
-  this.deleteButton = addControlToAlgorithmBar("Button", "Delete");
+  this.deleteButton = addControlToAlgorithmBar("Button", "Remove");
   this.deleteButton.onclick = this.deleteCallback.bind(this);
   this.controls.push(this.deleteButton);
 

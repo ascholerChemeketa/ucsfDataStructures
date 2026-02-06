@@ -32,8 +32,8 @@ import {
 
 var ARRAY_START_X = 100;
 var ARRAY_START_Y = 100;
-var ARRAY_ELEM_WIDTH = 50;
-var ARRAY_ELEM_HEIGHT = 30;
+var ARRAY_ELEM_WIDTH = 35;
+var ARRAY_ELEM_HEIGHT = 20;
 
 var ARRAY_ELEMS_PER_LINE = 10;
 var ARRAY_LINE_SPACING = 130;
@@ -105,6 +105,7 @@ QueueArray.prototype.addControls = function () {
   this.controls = [];
   
   this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+  this.inputField.setAttribute("placeholder", "Value to enqueue");
   this.controls.push(this.inputField);
 
   this.inputField.onkeydown = this.returnSubmit(  
@@ -179,7 +180,7 @@ QueueArray.prototype.setup = function () {
     );
     this.cmd("SetForegroundColor", this.arrayLabelID[i], INDEX_COLOR);
   }
-  this.cmd("CreateLabel", this.headLabelID, "Head", HEAD_LABEL_X, HEAD_LABEL_Y);
+  this.cmd("CreateLabel", this.headLabelID, "Start", HEAD_LABEL_X, HEAD_LABEL_Y);
   this.cmd(
     "CreateRectangle",
     this.headID,
@@ -190,7 +191,7 @@ QueueArray.prototype.setup = function () {
     HEAD_POS_Y,
   );
 
-  this.cmd("CreateLabel", this.tailLabelID, "Tail", TAIL_LABEL_X, TAIL_LABEL_Y);
+  this.cmd("CreateLabel", this.tailLabelID, "End", TAIL_LABEL_X, TAIL_LABEL_Y);
   this.cmd(
     "CreateRectangle",
     this.tailID,
@@ -247,7 +248,7 @@ QueueArray.prototype.enqueue = function (elemToEnqueue) {
   
 
   if(this.tail == this.head - 1 || (this.head == 0 && this.tail == SIZE - 1)) {
-    this.cmd("SetMessage", "Tail is one less than head. Queue is full. Cannot enqueue.");
+    this.cmd("SetMessage", "End is one less than start. Queue is full. Cannot enqueue.");
     this.cmd("Step");
     return this.commands;
   }
@@ -268,7 +269,7 @@ QueueArray.prototype.enqueue = function (elemToEnqueue) {
   );
 
   this.cmd("Step");
-  this.cmd("SetMessage", "Tail gives next available location.");
+  this.cmd("SetMessage", "End gives next available location.");
   this.cmd(
     "CreateHighlightCircle",
     this.highlight1ID,
@@ -296,13 +297,13 @@ QueueArray.prototype.enqueue = function (elemToEnqueue) {
   this.cmd("Delete", this.highlight1ID);
 
   this.cmd("SetHighlight", this.tailID, 1);
-    this.cmd("SetMessage", "Advance tail to next location.");
+    this.cmd("SetMessage", "Advance end to next location.");
   this.cmd("Step");
   this.tail = (this.tail + 1) % SIZE;
 
   this.cmd("SetText", this.tailID, this.tail);
   if (this.tail == 0 )
-    this.cmd("SetMessage", "Advance tail to next location. It wraps around to index 0.");
+    this.cmd("SetMessage", "Advance end to next location. It wraps around to index 0.");
 
   this.cmd("Step");
   this.cmd("SetHighlight", this.tailID, 0);
@@ -315,7 +316,7 @@ QueueArray.prototype.dequeue = function (ignored) {
   this.commands = new Array();
 
   if(this.tail == this.head) {
-    this.cmd("SetMessage", "Head == tail. Queue is empty.");
+    this.cmd("SetMessage", "Start == End. Queue is empty.");
     this.cmd("Step");
     return this.commands;
   }
@@ -341,7 +342,7 @@ QueueArray.prototype.dequeue = function (ignored) {
     HEAD_POS_Y,
   );
   
-  this.cmd("SetMessage", "Head gives location of first value.");
+  this.cmd("SetMessage", "Start gives location of first value.");
   this.cmd("Step");
 
   var xpos =
@@ -364,12 +365,12 @@ QueueArray.prototype.dequeue = function (ignored) {
   this.cmd("Step");
 
   this.cmd("SetHighlight", this.headID, 1);
-  this.cmd("SetMessage", "Increment head to next location.");
+  this.cmd("SetMessage", "Increment start to next location.");
   this.cmd("Step");
   this.head = (this.head + 1) % SIZE;
   
   if (this.head == 0 )
-    this.cmd("SetMessage", "Advance head to next location. It wraps around to index 0.");
+    this.cmd("SetMessage", "Advance start to next location. It wraps around to index 0.");
 
   this.cmd("SetText", this.headID, this.head);
   this.cmd("Step");

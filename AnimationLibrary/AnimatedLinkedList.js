@@ -36,6 +36,7 @@ export function AnimatedLinkedList(
   verticalOrientation,
   linkPosEnd,
   numLab,
+  numLinks,
   fillColor,
   edgeColor,
 ) {
@@ -48,6 +49,7 @@ export function AnimatedLinkedList(
     verticalOrientation,
     linkPosEnd,
     numLab,
+    numLinks,
     fillColor,
     edgeColor,
   );
@@ -66,6 +68,7 @@ AnimatedLinkedList.prototype.init = function (
   verticalOrientation,
   linkPosEnd,
   numLab,
+  numLinks,
   fillColor,
   edgeColor,
 ) {
@@ -80,20 +83,34 @@ AnimatedLinkedList.prototype.init = function (
   this.linkPositionEnd = linkPosEnd;
   this.linkPercent = linkPer;
 
+  this.numLinks = typeof numLinks === "number" ? numLinks : 1;
+  if (this.numLinks !== 2) {
+    this.numLinks = 1;
+  }
+
   this.numLabels = numLab;
 
   this.labels = [];
   this.labelPosX = [];
   this.labelPosY = [];
   this.labelColors = [];
-  this.nullPointer = false;
+  // Per-link null state. Index 0 is "next" (right), index 1 is "prev" (left)
+  this.nullPointer = new Array(this.numLinks);
+  for (let i = 0; i < this.numLinks; i++) {
+    this.nullPointer[i] = false;
+  }
 
   this.currentHeightDif = 6;
   this.maxHeightDiff = 5;
   this.minHeightDiff = 3;
   
   this.svgRect = null;
+  this.svgGroup = null;
+  // For singly linked list, svgLinkBox is used.
+  // For doubly linked list, we use svgLinkBoxLeft/svgLinkBoxRight.
   this.svgLinkBox = null;
+  this.svgLinkBoxLeft = null;
+  this.svgLinkBoxRight = null;
   this.svgLabels = [];
 
   for (var i = 0; i < this.numLabels; i++) {
@@ -109,6 +126,9 @@ AnimatedLinkedList.prototype.init = function (
 };
 
 AnimatedLinkedList.prototype.left = function () {
+  if (this.numLinks === 2) {
+    return this.x - this.w / 2.0;
+  }
   if (this.vertical) {
     return this.x - this.w / 2.0;
   } else if (this.linkPositionEnd) {
@@ -118,17 +138,42 @@ AnimatedLinkedList.prototype.left = function () {
   }
 };
 
-AnimatedLinkedList.prototype.setNull = function (np) {
-  if (this.nullPointer != np) {
-    this.nullPointer = np;
+AnimatedLinkedList.prototype.setNull = function (np, linkIndex) {
+  if (this.numLinks === 1) {
+    if (this.nullPointer[0] !== np) {
+      this.nullPointer[0] = np;
+    }
+    return;
+  }
+
+  if (Array.isArray(np)) {
+    for (let i = 0; i < this.numLinks; i++) {
+      this.nullPointer[i] = !!np[i];
+    }
+    return;
+  }
+
+  const idx = typeof linkIndex === "number" ? linkIndex : 0;
+  if (idx >= 0 && idx < this.numLinks) {
+    this.nullPointer[idx] = np;
   }
 };
 
-AnimatedLinkedList.prototype.getNull = function () {
-  return this.nullPointer;
+AnimatedLinkedList.prototype.getNull = function (linkIndex) {
+  if (this.numLinks === 1) {
+    return this.nullPointer[0];
+  }
+  const idx = typeof linkIndex === "number" ? linkIndex : 0;
+  if (idx >= 0 && idx < this.numLinks) {
+    return this.nullPointer[idx];
+  }
+  return this.nullPointer[0];
 };
 
 AnimatedLinkedList.prototype.right = function () {
+  if (this.numLinks === 2) {
+    return this.x + this.w / 2.0;
+  }
   if (this.vertical) {
     return this.x + this.w / 2.0;
   } else if (this.linkPositionEnd) {
@@ -177,14 +222,26 @@ AnimatedLinkedList.prototype.resetTextPosition = function () {
     }
   } else {
     this.labelPosY[0] = this.y;
-    this.labelPosX[0] =
-      this.x +
-      ((this.w * (1 - this.linkPercent)) / 2) * (1 / this.numLabels - 1);
-    for (var i = 1; i < this.numLabels; i++) {
+    // Compute the horizontal region used for labels (exclude pointer/link boxes)
+    let labelRegionLeft = this.left();
+    let labelRegionRight = this.right();
+
+    if (this.numLinks === 2) {
+      labelRegionLeft = this.left() + this.w * this.linkPercent;
+      labelRegionRight = this.right() - this.w * this.linkPercent;
+    } else if (this.linkPositionEnd) {
+      // Single pointer box on the right
+      labelRegionRight = this.right() - this.w * this.linkPercent;
+    } else {
+      // Single pointer box on the left
+      labelRegionLeft = this.left() + this.w * this.linkPercent;
+    }
+
+    const labelRegionWidth = Math.max(0, labelRegionRight - labelRegionLeft);
+    for (var i = 0; i < this.numLabels; i++) {
       this.labelPosY[i] = this.y;
       this.labelPosX[i] =
-        this.labelPosX[i - 1] +
-        (this.w * (1 - this.linkPercent)) / this.numLabels;
+        labelRegionLeft + labelRegionWidth * ((i + 0.5) / this.numLabels);
     }
   }
 };
@@ -195,22 +252,52 @@ AnimatedLinkedList.prototype.getTailPointerAttachPos = function (
   anchor,
 ) {
   //return [this.centerX(), this.centerY()]
-  
-  if (this.vertical && this.linkPositionEnd) {
-    return [this.x, this.y + this.h / 2.0];
-  } else if (this.vertical && !this.linkPositionEnd) {
-    return [this.x, this.y - this.h / 2.0];
-  } else if (!this.vertical && this.linkPositionEnd) {
-    return [this.x + this.w / 2.0, this.y];
-  } // (!this.vertical && !this.linkPositionEnd)
-  else {
-    return [this.x - this.w / 2.0, this.y];
+
+  // Attach from the center of the pointer box (next/prev) rather than the node edge.
+  // anchor 0: next (right). anchor 1: prev (left) for doubly-linked nodes.
+  const linkSizeX = this.w * this.linkPercent;
+  const linkSizeY = this.h * this.linkPercent;
+
+  if (!this.vertical) {
+    if (this.numLinks === 2) {
+      if (anchor === 1) {
+        // prev box (left)
+        return [this.left() + linkSizeX / 2.0, this.y];
+      }
+      // next box (right)
+      return [this.right() - linkSizeX / 2.0, this.y];
+    }
+
+    if (this.linkPositionEnd) {
+      // next box on the right
+      return [this.right() - linkSizeX / 2.0, this.y];
+    }
+    // next box on the left
+    return [this.left() + linkSizeX / 2.0, this.y];
   }
+
+  // Vertical layout
+  if (this.linkPositionEnd) {
+    // pointer box at bottom
+    return [this.x, this.bottom() - linkSizeY / 2.0];
+  }
+  // pointer box at top
+  return [this.x, this.top() + linkSizeY / 2.0];
 };
 
 AnimatedLinkedList.prototype.getHeadPointerAttachPos = function (fromX, fromY, anchorIndex) {
-  if(anchorIndex === 1) {
-    return [this.centerX(), this.top()]
+  if (anchorIndex === 2) {
+    // Used for the "Current" pointer: attach to the bottom of the node.
+    return [this.centerX(), this.bottom()];
+  }
+  if (anchorIndex === 1) {
+    // For doubly-linked nodes, anchorIndex 1 is used for "prev" edges.
+    // Those should attach to the right edge of the target node.
+    if (this.numLinks === 2 && !this.vertical) {
+      return [this.right(), this.y];
+    }
+    // Preserve existing behavior (used by some pointer boxes) for singly-linked nodes.
+    return [this.centerX(), this.top()];
   }
   //return [this.centerX(), this.centerY()]
   return this.getClosestCardinalPoint(fromX, fromY);
@@ -234,6 +321,10 @@ AnimatedLinkedList.prototype.getHeight = function () {
   return this.h;
 };
 
+AnimatedLinkedList.prototype.getSVGComponent = function () {
+  return this.svgGroup;
+};
+
 AnimatedLinkedList.prototype.draw = function (context) {
   var startX;
   var startY;
@@ -241,34 +332,79 @@ AnimatedLinkedList.prototype.draw = function (context) {
   startX = this.left();
   startY = this.top();
   
+  if (!this.addedToScene) {
+    if (this.svgGroup) {
+      this.svgGroup.setAttributeNS(null, "display", "none");
+    }
+    return;
+  }
+
+
+  if (!this.svgGroup) {
+    var svgns = "http://www.w3.org/2000/svg";
+    var group = document.createElementNS(svgns, "g");
+
+    if (this.layer !== 0 && context.svg.getElementById(`layer_${this.layer}`)) {
+      context.svg.getElementById(`layer_${this.layer}`).appendChild(group);
+    } else {
+      context.svg.getElementById("nodes").appendChild(group);
+    }
+
+    this.svgGroup = group;
+  }
+
+  this.svgGroup.setAttributeNS(null, "display", "block");
 
   if (!this.svgRect) {
-    var svgns = "http://www.w3.org/2000/svg";
     var rect = document.createElementNS(svgns, "rect");
     rect.setAttributeNS(
       null,
       "style",
       'fill: var(--svgFillColor); stroke: var(--svgColor);',
     );
-    context.svg.getElementById("nodes").appendChild(rect);
+    this.svgGroup.appendChild(rect);
     this.svgRect = rect;
     this.svgRect.setAttributeNS(null, "width", this.w);
     this.svgRect.setAttributeNS(null, "height", this.h);
     
-    var rect2 = document.createElementNS(svgns, "rect");
-    rect2.setAttributeNS(
-      null,
-      "style",
-      'fill: var(--svgFillColor); stroke: var(--svgColor);',
-    );
-    context.svg.getElementById("nodes").appendChild(rect2);
-    this.svgLinkBox = rect2;
-    if(this.vertical) {
-      this.svgLinkBox.setAttributeNS(null, "width", this.w);
-      this.svgLinkBox.setAttributeNS(null, "height", this.h * this.linkPercent);
+    if (this.numLinks === 2 && !this.vertical) {
+      var rectLeft = document.createElementNS(svgns, "rect");
+      rectLeft.setAttributeNS(
+        null,
+        "style",
+        'fill: var(--svgFillColor); stroke: var(--svgColor);',
+      );
+      this.svgGroup.appendChild(rectLeft);
+      this.svgLinkBoxLeft = rectLeft;
+      this.svgLinkBoxLeft.setAttributeNS(null, "width", this.w * this.linkPercent);
+      this.svgLinkBoxLeft.setAttributeNS(null, "height", this.h);
+
+      var rectRight = document.createElementNS(svgns, "rect");
+      rectRight.setAttributeNS(
+        null,
+        "style",
+        'fill: var(--svgFillColor); stroke: var(--svgColor);',
+      );
+      this.svgGroup.appendChild(rectRight);
+      this.svgLinkBoxRight = rectRight;
+      this.svgLinkBoxRight.setAttributeNS(null, "width", this.w * this.linkPercent);
+      this.svgLinkBoxRight.setAttributeNS(null, "height", this.h);
     } else {
-      this.svgLinkBox.setAttributeNS(null, "width", this.w * this.linkPercent);
-      this.svgLinkBox.setAttributeNS(null, "height", this.h);
+      var rect2 = document.createElementNS(svgns, "rect");
+      rect2.setAttributeNS(
+        null,
+        "style",
+        'fill: var(--svgFillColor); stroke: var(--svgColor);',
+      );
+      this.svgGroup.appendChild(rect2);
+      this.svgLinkBox = rect2;
+      if (this.vertical) {
+        this.svgLinkBox.setAttributeNS(null, "width", this.w);
+        this.svgLinkBox.setAttributeNS(null, "height", this.h * this.linkPercent);
+      } else {
+        this.svgLinkBox.setAttributeNS(null, "width", this.w * this.linkPercent);
+        this.svgLinkBox.setAttributeNS(null, "height", this.h);
+      }
     }
     
     for (i = 0; i < this.numLabels; i++) {
@@ -281,7 +417,7 @@ AnimatedLinkedList.prototype.draw = function (context) {
         "fill: var(--svgColor); stroke: none; stroke-width: 1px;",
       );
       this.svgLabels.push(text);
-      this.svgRect.after(text);
+      this.svgGroup.appendChild(text);
 
       text.addEventListener("click", () => {
         let input = document.getElementById("inputField");
@@ -375,11 +511,16 @@ AnimatedLinkedList.prototype.draw = function (context) {
     context.beginPath();
     context.moveTo(startX + this.w, startY);
     context.lineTo(startX, startY);
-    if (this.nullPointer) {
+    if (this.nullPointer[0]) {
       context.lineTo(this.startX + this.w, this.bottom());
     }
     context.closePath();
     context.stroke();
+
+    if (this.svgLinkBox) {
+      this.svgLinkBox.setAttributeNS(null, "x", startX);
+      this.svgLinkBox.setAttributeNS(null, "y", startY);
+    }
   } else if (this.vertical && !this.linkPositionEnd) {
     startX = this.left();
     startY = this.top() + this.h * this.linkPercent;
@@ -387,11 +528,58 @@ AnimatedLinkedList.prototype.draw = function (context) {
     context.beginPath();
     context.moveTo(startX + this.w, startY);
     context.lineTo(startX, startY);
-    if (this.nullPointer) {
+    if (this.nullPointer[0]) {
       context.lineTo(startX + this.w, this.top());
     }
     context.closePath();
     context.stroke();
+
+    if (this.svgLinkBox) {
+      this.svgLinkBox.setAttributeNS(null, "x", this.left());
+      this.svgLinkBox.setAttributeNS(null, "y", this.top());
+    }
+  } else if (!this.vertical && this.numLinks === 2) {
+    // Draw both separators + position both link boxes.
+    const leftX = this.left() + this.w * this.linkPercent;
+    const rightX = this.right() - this.w * this.linkPercent;
+    startY = this.top();
+
+    context.beginPath();
+    context.moveTo(leftX, startY + this.h);
+    context.lineTo(leftX, startY);
+    context.closePath();
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(rightX, startY + this.h);
+    context.lineTo(rightX, startY);
+    context.closePath();
+    context.stroke();
+
+    // Null indicators in pointer boxes (left=prev index 1, right=next index 0)
+    if (this.nullPointer[1]) {
+      context.beginPath();
+      context.moveTo(this.left(), startY);
+      context.lineTo(leftX, startY + this.h);
+      context.closePath();
+      context.stroke();
+    }
+    if (this.nullPointer[0]) {
+      context.beginPath();
+      context.moveTo(rightX, startY);
+      context.lineTo(this.right(), startY + this.h);
+      context.closePath();
+      context.stroke();
+    }
+
+    if (this.svgLinkBoxLeft) {
+      this.svgLinkBoxLeft.setAttributeNS(null, "x", this.left());
+      this.svgLinkBoxLeft.setAttributeNS(null, "y", startY);
+    }
+    if (this.svgLinkBoxRight) {
+      this.svgLinkBoxRight.setAttributeNS(null, "x", rightX);
+      this.svgLinkBoxRight.setAttributeNS(null, "y", startY);
+    }
   } else if (!this.vertical && this.linkPositionEnd) {
     startX = this.right() - this.w * this.linkPercent;
     startY = this.top();
@@ -399,15 +587,17 @@ AnimatedLinkedList.prototype.draw = function (context) {
     context.beginPath();
     context.moveTo(startX, startY + this.h);
     context.lineTo(startX, startY);
-    if (this.nullPointer) {
+    if (this.nullPointer[0]) {
       context.lineTo(this.right(), startY + this.h);
     }
     context.closePath();
     context.stroke();
 
     
-    this.svgLinkBox.setAttributeNS(null, "x", startX);
-    this.svgLinkBox.setAttributeNS(null, "y", startY);
+    if (this.svgLinkBox) {
+      this.svgLinkBox.setAttributeNS(null, "x", startX);
+      this.svgLinkBox.setAttributeNS(null, "y", startY);
+    }
   
   } // (!vertical && !linkPositionEnd)
   else {
@@ -417,7 +607,7 @@ AnimatedLinkedList.prototype.draw = function (context) {
     context.beginPath();
     context.moveTo(startX, startY + this.h);
     context.lineTo(startX, startY);
-    if (this.nullPointer) {
+    if (this.nullPointer[0]) {
       context.lineTo(this.left(), startY);
     }
     context.closePath();
@@ -459,17 +649,16 @@ AnimatedLinkedList.prototype.setText = function (newText, textIndex) {
 };
 
 AnimatedLinkedList.prototype.remove = function () {
-  if (this.svgRect) {
-    this.svgRect.remove();
-    this.svgRect = null;
-    
-    this.svgLinkBox.remove();
-    this.svgLinkBox = null;
-    for (let i = 0; i < this.numLabels; i++) {
-      this.svgLabels[i].remove();
-      this.svgLabels[i] = null;
-    }
+  if (this.svgGroup) {
+    this.svgGroup.remove();
+    this.svgGroup = null;
   }
+
+  this.svgRect = null;
+  this.svgLinkBox = null;
+  this.svgLinkBoxLeft = null;
+  this.svgLinkBoxRight = null;
+  this.svgLabels = [];
 };
 
 AnimatedLinkedList.prototype.createUndoDelete = function () {
@@ -489,6 +678,7 @@ AnimatedLinkedList.prototype.createUndoDelete = function () {
     this.foregroundColor,
     this.layer,
     this.nullPointer,
+    this.numLinks,
   );
 };
 
@@ -514,6 +704,7 @@ function UndoDeleteLinkedList(
   fgColor,
   l,
   np,
+  numLinks,
 ) {
   this.objectID = id;
   this.posX = x;
@@ -530,6 +721,7 @@ function UndoDeleteLinkedList(
   this.layer = l;
   this.numLabels = numlab;
   this.nullPointer = np;
+  this.numLinks = typeof numLinks === "number" ? numLinks : 1;
 }
 
 UndoDeleteLinkedList.prototype = new UndoBlock();
@@ -545,12 +737,19 @@ UndoDeleteLinkedList.prototype.undoInitialStep = function (world) {
     this.verticalOrentation,
     this.linkAtEnd,
     this.numLabels,
+    this.numLinks,
     this.backgroundColor,
     this.foregroundColor,
   );
   world.setNodePosition(this.objectID, this.posX, this.posY);
   world.setLayer(this.objectID, this.layer);
-  world.setNull(this.objectID, this.nullPointer);
+  if (Array.isArray(this.nullPointer)) {
+    for (let i = 0; i < this.nullPointer.length; i++) {
+      world.setNull(this.objectID, this.nullPointer[i], i);
+    }
+  } else {
+    world.setNull(this.objectID, this.nullPointer);
+  }
   for (var i = 0; i < this.numLabels; i++) {
     world.setText(this.objectID, this.labels[i], i);
     world.setTextColor(this.objectID, this.labelColors[i], i);

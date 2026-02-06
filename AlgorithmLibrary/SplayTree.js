@@ -24,12 +24,19 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initAnimationManager } from "../AnimationLibrary/AnimationMain.js";
+import {
+  Algorithm,
+  addControlToAlgorithmBar,
+  addSeparatorToAlgorithmBar,
+} from "../AlgorithmLibrary/Algorithm.js";
+
 // Constants.
 
 SPLAYTREE.LINK_COLOR = "#007700";
 SPLAYTREE.HIGHLIGHT_CIRCLE_COLOR = "#007700";
-SPLAYTREE.FOREGROUND_COLOR = "#007700";
-SPLAYTREE.BACKGROUND_COLOR = "#EEFFEE";
+SPLAYTREE.FOREGROUND_COLOR = "var(--svgColor)";
+// SPLAYTREE.BACKGROUND_COLOR = "#EEFFEE";
 SPLAYTREE.PRINT_COLOR = SPLAYTREE.FOREGROUND_COLOR;
 
 SPLAYTREE.WIDTH_DELTA = 50;
@@ -40,9 +47,28 @@ SPLAYTREE.FIRST_PRINT_POS_X = 50;
 SPLAYTREE.PRINT_VERTICAL_GAP = 20;
 SPLAYTREE.PRINT_HORIZONTAL_GAP = 50;
 
-function SPLAYTREE(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+function SPLAYTREE(opts = {}) {
+  if (!opts.title) opts.title = opts.title || "Splay Tree";
+  opts.centered = true;
+
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+
+  let am = initAnimationManager(opts);
+  this.init(am, 800, 400);
+
+  this.addControls();
+
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
+      this.implementAction(this.insertElement.bind(this), d);
+      am.skipForward();
+    }
+    am.clearHistory();
+    am.animatedObjects.draw();
+  }
 }
 
 SPLAYTREE.prototype = new Algorithm();
@@ -51,47 +77,68 @@ SPLAYTREE.superclass = Algorithm.prototype;
 
 SPLAYTREE.prototype.init = function (am, w, h) {
   var sc = SPLAYTREE.superclass;
-  this.startingX = w / 2;
+  this.startingX = 100; // w / 2;
   this.first_print_pos_y = h - 2 * SPLAYTREE.PRINT_VERTICAL_GAP;
   this.print_max = w - 10;
 
   var fn = sc.init;
-  fn.call(this, am);
-  this.addControls();
+  fn.call(this, am, w, h);
   this.nextIndex = 0;
   this.commands = [];
-  this.cmd("CreateLabel", 0, "", 20, 10, 0);
-  this.nextIndex = 1;
   this.animationManager.StartNewAnimation(this.commands);
   this.animationManager.skipForward();
   this.animationManager.clearHistory();
+  // Programmatic bindings
+  this.doInsert = function (val) {
+    this.implementAction(this.insertElement.bind(this), val);
+  };
+  this.doDelete = function (val) {
+    this.implementAction(this.deleteElement.bind(this), val);
+  };
+  // Avoid clashing with recursive helper `doFind(tree, value)`
+  this.doFindValue = function (val) {
+    this.implementAction(this.findElement.bind(this), val);
+  };
+  this.doPrint = function (order = "In") {
+    this.implementAction(this.printTree.bind(this), order);
+  };
+  this.doInsertRandom = function(count = 10, maxValue = 999) {
+    for (let i = 0; i < count; i++) {
+      const raw = Math.floor(1 + Math.random() * maxValue);
+      const insertedValue = this.normalizeNumber(String(raw), 4);
+      this.implementAction(this.insertElement.bind(this), insertedValue);
+      this.animationManager.skipForward();
+    }
+    this.animationManager.clearHistory();
+    this.animationManager.animatedObjects.draw();
+  };
 };
 
 SPLAYTREE.prototype.addControls = function () {
-  this.insertField = addControlToAlgorithmBar("Text", "");
-  this.insertField.onkeydown = this.returnSubmit(
-    this.insertField,
+  addSeparatorToAlgorithmBar();
+  this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+  this.inputField.onkeydown = this.returnSubmit(
+    this.inputField,
     this.insertCallback.bind(this),
     4,
   );
+
   this.insertButton = addControlToAlgorithmBar("Button", "Insert");
   this.insertButton.onclick = this.insertCallback.bind(this);
-  this.deleteField = addControlToAlgorithmBar("Text", "");
-  this.deleteField.onkeydown = this.returnSubmit(
-    this.deleteField,
-    this.deleteCallback.bind(this),
-    4,
-  );
-  this.deleteButton = addControlToAlgorithmBar("Button", "Delete");
+
+  this.deleteButton = addControlToAlgorithmBar("Button", "Remove");
   this.deleteButton.onclick = this.deleteCallback.bind(this);
-  this.findField = addControlToAlgorithmBar("Text", "");
-  this.findField.onkeydown = this.returnSubmit(
-    this.findField,
-    this.findCallback.bind(this),
-    4,
-  );
+
   this.findButton = addControlToAlgorithmBar("Button", "Find");
   this.findButton.onclick = this.findCallback.bind(this);
+
+  this.clearButton = addControlToAlgorithmBar("Button", "Clear");
+  this.clearButton.onclick = this.clearCallback.bind(this);
+
+  this.insertRandomButton = addControlToAlgorithmBar("Button", "Insert Random Values");
+  this.insertRandomButton.onclick = this.insertRandomCallback.bind(this);
+
+  addSeparatorToAlgorithmBar();
   this.printButton = addControlToAlgorithmBar("Button", "Print");
   this.printButton.onclick = this.printCallback.bind(this);
 };
@@ -102,23 +149,62 @@ SPLAYTREE.prototype.reset = function () {
 };
 
 SPLAYTREE.prototype.insertCallback = function (event) {
-  var insertedValue = this.insertField.value;
+  var insertedValue = this.inputField.value;
   // Get text value
   insertedValue = this.normalizeNumber(insertedValue, 4);
   if (insertedValue != "") {
     // set text value
-    this.insertField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.insertElement.bind(this), insertedValue);
   }
 };
 
 SPLAYTREE.prototype.deleteCallback = function (event) {
-  var deletedValue = this.deleteField.value;
+  var deletedValue = this.inputField.value;
   if (deletedValue != "") {
     deletedValue = this.normalizeNumber(deletedValue, 4);
-    this.deleteField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.deleteElement.bind(this), deletedValue);
   }
+};
+
+SPLAYTREE.prototype.clearCallback = function (event) {
+  this.implementAction(this.clearData.bind(this), "");
+};
+
+SPLAYTREE.prototype.clearData = function () {
+  if (this.treeRoot == null) return;
+
+  this.commands = [];
+
+  function clearTree(tree, handler) {
+    if (tree != null) {
+      if (tree.left != null) {
+        clearTree(tree.left, handler);
+      }
+      if (tree.right != null) {
+        clearTree(tree.right, handler);
+      }
+      handler.cmd("Delete", tree.graphicID);
+    }
+  }
+
+  clearTree(this.treeRoot, this);
+  this.treeRoot = null;
+  this.cmd("SetMessage", "");
+  return this.commands;
+};
+
+SPLAYTREE.prototype.insertRandomCallback = function (event) {
+  var numToInsert = 10; // this.inputField.value;
+  for (let i = 0; i < numToInsert; i++) {
+    const raw = Math.floor(1 + Math.random() * 999);
+    const insertedValue = this.normalizeNumber(String(raw), 4);
+    this.implementAction(this.insertElement.bind(this), insertedValue);
+    this.animationManager.skipForward();
+  }
+  this.animationManager.clearHistory();
+  this.animationManager.animatedObjects.draw();
 };
 
 //  TODO:  This top-down version is broken.  Don't use
@@ -239,9 +325,11 @@ SPLAYTREE.prototype.printTreeRec = function (tree) {
 
 SPLAYTREE.prototype.findCallback = function (event) {
   var findValue;
-  findValue = this.normalizeNumber(this.findField.value, 4);
-  this.findField.value = "";
-  this.implementAction(this.findElement.bind(this), findValue);
+  findValue = this.normalizeNumber(this.inputField.value, 4);
+  if (findValue != "") {
+    this.inputField.value = "";
+    this.implementAction(this.findElement.bind(this), findValue);
+  }
 };
 
 SPLAYTREE.prototype.findElement = function (findValue) {
@@ -252,22 +340,21 @@ SPLAYTREE.prototype.findElement = function (findValue) {
   var found = this.doFind(this.treeRoot, findValue);
 
   if (found) {
-    this.cmd("SetText", 0, "Element " + findValue + " found.");
+    this.cmd("SetMessage", "Element " + findValue + " found.");
   } else {
-    this.cmd("SetText", 0, "Element " + findValue + " not found.");
+    this.cmd("SetMessage", "Element " + findValue + " not found.");
   }
 
   return this.commands;
 };
 
 SPLAYTREE.prototype.doFind = function (tree, value) {
-  this.cmd("SetText", 0, "Searching for " + value);
+  this.cmd("SetMessage", "Searching for " + value);
   if (tree != null) {
     this.cmd("SetHighlight", tree.graphicID, 1);
     if (tree.data == value) {
       this.cmd(
-        "SetText",
-        0,
+        "SetMessage",
         "Searching for " +
           value +
           " : " +
@@ -277,7 +364,7 @@ SPLAYTREE.prototype.doFind = function (tree, value) {
           " (Element found!)",
       );
       this.cmd("Step");
-      this.cmd("SetText", 0, "Splaying found node to root of tree");
+      this.cmd("SetMessage", "Splaying found node to root of tree");
       this.cmd("Step");
       this.cmd("SetHighlight", tree.graphicID, 0);
       this.splayUp(tree);
@@ -285,8 +372,7 @@ SPLAYTREE.prototype.doFind = function (tree, value) {
     } else {
       if (tree.data > value) {
         this.cmd(
-          "SetText",
-          0,
+          "SetMessage",
           "Searching for " +
             value +
             " : " +
@@ -315,8 +401,7 @@ SPLAYTREE.prototype.doFind = function (tree, value) {
         }
       } else {
         this.cmd(
-          "SetText",
-          0,
+          "SetMessage",
           "Searching for " +
             value +
             " : " +
@@ -347,14 +432,12 @@ SPLAYTREE.prototype.doFind = function (tree, value) {
     }
   } else {
     this.cmd(
-      "SetText",
-      0,
+      "SetMessage",
       "Searching for " + value + " : " + "< Empty Tree > (Element not found)",
     );
     this.cmd("Step");
     this.cmd(
-      "SetText",
-      0,
+      "SetMessage",
       "Searching for " + value + " : " + " (Element not found)",
     );
     return false;
@@ -363,7 +446,7 @@ SPLAYTREE.prototype.doFind = function (tree, value) {
 
 SPLAYTREE.prototype.insertElement = function (insertedValue) {
   this.commands = new Array();
-  this.cmd("SetText", 0, "Inserting " + insertedValue);
+  this.cmd("SetMessage", "Inserting " + insertedValue);
   this.highlightID = this.nextIndex++;
 
   if (this.treeRoot == null) {
@@ -395,11 +478,11 @@ SPLAYTREE.prototype.insertElement = function (insertedValue) {
     this.cmd("SetHighlight", insertElem.graphicID, 1);
     this.insert(insertElem, this.treeRoot);
     this.resizeTree();
-    this.cmd("SetText", 0, "Splay inserted element to root of tree");
+    this.cmd("SetMessage", "Splay inserted element to root of tree");
     this.cmd("Step");
     this.splayUp(insertElem);
   }
-  this.cmd("SetText", 0, "");
+  this.cmd("SetMessage", "");
   return this.commands;
 };
 
@@ -409,14 +492,12 @@ SPLAYTREE.prototype.insert = function (elem, tree) {
 
   if (elem.data < tree.data) {
     this.cmd(
-      "SetText",
-      0,
+      "SetMessage",
       elem.data + " < " + tree.data + ".  Looking at left subtree",
     );
   } else {
     this.cmd(
-      "SetText",
-      0,
+      "SetMessage",
       elem.data + " >= " + tree.data + ".  Looking at right subtree",
     );
   }
@@ -426,7 +507,7 @@ SPLAYTREE.prototype.insert = function (elem, tree) {
 
   if (elem.data < tree.data) {
     if (tree.left == null) {
-      this.cmd("SetText", 0, "Found null tree, inserting element");
+      this.cmd("SetMessage", "Found null tree, inserting element");
 
       this.cmd("SetHighlight", elem.graphicID, 0);
       tree.left = elem;
@@ -447,7 +528,7 @@ SPLAYTREE.prototype.insert = function (elem, tree) {
     }
   } else {
     if (tree.right == null) {
-      this.cmd("SetText", 0, "Found null tree, inserting element");
+      this.cmd("SetMessage", "Found null tree, inserting element");
       this.cmd("SetHighlight", elem.graphicID, 0);
       tree.right = elem;
       elem.parent = tree;
@@ -473,34 +554,34 @@ SPLAYTREE.prototype.insert = function (elem, tree) {
 
 SPLAYTREE.prototype.deleteElement = function (deletedValue) {
   this.commands = [];
-  this.cmd("SetText", 0, "Deleting " + deletedValue);
+  this.cmd("SetMessage", "Deleting " + deletedValue);
   this.cmd("Step");
-  this.cmd("SetText", 0, "");
+  this.cmd("SetMessage", "");
   this.highlightID = this.nextIndex++;
   this.treeDelete(this.treeRoot, deletedValue);
-  this.cmd("SetText", 0, "");
+  this.cmd("SetMessage", "");
   // Do delete
   return this.commands;
 };
 
 SPLAYTREE.prototype.treeDelete = function (tree, valueToDelete) {
-  this.cmd("SetText", 0, "Finding " + valueToDelete + " and splaying to rooot");
+  this.cmd("SetMessage", "Finding " + valueToDelete + " and splaying to rooot");
   this.cmd("Step");
 
   var inTree = this.doFind(this.treeRoot, valueToDelete);
-  this.cmd("SetText", 0, "Removing root, leaving left and right trees");
+  this.cmd("SetMessage", "Removing root, leaving left and right trees");
   this.cmd("Step");
   if (inTree) {
     if (this.treeRoot.right == null) {
       this.cmd("Delete", this.treeRoot.graphicID);
-      this.cmd("SetText", 0, "No right tree, make left tree the root.");
+      this.cmd("SetMessage", "No right tree, make left tree the root.");
       this.cmd("Step");
       this.treeRoot = this.treeRoot.left;
       this.treeRoot.parent = null;
       this.resizeTree();
     } else if (this.treeRoot.left == null) {
       this.cmd("Delete", this.treeRoot.graphicID);
-      this.cmd("SetText", 0, "No left tree, make right tree the root.");
+      this.cmd("SetMessage", "No left tree, make right tree the root.");
       this.cmd("Step");
       this.treeRoot = this.treeRoot.right;
       this.treeRoot.parent = null;
@@ -512,15 +593,14 @@ SPLAYTREE.prototype.treeDelete = function (tree, valueToDelete) {
       this.cmd("Disconnect", this.treeRoot.graphicID, left.graphicID);
       this.cmd("Disconnect", this.treeRoot.graphicID, right.graphicID);
       this.cmd("SetAlpha", this.treeRoot.graphicID, 0);
-      this.cmd("SetText", 0, "Splay largest element in left tree to root");
+      this.cmd("SetMessage", "Splay largest element in left tree to root");
       this.cmd("Step");
 
       left.parent = null;
       var largestLeft = this.findMax(left);
       this.splayUp(largestLeft);
       this.cmd(
-        "SetText",
-        0,
+        "SetMessage",
         "Left tree now has no right subtree, connect left and right trees",
       );
       this.cmd("Step");
@@ -547,7 +627,7 @@ SPLAYTREE.prototype.singleRotateRight = function (tree) {
   var t1 = A.left;
   var t2 = A.right;
 
-  this.cmd("SetText", 0, "Zig Right");
+  this.cmd("SetMessage", "Zig Right");
   this.cmd("SetEdgeHighlight", B.graphicID, A.graphicID, 1);
   this.cmd("Step");
 
@@ -590,7 +670,7 @@ SPLAYTREE.prototype.zigZigRight = function (tree) {
   var t3 = B.right;
   var t4 = C.right;
 
-  this.cmd("SetText", 0, "Zig-Zig Right");
+  this.cmd("SetMessage", "Zig-Zig Right");
   this.cmd("SetEdgeHighlight", C.graphicID, B.graphicID, 1);
   this.cmd("SetEdgeHighlight", B.graphicID, A.graphicID, 1);
   this.cmd("Step");
@@ -643,7 +723,7 @@ SPLAYTREE.prototype.zigZigLeft = function (tree) {
   var t3 = C.left;
   var t4 = C.right;
 
-  this.cmd("SetText", 0, "Zig-Zig Left");
+  this.cmd("SetMessage", "Zig-Zig Left");
   this.cmd("SetEdgeHighlight", A.graphicID, B.graphicID, 1);
   this.cmd("SetEdgeHighlight", B.graphicID, C.graphicID, 1);
   this.cmd("Step");
@@ -694,7 +774,7 @@ SPLAYTREE.prototype.singleRotateLeft = function (tree) {
   var t2 = B.left;
   var t3 = B.right;
 
-  this.cmd("SetText", 0, "Zig Left");
+  this.cmd("SetMessage", "Zig Left");
   this.cmd("SetEdgeHighlight", A.graphicID, B.graphicID, 1);
   this.cmd("Step");
 
@@ -778,10 +858,18 @@ SPLAYTREE.prototype.findMax = function (tree) {
 };
 
 SPLAYTREE.prototype.doubleRotateRight = function (tree) {
-  this.cmd("SetText", 0, "Zig-Zag Right");
-  var A = tree.left;
-  var B = tree.left.right;
+  this.cmd("SetMessage", "Zig-Zag Right");
   var C = tree;
+  var A = C.left;
+  if (A == null) {
+    this.singleRotateRight(C);
+    return;
+  }
+  var B = A.right;
+  if (B == null) {
+    this.zigZigRight(C);
+    return;
+  }
   var t1 = A.left;
   var t2 = B.left;
   var t3 = B.right;
@@ -801,7 +889,7 @@ SPLAYTREE.prototype.doubleRotateRight = function (tree) {
   if (t3 != null) {
     this.cmd("Disconnect", B.graphicID, t3.graphicID);
     t3.parent = C;
-    C.left = t2;
+    C.left = t3;
     this.cmd("Connect", C.graphicID, t3.graphicID, SPLAYTREE.LINK_COLOR);
   }
   if (C.parent == null) {
@@ -833,10 +921,20 @@ SPLAYTREE.prototype.doubleRotateRight = function (tree) {
 };
 
 SPLAYTREE.prototype.doubleRotateLeft = function (tree) {
-  this.cmd("SetText", 0, "Zig-Zag Left");
+  this.cmd("SetMessage", "Zig-Zag Left");
   var A = tree;
-  var B = tree.right.left;
-  var C = tree.right;
+  var C = A.right;
+  if (C == null) {
+    // Fallback: nothing to zig-zag against, do single rotate
+    this.singleRotateLeft(A);
+    return;
+  }
+  var B = C.left;
+  if (B == null) {
+    // Structure is zig-zig, not zig-zag; fallback safely
+    this.zigZigLeft(A);
+    return;
+  }
   var t1 = A.left;
   var t2 = B.left;
   var t3 = B.right;
@@ -856,7 +954,7 @@ SPLAYTREE.prototype.doubleRotateLeft = function (tree) {
   if (t3 != null) {
     this.cmd("Disconnect", B.graphicID, t3.graphicID);
     t3.parent = C;
-    C.left = t2;
+    C.left = t3;
     this.cmd("Connect", C.graphicID, t3.graphicID, SPLAYTREE.LINK_COLOR);
   }
 
@@ -975,28 +1073,21 @@ BSTNode.prototype.isLeftChild = function () {
 };
 
 SPLAYTREE.prototype.disableUI = function (event) {
-  this.insertField.disabled = true;
-  this.insertButton.disabled = true;
-  this.deleteField.disabled = true;
-  this.deleteButton.disabled = true;
-  this.findField.disabled = true;
-  this.findButton.disabled = true;
-  this.printButton.disabled = true;
+  let inputs = document
+    .getElementById("AlgorithmSpecificControls")
+    .querySelectorAll("input");
+  for (let i of inputs) {
+    i.disabled = true;
+  }
 };
 
 SPLAYTREE.prototype.enableUI = function (event) {
-  this.insertField.disabled = false;
-  this.insertButton.disabled = false;
-  this.deleteField.disabled = false;
-  this.deleteButton.disabled = false;
-  this.findField.disabled = false;
-  this.findButton.disabled = false;
-  this.printButton.disabled = false;
+  let inputs = document
+    .getElementById("AlgorithmSpecificControls")
+    .querySelectorAll("input");
+  for (let i of inputs) {
+    i.disabled = false;
+  }
 };
 
-var currentAlg;
-
-function init() {
-  var animManag = initCanvas(canvas);
-  currentAlg = new SPLAYTREE(animManag, canvas.width, canvas.height);
-}
+export { SPLAYTREE as SplayTree };

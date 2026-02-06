@@ -24,13 +24,54 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import { initAnimationManager, initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import { addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
+import { Graph } from "../AlgorithmLibrary/Graph.js";
+
 export function TopoSortDFS(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+  // Support legacy canvas element or new opts-based initialization
+  let am;
+  let w;
+  let h;
+
+  if (canvas && typeof canvas.getContext === "function") {
+    const legacyCanvas = canvas;
+    am = initCanvas(legacyCanvas, null, "Topological Sort (DFS)", false, {
+      viewWidth: legacyCanvas.width,
+      viewHeight: legacyCanvas.height,
+    });
+    w = legacyCanvas.width;
+    h = legacyCanvas.height;
+  } else {
+    const opts = canvas || {};
+    const viewWidth =
+      Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
+        ? opts.viewWidth
+        : Number.isFinite(opts.width) && opts.width > 0
+          ? opts.width
+          : 1000;
+    const viewHeight =
+      Number.isFinite(opts.viewHeight) && opts.viewHeight > 0
+        ? opts.viewHeight
+        : Number.isFinite(opts.height) && opts.height > 0
+          ? opts.height
+          : 500;
+
+    am = initAnimationManager({
+      title: opts.title || "Topological Sort (DFS)",
+      height: opts.height || viewHeight,
+      viewWidth,
+      viewHeight,
+      ...opts,
+    });
+    w = viewWidth;
+    h = viewHeight;
+  }
+  this.init(am, w, h);
 }
 
-TopoSortDFS.ORDERING_INITIAL_X = 300;
-TopoSortDFS.ORDERING_INITIAL_Y = 70;
+TopoSortDFS.ORDERING_INITIAL_X = 200;
+TopoSortDFS.ORDERING_INITIAL_Y = 50;
 TopoSortDFS.ORDERING_DELTA_Y = 20;
 
 TopoSortDFS.D_X_POS_SMALL = [760, 685, 915, 610, 910, 685, 915, 760];
@@ -50,7 +91,7 @@ TopoSortDFS.F_X_POS_LARGE = [
 ];
 
 TopoSortDFS.D_Y_POS_LARGE = [
-  037, 037, 037, 037, 137, 137, 137, 237, 237, 237, 237, 337, 337, 337, 437,
+  37, 37, 37, 37, 137, 137, 137, 237, 237, 237, 237, 337, 337, 337, 437,
   437, 437, 437,
 ];
 
@@ -80,8 +121,12 @@ TopoSortDFS.prototype.init = function (am, w, h) {
 
 TopoSortDFS.prototype.setup = function () {
   TopoSortDFS.superclass.setup.call(this);
-  this.messageID = new Array();
   this.animationManager.setAllLayers([0, this.currentLayer]);
+  this.commands = new Array();
+  this.messageID = new Array();
+  // Track whether Run has been pressed; used to keep Run disabled until Reset
+  this.runLocked = false;
+  if (this.startButton) this.startButton.disabled = false;
 
   this.highlightCircleL = this.nextIndex++;
   this.highlightCircleAL = this.nextIndex++;
@@ -104,9 +149,23 @@ TopoSortDFS.prototype.setup = function () {
       }
     }
   }
+
+  // Initialize DFS call stack visualization parameters.
+  this.stackBaseX = 30;
+  this.stackBaseY = 20;
+  this.stackSectionY = this.stackBaseY;
+  this.stackIndent = 10;
+  this.stackLineHeight = 20;
+  this.stackSectionGap = 12;
+  this.stackLabelIDs = [];
+  this.callStackDepth = 0;
+  this.stackRowCount = 0;
 };
 
 TopoSortDFS.prototype.startCallback = function (event) {
+  // Lock Run until user resets
+  this.runLocked = true;
+  if (this.startButton) this.startButton.disabled = true;
   this.implementAction(this.doTopoSort.bind(this), "");
 };
 
@@ -125,15 +184,12 @@ TopoSortDFS.prototype.doTopoSort = function (ignored) {
   this.rebuildEdges(); // HMMM.. do I want this?
   this.messageID = new Array();
 
+  this.cmd("SetMessage", "Run DFS and build topological order.");
+  this.cmd("Step");
+
   var headerID = this.nextIndex++;
   this.messageID.push(headerID);
-  this.cmd(
-    "CreateLabel",
-    headerID,
-    "Topological Order",
-    TopoSortDFS.ORDERING_INITIAL_X,
-    TopoSortDFS.ORDERING_INITIAL_Y - 1.5 * TopoSortDFS.ORDERING_DELTA_Y,
-  );
+  this.cmd("CreateLabel", headerID, "Topological Order", TopoSortDFS.ORDERING_INITIAL_X, TopoSortDFS.ORDERING_INITIAL_Y - 1.5 * TopoSortDFS.ORDERING_DELTA_Y);
 
   headerID = this.nextIndex++;
   this.messageID.push(headerID);
@@ -167,6 +223,14 @@ TopoSortDFS.prototype.doTopoSort = function (ignored) {
   var vertex;
   for (vertex = 0; vertex < this.size; vertex++) {
     if (!this.visited[vertex]) {
+      // Start new DFS root: add stack section gap
+      if (vertex > 0) {
+        this.stackSectionY = this.stackSectionY + (this.stackRowCount * this.stackLineHeight) + this.stackSectionGap;
+        this.callStackDepth = 0;
+        this.stackRowCount = 0;
+      }
+      this.cmd("SetMessage", "Start DFS from vertex " + vertex + ".");
+      this.cmd("Step");
       this.cmd(
         "CreateHighlightCircle",
         this.highlightCircleL,
@@ -193,23 +257,7 @@ TopoSortDFS.prototype.doTopoSort = function (ignored) {
       );
       this.cmd("SetLayer", this.highlightCircleAM, 3);
 
-      if (vertex > 0) {
-        var breakID = this.nextIndex++;
-        this.messageID.push(breakID);
-        this.cmd(
-          "CreateRectangle",
-          breakID,
-          "",
-          200,
-          0,
-          10,
-          this.messageY,
-          "left",
-          "bottom",
-        );
-        this.messageY = this.messageY + 20;
-      }
-      this.dfsVisit(vertex, 10, false);
+      this.dfsVisit(vertex, 0, false);
       this.cmd("Delete", this.highlightCircleL, 2);
       this.cmd("Delete", this.highlightCircleAL, 3);
       this.cmd("Delete", this.highlightCircleAM, 4);
@@ -237,27 +285,24 @@ TopoSortDFS.prototype.setup_small = function () {
 };
 
 TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
-  var nextMessage = this.nextIndex++;
-  this.messageID.push(nextMessage);
-  this.cmd(
-    "CreateLabel",
-    nextMessage,
-    "DFS(" + String(startVertex) + ")",
-    messageX,
-    this.messageY,
-    0,
-  );
+  // Push current DFS call onto stack visualization, keep labels visible
+  this.callStackDepth = (this.callStackDepth || 0) + 1;
+  var indentDepth = this.callStackDepth - 1;
+  var stackLabelID = this.nextIndex++;
+  if (!this.stackLabelIDs) {
+    this.stackLabelIDs = [];
+  }
+  this.stackLabelIDs.push(stackLabelID);
+  this.cmd("CreateLabel", stackLabelID, "DFS(" + String(startVertex) + ")", this.stackBaseX + indentDepth * this.stackIndent, this.stackSectionY + this.stackRowCount * this.stackLineHeight);
+  this.stackRowCount++;
+  this.cmd("SetMessage", "First visit to " + String(startVertex) + ".");
+  this.cmd("Step");
+  this.cmd("SetMessage", "DFS(" + String(startVertex) + ")");
 
   this.messageY = this.messageY + 20;
   if (!this.visited[startVertex]) {
     this.d_times[startVertex] = this.currentTime++;
-    this.cmd(
-      "CreateLabel",
-      this.d_timesID_L[startVertex],
-      "d = " + String(this.d_times[startVertex]),
-      this.d_x_pos[startVertex],
-      this.d_y_pos[startVertex],
-    );
+    this.cmd("CreateLabel", this.d_timesID_L[startVertex], "d = " + String(this.d_times[startVertex]), this.x_pos_logical[startVertex] - 44, this.y_pos_logical[startVertex] - 14);
     this.cmd(
       "CreateLabel",
       this.d_timesID_AL[startVertex],
@@ -270,26 +315,21 @@ TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
     this.cmd("SetLayer", this.d_timesID_L[startVertex], 1);
     this.cmd("SetLayer", this.d_timesID_AL[startVertex], 2);
 
+
     this.visited[startVertex] = true;
     this.cmd("Step");
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[startVertex][neighbor] > 0) {
         this.highlightEdge(startVertex, neighbor, 1);
         if (this.visited[neighbor]) {
-          nextMessage = this.nextIndex;
-          this.cmd(
-            "CreateLabel",
-            nextMessage,
-            "Vertex " + String(neighbor) + " already this.visited.",
-            messageX,
-            this.messageY,
-            0,
-          );
+          this.cmd("SetMessage", "Neighbor " + String(neighbor) + " already visited; skip.");
+        } else {
+          this.cmd("SetMessage", "Visit unvisited neighbor " + String(neighbor) + ".");
         }
         this.cmd("Step");
         this.highlightEdge(startVertex, neighbor, 0);
         if (this.visited[neighbor]) {
-          this.cmd("Delete", nextMessage, "DNM");
+          // no-op: message handled via SetMessage
         }
 
         if (!this.visited[neighbor]) {
@@ -328,15 +368,7 @@ TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
 
           this.cmd("Step");
           this.dfsVisit(neighbor, messageX + 10, printCCNum);
-          nextMessage = this.nextIndex;
-          this.cmd(
-            "CreateLabel",
-            nextMessage,
-            "Returning from recursive call: DFS(" + String(neighbor) + ")",
-            messageX + 20,
-            this.messageY,
-            0,
-          );
+          this.cmd("SetMessage", "Return from DFS(" + String(neighbor) + ")");
 
           this.cmd(
             "Move",
@@ -357,20 +389,13 @@ TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
             this.adj_matrix_y_start + startVertex * this.adj_matrix_height,
           );
           this.cmd("Step");
-          this.cmd("Delete", nextMessage, 18);
         }
         this.cmd("Step");
       }
     }
 
     this.f_times[startVertex] = this.currentTime++;
-    this.cmd(
-      "CreateLabel",
-      this.f_timesID_L[startVertex],
-      "f = " + String(this.f_times[startVertex]),
-      this.f_x_pos[startVertex],
-      this.f_y_pos[startVertex],
-    );
+    this.cmd("CreateLabel", this.f_timesID_L[startVertex], "f = " + String(this.f_times[startVertex]), this.x_pos_logical[startVertex] - 44, this.y_pos_logical[startVertex] + 14);
     this.cmd(
       "CreateLabel",
       this.f_timesID_AL[startVertex],
@@ -380,6 +405,7 @@ TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
         startVertex * this.adj_list_height +
         (1 / 4) * this.adj_list_height,
     );
+    this.cmd("SetMessage", `Finish vertex ${startVertex}. Push on top of topological order.`);
 
     this.cmd("SetLayer", this.f_timesID_L[startVertex], 1);
     this.cmd("SetLayer", this.f_timesID_AL[startVertex], 2);
@@ -451,12 +477,15 @@ TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
     }
     this.cmd("Step");
   }
+  // Pop logical stack depth (keep labels visible)
+  this.callStackDepth--;
 };
 
 TopoSortDFS.prototype.reset = function () {
   // TODO:  Fix undo messing with setup vars.
   this.messageID = new Array();
   this.nextIndex = this.initialIndex;
+  this.runLocked = false;
   for (var i = 0; i < this.size; i++) {
     this.adj_list_list[i] = this.old_adj_list_list[i];
     this.adj_list_index[i] = this.old_adj_list_index[i];
@@ -471,7 +500,8 @@ TopoSortDFS.prototype.reset = function () {
 };
 
 TopoSortDFS.prototype.enableUI = function (event) {
-  this.startButton.disabled = false;
+  // Keep Run disabled if we've executed and not reset
+  this.startButton.disabled = !!this.runLocked;
 
   TopoSortDFS.superclass.enableUI.call(this, event);
 };
@@ -487,3 +517,10 @@ function init() {
   var animManag = initCanvas(canvas);
   currentAlg = new TopoSortDFS(animManag, canvas.width, canvas.height);
 }
+
+// Re-enable Run on skip back (undo)
+TopoSortDFS.prototype.undo = function (event) {
+  TopoSortDFS.superclass.undo.call(this, event);
+  this.runLocked = false;
+  this.enableUI(event);
+};

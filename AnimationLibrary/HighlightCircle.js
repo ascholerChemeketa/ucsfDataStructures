@@ -51,7 +51,18 @@ HighlightCircle.prototype.remove = function () {
   }
 };
 
+HighlightCircle.prototype.getSVGComponent = function () {
+  return this.svgCircle;
+};
+
 HighlightCircle.prototype.draw = function (ctx) {
+
+  if (!this.addedToScene) {
+    if (this.svgCircle) {
+      this.svgCircle.setAttributeNS(null, "display", "none");
+    }
+    return;
+  }
 
   if (!this.svgCircle) {
     var svgns = "http://www.w3.org/2000/svg";
@@ -59,13 +70,21 @@ HighlightCircle.prototype.draw = function (ctx) {
     circle.setAttributeNS(
       null,
       "style",
-      'fill: none; stroke: var(--svgColor--althighlight); stroke-width: 2px;',
+      'fill: rgba(255, 255, 255, 0); stroke: var(--svgColor--althighlight); stroke-width: 2px;',
     );
     circle.setAttribute("pointer-events", "visible");
     circle.setAttributeNS(null, "r", this.radius);
-    ctx.svg.getElementById("nodes").appendChild(circle);
+
+    if (this.layer !== 0 && ctx.svg.getElementById(`layer_${this.layer}`)) {
+      ctx.svg.getElementById(`layer_${this.layer}`).appendChild(circle);
+    } else {
+      ctx.svg.getElementById("nodes").appendChild(circle);
+    }
+
     this.svgCircle = circle;
   }
+
+  this.svgCircle.setAttributeNS(null, "display", "block");
   this.svgCircle.setAttributeNS(null, "cx", this.x);
   this.svgCircle.setAttributeNS(null, "cy", this.y);
 };

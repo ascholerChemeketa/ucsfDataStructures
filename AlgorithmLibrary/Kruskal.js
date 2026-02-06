@@ -24,7 +24,10 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import {
+  initAnimationManager,
+  initCanvas,
+} from "../AnimationLibrary/AnimationMain.js";
 import { addControlToAlgorithmBar } from "../AlgorithmLibrary/Algorithm.js";
 import {
   Graph,
@@ -33,8 +36,47 @@ import {
 } from "../AlgorithmLibrary/Graph.js";
 
 export function Kruskal(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+  // New-style usage: `new Kruskal({ ...opts })` (preferred)
+  // Legacy usage: `new Kruskal(canvas)`
+  let am;
+  let w;
+  let h;
+
+  if (canvas && typeof canvas.getContext === "function") {
+    const legacyCanvas = canvas;
+    am = initCanvas(legacyCanvas, null, "Kruskal MST", false, {
+      viewWidth: legacyCanvas.width,
+      viewHeight: legacyCanvas.height,
+    });
+    w = legacyCanvas.width;
+    h = legacyCanvas.height;
+  } else {
+    const opts = canvas || {};
+    const viewWidth =
+      Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
+        ? opts.viewWidth
+        : Number.isFinite(opts.width) && opts.width > 0
+          ? opts.width
+          : 1000;
+    const viewHeight =
+      Number.isFinite(opts.viewHeight) && opts.viewHeight > 0
+        ? opts.viewHeight
+        : Number.isFinite(opts.height) && opts.height > 0
+          ? opts.height
+          : 500;
+
+    am = initAnimationManager({
+      title: opts.title || "Kruskal MST",
+      height: opts.height || viewHeight,
+      viewWidth,
+      viewHeight,
+      ...opts,
+    });
+    w = viewWidth;
+    h = viewHeight;
+  }
+
+  this.init(am, w, h);
 }
 
 Kruskal.HIGHLIGHT_CIRCLE_COLOR = "#000000";
@@ -53,7 +95,7 @@ Kruskal.EDGE_LIST_START_X = 150;
 Kruskal.EDGE_LIST_START_Y = 130;
 
 Kruskal.FIND_LABEL_1_X = 30;
-Kruskal.FIND_LABEL_2_X = 100;
+Kruskal.FIND_LABEL_2_X = 120;
 Kruskal.FIND_LABEL_1_Y = 30;
 Kruskal.FIND_LABEL_2_Y = Kruskal.FIND_LABEL_1_Y;
 
@@ -152,6 +194,8 @@ Kruskal.prototype.disjointSetFind = function (valueToFind, highlightCircleID) {
 Kruskal.prototype.doKruskal = function (ignored) {
   this.commands = new Array();
 
+  const mstEdges = [];
+
   this.edgesListLeftID = new Array();
   this.edgesListRightID = new Array();
   this.edgesListLeft = new Array();
@@ -211,6 +255,7 @@ Kruskal.prototype.doKruskal = function (ignored) {
       }
     }
   }
+  this.cmd("SetMessage", "Created edge list from graph");
   this.cmd("Step");
 
   // Sort edge list based on edge cost
@@ -262,7 +307,7 @@ Kruskal.prototype.doKruskal = function (ignored) {
         (i % Kruskal.EDGE_LIST_MAX_PER_COLUMN) * Kruskal.EDGE_LIST_ELEM_HEIGHT,
     );
   }
-
+  this.cmd("SetMessage", "Sorted edges by increasing weight");
   this.cmd("Step");
 
   var findLabelLeft = this.nextIndex++;
@@ -270,7 +315,6 @@ Kruskal.prototype.doKruskal = function (ignored) {
   var highlightCircle1 = this.nextIndex++;
   var highlightCircle2 = this.nextIndex++;
   var moveLabelID = this.nextIndex++;
-  var messageLabelID = this.nextIndex++;
 
   var edgesAdded = 0;
   var nextListIndex = 0;
@@ -292,6 +336,14 @@ Kruskal.prototype.doKruskal = function (ignored) {
   );
 
   while (edgesAdded < this.size - 1 && nextListIndex < edgeCount) {
+    const edgeU = this.edgesListLeft[nextListIndex];
+    const edgeV = this.edgesListRight[nextListIndex];
+    const edgeW = this.adj_matrix[edgeU][edgeV];
+
+    this.cmd(
+      "SetMessage",
+      `Consider next cheapest edge (${edgeU}, ${edgeV}) with weight ${edgeW}`,
+    );
     this.cmd(
       "SetEdgeHighlight",
       this.edgesListLeftID[nextListIndex],
@@ -299,21 +351,13 @@ Kruskal.prototype.doKruskal = function (ignored) {
       1,
     );
 
-    this.highlightEdge(
-      this.edgesListLeft[nextListIndex],
-      this.edgesListRight[nextListIndex],
-      1,
-    );
-    this.highlightEdge(
-      this.edgesListRight[nextListIndex],
-      this.edgesListLeft[nextListIndex],
-      1,
-    );
+    this.highlightEdge(edgeU, edgeV, 1);
+    this.highlightEdge(edgeV, edgeU, 1);
 
     this.cmd(
       "SetText",
       findLabelLeft,
-      "find(" + String(this.edgesListLeft[nextListIndex]) + ") = ",
+      "find(" + String(edgeU) + ") = ",
     );
 
     this.cmd(
@@ -333,19 +377,20 @@ Kruskal.prototype.doKruskal = function (ignored) {
       highlightCircle1,
       Kruskal.SET_ARRAY_START_X - Kruskal.SET_ARRAY_ELEM_WIDTH,
       Kruskal.SET_ARRAY_START_Y +
-        this.edgesListLeft[nextListIndex] * Kruskal.SET_ARRAY_ELEM_HEIGHT,
+        edgeU * Kruskal.SET_ARRAY_ELEM_HEIGHT,
     );
+    this.cmd("SetMessage", `Find representative for ${edgeU}`);
     this.cmd("Step");
 
     var left = this.disjointSetFind(
-      this.edgesListLeft[nextListIndex],
+      edgeU,
       highlightCircle1,
     );
     this.cmd(
       "SetText",
       findLabelLeft,
       "find(" +
-        String(this.edgesListLeft[nextListIndex]) +
+        String(edgeU) +
         ") = " +
         String(left),
     );
@@ -353,7 +398,7 @@ Kruskal.prototype.doKruskal = function (ignored) {
     this.cmd(
       "SetText",
       findLabelRight,
-      "find(" + String(this.edgesListRight[nextListIndex]) + ") = ",
+      "find(" + String(edgeV) + ") = ",
     );
 
     this.cmd(
@@ -375,58 +420,49 @@ Kruskal.prototype.doKruskal = function (ignored) {
       highlightCircle2,
       Kruskal.SET_ARRAY_START_X - Kruskal.SET_ARRAY_ELEM_WIDTH,
       Kruskal.SET_ARRAY_START_Y +
-        this.edgesListRight[nextListIndex] * Kruskal.SET_ARRAY_ELEM_HEIGHT,
+        edgeV * Kruskal.SET_ARRAY_ELEM_HEIGHT,
     );
+    this.cmd("SetMessage", `Find representative for ${edgeV}`);
     this.cmd("Step");
 
     var right = this.disjointSetFind(
-      this.edgesListRight[nextListIndex],
+      edgeV,
       highlightCircle2,
     );
     this.cmd(
       "SetText",
       findLabelRight,
       "find(" +
-        String(this.edgesListRight[nextListIndex]) +
+        String(edgeV) +
         ") = " +
         String(right),
     );
-
+    this.cmd(
+      "SetMessage",
+      `Compare representatives: ${left} vs ${right}`,
+    );
     this.cmd("Step");
 
     if (left != right) {
       this.cmd(
-        "CreateLabel",
-        messageLabelID,
-        "Vertices in different trees.  Add edge to tree: Union(" +
-          String(left) +
-          "," +
-          String(right) +
-          ")",
-        Kruskal.MESSAGE_LABEL_X,
-        Kruskal.MESSAGE_LABEL_Y,
-        0,
+        "SetMessage",
+        `Different components. Add edge and union(${left}, ${right})`,
       );
       this.cmd("Step");
-      this.highlightEdge(
-        this.edgesListLeft[nextListIndex],
-        this.edgesListRight[nextListIndex],
-        1,
-      );
-      this.highlightEdge(
-        this.edgesListRight[nextListIndex],
-        this.edgesListLeft[nextListIndex],
-        1,
-      );
+
+      mstEdges.push([edgeU, edgeV]);
+
+      this.highlightEdge(edgeU, edgeV, 1);
+      this.highlightEdge(edgeV, edgeU, 1);
       edgesAdded++;
       this.setEdgeColor(
-        this.edgesListLeft[nextListIndex],
-        this.edgesListRight[nextListIndex],
+        edgeU,
+        edgeV,
         "#FF0000",
       );
       this.setEdgeColor(
-        this.edgesListRight[nextListIndex],
-        this.edgesListLeft[nextListIndex],
+        edgeV,
+        edgeU,
         "#FF0000",
       );
       if (this.setData[left] < this.setData[right]) {
@@ -443,6 +479,10 @@ Kruskal.prototype.doKruskal = function (ignored) {
           moveLabelID,
           Kruskal.SET_ARRAY_START_X,
           Kruskal.SET_ARRAY_START_Y + left * Kruskal.SET_ARRAY_ELEM_HEIGHT,
+        );
+        this.cmd(
+          "SetMessage",
+          `Union by size: attach root ${right} under root ${left}`,
         );
         this.cmd("Step");
         this.cmd("Delete", moveLabelID);
@@ -463,6 +503,10 @@ Kruskal.prototype.doKruskal = function (ignored) {
           Kruskal.SET_ARRAY_START_X,
           Kruskal.SET_ARRAY_START_Y + right * Kruskal.SET_ARRAY_ELEM_HEIGHT,
         );
+        this.cmd(
+          "SetMessage",
+          `Union by size: attach root ${left} under root ${right}`,
+        );
         this.cmd("Step");
         this.cmd("Delete", moveLabelID);
         this.setData[right] = this.setData[right] + this.setData[left];
@@ -472,28 +516,15 @@ Kruskal.prototype.doKruskal = function (ignored) {
       this.cmd("SetText", this.setID[right], this.setData[right]);
     } else {
       this.cmd(
-        "CreateLabel",
-        messageLabelID,
-        "Vertices in the same tree.  Skip edge",
-        Kruskal.MESSAGE_LABEL_X,
-        Kruskal.MESSAGE_LABEL_Y,
-        0,
+        "SetMessage",
+        "Vertices already in the same component. Skip edge to avoid cycle",
       );
       this.cmd("Step");
     }
 
-    this.highlightEdge(
-      this.edgesListLeft[nextListIndex],
-      this.edgesListRight[nextListIndex],
-      0,
-    );
-    this.highlightEdge(
-      this.edgesListRight[nextListIndex],
-      this.edgesListLeft[nextListIndex],
-      0,
-    );
+    this.highlightEdge(edgeU, edgeV, 0);
+    this.highlightEdge(edgeV, edgeU, 0);
 
-    this.cmd("Delete", messageLabelID);
     this.cmd("Delete", highlightCircle1);
     this.cmd("Delete", highlightCircle2);
 
@@ -505,6 +536,15 @@ Kruskal.prototype.doKruskal = function (ignored) {
   }
   this.cmd("Delete", findLabelLeft);
   this.cmd("Delete", findLabelRight);
+
+  if (mstEdges.length > 0) {
+    this.cmd("SetMessage", "Kruskal complete: highlighting MST edges");
+    for (i = 0; i < mstEdges.length; i++) {
+      this.highlightEdge(mstEdges[i][0], mstEdges[i][1], 1);
+      this.highlightEdge(mstEdges[i][1], mstEdges[i][0], 1);
+    }
+    this.cmd("Step");
+  }
 
   return this.commands;
 };
@@ -523,10 +563,3 @@ Kruskal.prototype.disableUI = function (event) {
 
   Kruskal.superclass.disableUI.call(this, event);
 };
-
-var currentAlg;
-
-function init() {
-  var animManag = initCanvas(canvas);
-  currentAlg = new Kruskal(animManag, canvas.width, canvas.height);
-}

@@ -215,6 +215,13 @@ Search.prototype.getIndexY = function (index) {
   return ypos;
 };
 
+// Highlight circles should sit on the array cell (rectangle), not on the index label.
+// Array rectangles are created at (getIndexY(index) - ARRAY_ELEM_HEIGHT), so their
+// center Y is exactly (getIndexY(index) - ARRAY_ELEM_HEIGHT).
+Search.prototype.getIndexCircleY = function (index) {
+  return this.getIndexY(index) - ARRAY_ELEM_HEIGHT;
+};
+
 Search.prototype.setup = function () {
   this.nextIndex = 0;
 
@@ -563,7 +570,7 @@ Search.prototype.binarySearch = function (searchVal) {
         Search.CODE_HIGHLIGHT_COLOR,
       );
       this.cmd("SetHighlight", this.highBoxID, 1);
-      this.cmd("SetHighlight", this.lowBoxID, 1);
+    this.cmd("Move", this.lowCircleID, this.getIndexX(0), this.getIndexCircleY(0));
       this.cmd("SetHighlight", this.midBoxID, 1);
       this.cmd("SetText", this.midBoxID, mid);
       this.cmd(
@@ -586,7 +593,7 @@ Search.prototype.binarySearch = function (searchVal) {
       this.cmd("SetHighlight", this.arrayID[mid], 1);
       this.cmd(
         "SetForegroundColor",
-        this.binaryCodeID[5][1],
+    this.cmd("Move", this.highCircleID, this.getIndexX(SIZE - 1), this.getIndexCircleY(SIZE - 1));
         Search.CODE_HIGHLIGHT_COLOR,
       );
       this.cmd("step");
@@ -625,7 +632,7 @@ Search.prototype.binarySearch = function (searchVal) {
           this.cmd("SetHighlight", this.lowID, 1);
           this.cmd("SetText", this.lowBoxID, mid + 1);
           this.cmd(
-            "Move",
+        this.cmd("Move", this.midCircleID, this.getIndexX(mid), this.getIndexCircleY(mid));
             this.lowCircleID,
             this.getIndexX(mid + 1),
             this.getIndexY(mid + 1),
@@ -677,7 +684,7 @@ Search.prototype.binarySearch = function (searchVal) {
     this.cmd("SetText", this.resultString, "   Element Not found");
     this.cmd("SetText", this.resultBoxID, -1);
     this.cmd("AlignRight", this.resultString, this.resultBoxID);
-    this.cmd(
+            this.cmd("Move", this.lowCircleID, this.getIndexX(mid + 1), this.getIndexCircleY(mid + 1));
       "SetForegroundColor",
       this.binaryCodeID[11][0],
       Search.CODE_HIGHLIGHT_COLOR,
@@ -698,7 +705,7 @@ Search.prototype.binarySearch = function (searchVal) {
       this.getIndexY(mid),
     );
 
-    this.cmd("Move", this.movingLabelID, RESULT_X, RESULT_Y);
+            this.cmd("Move", this.highCircleID, this.getIndexX(high), this.getIndexCircleY(high));
 
     this.cmd("AlignRight", this.resultString, this.resultBoxID);
     this.cmd(

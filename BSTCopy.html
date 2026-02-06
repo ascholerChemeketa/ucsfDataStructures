@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <head>
+    <title>BST Copy Visualization</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+
+  <body>
+    <script type="module">
+      import { BSTCopy } from "./dist/entry.js";
+
+      // Edit initialData to change the source BST.
+      new BSTCopy({
+        title: "BST Copy (Preorder)",
+        initialData: [200, 100, 50, 101, 120, 76, 74, 37],
+        zoom: "1x",
+        singleMode: false,
+      });
+    </script>
+  </body>
+</html>

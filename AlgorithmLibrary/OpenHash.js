@@ -24,21 +24,71 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import {
+  initAnimationManager,
+  initCanvas,
+} from "../AnimationLibrary/AnimationMain.js";
 import { Algorithm, addRadioButtonGroupToAlgorithmBar } from "./Algorithm.js";
 import { Hash } from "./Hash.js";
 
 export function OpenHash(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+  // New-style usage: `new OpenHash({ ...opts })` (preferred)
+  // Legacy usage: `new OpenHash(canvas)`
+  let am;
+  let w;
+  let h;
+
+  if (canvas && typeof canvas.getContext === "function") {
+    const legacyCanvas = canvas;
+    am = initCanvas(legacyCanvas, null, "Open Hashing", false, {
+      viewWidth: legacyCanvas.width,
+      viewHeight: legacyCanvas.height,
+    });
+    w = legacyCanvas.width;
+    h = legacyCanvas.height;
+  } else {
+    const opts = canvas || {};
+    const viewWidth =
+      Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
+        ? opts.viewWidth
+        : Number.isFinite(opts.width) && opts.width > 0
+          ? opts.width
+          : 1000;
+    const viewHeight =
+      Number.isFinite(opts.viewHeight) && opts.viewHeight > 0
+        ? opts.viewHeight
+        : Number.isFinite(opts.height) && opts.height > 0
+          ? opts.height
+          : 500;
+
+    am = initAnimationManager({
+      title: opts.title || "Open Hashing",
+      height: opts.height || viewHeight,
+      viewWidth,
+      viewHeight,
+      ...opts,
+    });
+    w = viewWidth;
+    h = viewHeight;
+  }
+
+  this.init(am, w, h);
+  if(opts.initialData) {
+    for (let d of opts.initialData) {
+      this.implementAction(this.insertElement.bind(this), d);
+      am.skipForward();
+    }
+    am.clearHistory();
+    am.animatedObjects.draw();
+  }
 }
 
-var POINTER_ARRAY_ELEM_WIDTH = 70;
+var POINTER_ARRAY_ELEM_WIDTH = 50;
 var POINTER_ARRAY_ELEM_HEIGHT = 30;
-var POINTER_ARRAY_ELEM_START_X = 50;
+var POINTER_ARRAY_ELEM_START_X = 30;
 
 var LINKED_ITEM_HEIGHT = 30;
-var LINKED_ITEM_WIDTH = 65;
+var LINKED_ITEM_WIDTH = 50;
 
 var LINKED_ITEM_Y_DELTA = 50;
 var LINKED_ITEM_POINTER_PERCENT = 0.25;
@@ -47,7 +97,7 @@ var MAX_DATA_VALUE = 999;
 
 var HASH_TABLE_SIZE = 13;
 
-var ARRAY_Y_POS = 350;
+var ARRAY_Y_POS = 300;
 
 var INDEX_COLOR = "#0000FF";
 
@@ -60,7 +110,7 @@ OpenHash.prototype.init = function (am, w, h) {
   var fn = sc.init;
   fn.call(this, am, w, h);
   this.nextIndex = 0;
-  this.POINTER_ARRAY_ELEM_Y = h - POINTER_ARRAY_ELEM_WIDTH;
+  this.POINTER_ARRAY_ELEM_Y = ARRAY_Y_POS; // = h - POINTER_ARRAY_ELEM_WIDTH;
   this.setup();
 };
 

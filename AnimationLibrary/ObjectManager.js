@@ -123,10 +123,11 @@ class Dragable {
   }
 }
 
-function makeSVG(centered) {
+function makeSVG(centered, viewWidth = 800, viewHeight = 400) {
   let sizeStyle = centered ? "xMidYMin" : "xMinYMin";
   const s = `
-  <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 800 400" preserveAspectRatio="${sizeStyle} slice">
+  <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 ${viewWidth} ${viewHeight}" 
+     preserveAspectRatio="${sizeStyle} slice">
     <defs>
       <marker id="SVGTriangleMarker" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8"
         markerHeight="8" orient="auto-start-reverse">
@@ -136,6 +137,14 @@ function makeSVG(centered) {
         markerHeight="8" orient="auto-start-reverse">
         <path fill="var(--svgColor--highlight)" d="M 0 0 L 10 5 L 0 10 z"></path>
       </marker>
+      <style>
+        :root {
+          --svgFillColor: rgba(255,255,255,0);
+          --svgColor: #111111;
+          --svgColor--highlight: #FF5733;
+          font-family: sans-serif;
+        }
+      </style>
     </defs>
     <g id="allElements">
       <g id="layer_0">
@@ -156,7 +165,10 @@ export function ObjectManager(canvas, centered = false) {
   this.activeLayers = [];
   this.activeLayers[0] = true;
   this.ctx = canvas.getContext("2d");
-  this.svg = makeSVG(centered);
+
+  const baseViewWidth = Number.isFinite(canvas?.width) && canvas.width > 0 ? canvas.width : 800;
+  const baseViewHeight = Number.isFinite(canvas?.height) && canvas.height > 0 ? canvas.height : 400;
+  this.svg = makeSVG(centered, baseViewWidth, baseViewHeight);
   this.ctx.svg = this.svg;
   this.framenum = 0;
   this.width = 0;
@@ -164,29 +176,70 @@ export function ObjectManager(canvas, centered = false) {
   this.centered = centered;
 
   //Default viewport measurements
-  this.svgBaseViewWidth = 800;
-  this.svgBaseViewHeight = 400;
+  this.svgBaseViewWidth = baseViewWidth;
+  this.svgBaseViewHeight = baseViewHeight;
   this.svgXOffset = 0;
   this.svgYOffset = 0;
   this.svgZoom = 1;
 
-  this.setZoom = function (zoomLevel) {
-    if(innerWidth < 400)
-      zoomLevel /= 1.5;
-    let zoomDelta = zoomLevel - this.svgZoom;
-    this.svgZoom = zoomLevel;
-    
-    //Zoom from top center
-    let centerFactorX = this.centered ? (-zoomDelta) * this.svgBaseViewWidth / 2 : 0;
-    let centerFactorY = 0;
+  this.setZoom = function (zoomLevel, focusClientX, focusClientY) {
+    zoomLevel = parseFloat(zoomLevel);
+    if (!Number.isFinite(zoomLevel) || zoomLevel <= 0) return;
 
-    let vb = this.svg.getAttribute('viewBox').split(" ");
-    vb[0] = parseFloat(vb[0]) + centerFactorX;
-    vb[1] = parseFloat(vb[1]) + centerFactorY;
-    vb[2] = this.svgBaseViewWidth * this.svgZoom;
-    vb[3] = this.svgBaseViewHeight * this.svgZoom;
-    this.svg.setAttribute('viewBox', vb.join(" "));
-  }
+    if (innerWidth < 400) zoomLevel /= 1.5;
+
+    const vb = this.svg.getAttribute("viewBox").split(" ").map(parseFloat);
+    const prevVbW = vb[2];
+    const prevVbH = vb[3];
+
+    const rect = this.svg.getBoundingClientRect();
+    const focusProvided = Number.isFinite(focusClientX) && Number.isFinite(focusClientY);
+
+    // Update zoom first so vb[2]/vb[3] compute correctly.
+    const zoomDelta = zoomLevel - this.svgZoom;
+    this.svgZoom = zoomLevel;
+
+    const nextVbW = this.svgBaseViewWidth * this.svgZoom;
+    const nextVbH = this.svgBaseViewHeight * this.svgZoom;
+
+    if (
+      focusProvided &&
+      rect.width > 0 &&
+      rect.height > 0 &&
+      focusClientX >= rect.left &&
+      focusClientX <= rect.right &&
+      focusClientY >= rect.top &&
+      focusClientY <= rect.bottom
+    ) {
+      const ctm = this.svg.getScreenCTM && this.svg.getScreenCTM();
+      if (ctm && ctm.inverse) {
+        const pt = new DOMPoint(focusClientX, focusClientY);
+        const focusSvg = pt.matrixTransform(ctm.inverse());
+
+        const normX = (focusSvg.x - vb[0]) / prevVbW;
+        const normY = (focusSvg.y - vb[1]) / prevVbH;
+
+        vb[2] = nextVbW;
+        vb[3] = nextVbH;
+        vb[0] = focusSvg.x - normX * nextVbW;
+        vb[1] = focusSvg.y - normY * nextVbH;
+        this.svg.setAttribute("viewBox", vb.join(" "));
+        return;
+      }
+    }
+
+    // Fallback: zoom from top center (previous behavior).
+    const centerFactorX = this.centered
+      ? (-zoomDelta) * this.svgBaseViewWidth / 2
+      : 0;
+    const centerFactorY = 0;
+
+    vb[0] = vb[0] + centerFactorX;
+    vb[1] = vb[1] + centerFactorY;
+    vb[2] = nextVbW;
+    vb[3] = nextVbH;
+    this.svg.setAttribute("viewBox", vb.join(" "));
+  };
 
   this.cssStyle = window.getComputedStyle(canvas);
 
@@ -421,19 +474,9 @@ export function ObjectManager(canvas, centered = false) {
   this.setLayer = function (objectID, layer) {
     if (this.Nodes[objectID] != null && this.Nodes[objectID] != undefined) {
       this.Nodes[objectID].layer = layer;
-      if (this.activeLayers[layer]) {
-        this.Nodes[objectID].addedToScene = true;
-      } else {
-        // this.Nodes[objectID].addedToScene = false;
-      }
+      this.Nodes[objectID].addedToScene = this.activeLayers[layer] === true;
 
-      let svgElement = this.Nodes[objectID].getSVGComponent();
-      console.log(this.Nodes[objectID])
-      console.log(layer)
-      console.log(svgElement)
-      if( svgElement ) {
-        svgElement.parentNode.removeChild(svgElement);
-      }
+      // Ensure the target SVG layer group exists before we (re)attach elements.
       
       if(this.svg.getElementById(`layer_${layer}`) == null) {
         let root = this.svg.getElementById("allElements");
@@ -457,9 +500,24 @@ export function ObjectManager(canvas, centered = false) {
         newLayer.appendChild(newNodes);
       }
 
-      if( svgElement ) {
+      // If the object hasn't created its SVG yet, force a draw now so we can
+      // move/hide it deterministically (important for HighlightCircle).
+      let svgElement = this.Nodes[objectID]?.getSVGComponent?.();
+      if (!svgElement) {
+        this.Nodes[objectID].draw(this.ctx);
+        svgElement = this.Nodes[objectID]?.getSVGComponent?.();
+      }
+
+      if (svgElement && svgElement.parentNode) {
+        svgElement.parentNode.removeChild(svgElement);
+      }
+
+      if (svgElement) {
         this.svg.getElementById(`layer_${layer}`).appendChild(svgElement);
       }
+
+      // Apply addedToScene visibility immediately after layer change.
+      this.Nodes[objectID].draw(this.ctx);
 
       if (this.Edges.has(objectID)) {
         for (let [obj2, edge] of this.Edges.get(objectID)) {
@@ -500,6 +558,37 @@ export function ObjectManager(canvas, centered = false) {
   };
 
   this.clearAllObjects = function () {
+    // Important: remove existing SVG/DOM elements so a full reset (e.g. new graph)
+    // does not leave orphaned SVG nodes/labels behind.
+    if (this.Nodes && this.Nodes.length) {
+      for (let i = 0; i < this.Nodes.length; i++) {
+        const node = this.Nodes[i];
+        if (node && typeof node.remove === "function") {
+          node.remove();
+        }
+      }
+    }
+
+    if (this.Edges) {
+      for (let [from, targets] of this.Edges) {
+        for (let [to, edge] of targets) {
+          if (edge && typeof edge.remove === "function") {
+            edge.remove();
+          }
+        }
+      }
+    }
+
+    if (this.BackEdges) {
+      for (let [from, targets] of this.BackEdges) {
+        for (let [to, edge] of targets) {
+          if (edge && typeof edge.remove === "function") {
+            edge.remove();
+          }
+        }
+      }
+    }
+
     this.Nodes = [];
     this.Edges = new Map();
     this.BackEdges = new Map();
@@ -666,8 +755,11 @@ export function ObjectManager(canvas, centered = false) {
   };
 
   this.getNodeX = function (nodeID) {
+    // During resets / deletes, queued animation commands can still reference
+    // objects that no longer exist (commonly highlight circles). In that case,
+    // fail soft instead of throwing and crashing the whole animation.
     if (this.Nodes[nodeID] == null || this.Nodes[nodeID] == undefined) {
-      throw "getting x position of an object that does not exit";
+      return 0;
     }
     return this.Nodes[nodeID].x;
   };
@@ -708,8 +800,9 @@ export function ObjectManager(canvas, centered = false) {
   };
 
   this.getNodeY = function (nodeID) {
+    // See getNodeX comment.
     if (this.Nodes[nodeID] == null || this.Nodes[nodeID] == undefined) {
-      throw "getting y position of an object that does not exit";
+      return 0;
     }
     return this.Nodes[nodeID].y;
   };
@@ -756,15 +849,15 @@ export function ObjectManager(canvas, centered = false) {
     // this.BackEdges[objectIDto].push(l);
   };
 
-  this.setNull = function (objectID, nullVal) {
+  this.setNull = function (objectID, nullVal, linkIndex) {
     if (this.Nodes[objectID] != null && this.Nodes[objectID] != undefined) {
-      this.Nodes[objectID].setNull(nullVal);
+      this.Nodes[objectID].setNull(nullVal, linkIndex);
     }
   };
 
-  this.getNull = function (objectID) {
+  this.getNull = function (objectID, linkIndex) {
     if (this.Nodes[objectID] != null && this.Nodes[objectID] != undefined) {
-      return this.Nodes[objectID].getNull();
+      return this.Nodes[objectID].getNull(linkIndex);
     }
     return false; // TODO:  Error here?
   };
@@ -919,7 +1012,12 @@ export function ObjectManager(canvas, centered = false) {
     // }
     return oldHighlight;
   };
-  this.addLabelObject = function (objectID, objectLabel, centering) {
+  this.addLabelObject = function (
+    objectID,
+    objectLabel,
+    centering,
+    fontSizePercent,
+  ) {
     if (this.Nodes[objectID] != null && this.Nodes[objectID] != undefined) {
       throw new Error("addLabelObject: Object Already Exists!");
     }
@@ -930,6 +1028,10 @@ export function ObjectManager(canvas, centered = false) {
       centering,
       this.getTextWidth(objectLabel),
     );
+
+    if (fontSizePercent != undefined) {
+      newLabel.setFontSizePercent(fontSizePercent);
+    }
     this.Nodes[objectID] = newLabel;
   };
 
@@ -942,6 +1044,7 @@ export function ObjectManager(canvas, centered = false) {
     verticalOrientation,
     linkPosEnd,
     numLabels,
+    numLinks,
     backgroundColor,
     foregroundColor,
   ) {
@@ -960,6 +1063,7 @@ export function ObjectManager(canvas, centered = false) {
       verticalOrientation,
       linkPosEnd,
       numLabels,
+      numLinks,
       backgroundColor,
       foregroundColor,
     );

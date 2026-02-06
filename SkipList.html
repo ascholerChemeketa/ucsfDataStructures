@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Skip List Visualization</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+
+  <body>
+    <script type="module">
+      import { SkipList } from "./dist/entry.js";
+
+      // Demo: insert a handful of values and run a find.
+      let anim = new SkipList({ initialData: [5, 10, 15, 20, 25, 30] });
+      // anim.doInsert(18);
+      // anim.doInsertRandom();
+      // anim.doFindValue(12);
+    </script>
+  </body>
+</html>

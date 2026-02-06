@@ -35,6 +35,8 @@ import {
 // BST.LINK_COLOR = "#007700";
 // BST.HIGHLIGHT_CIRCLE_COLOR = "#007700";
 // BST.FOREGROUND_COLOR = "#007700";
+
+BST.FOREGROUND_COLOR = "var(--svgColor)";
 // BST.BACKGROUND_COLOR = "#EEFFEE";
 // BST.PRINT_COLOR = BST.FOREGROUND_COLOR;
 
@@ -76,7 +78,7 @@ BST.superclass = Algorithm.prototype;
 
 BST.prototype.init = function (am, w, h) {
   var sc = BST.superclass;
-  this.startingX = w / 2 + 50;
+  this.startingX = 200; //w / 2 + 50;
   this.first_print_pos_y = h - 2 * BST.PRINT_VERTICAL_GAP;
   this.print_max = w - 10;
 
@@ -101,11 +103,44 @@ BST.prototype.init = function (am, w, h) {
   this.doDelete = function (val) {
     this.implementAction( this.deleteElement.bind(this), val);
   };
+  this.doRemove = function (val) {
+    this.implementAction( this.deleteElement.bind(this), val);
+  };
   this.doFind = function (val) {
     this.implementAction( this.findElement.bind(this), val);
   };
   this.doPrint = function (order = "In") {
     this.implementAction( this.printTree.bind(this), order);
+  };
+
+  // Programmatic traversal bindings
+  this.doPre = function () {
+    this.implementAction(this.printTree.bind(this), "Pre");
+  };
+  this.doIn = function () {
+    this.implementAction(this.printTree.bind(this), "In");
+  };
+  this.doPost = function () {
+    this.implementAction(this.printTree.bind(this), "Post");
+  };
+
+  // Programmatic rotation bindings
+  this.doRotateLeft = function (val) {
+    this.implementAction(this.rotateLeftAtValue.bind(this), val);
+  };
+  this.doRotateRight = function (val) {
+    this.implementAction(this.rotateRightAtValue.bind(this), val);
+  };
+
+  // Programmatic random insert binding
+  this.doInsertRandom = function(count = 10, maxValue = 999) {
+    for (let i = 0; i < count; i++) {
+      const insertedValue = Math.floor(1 + Math.random() * maxValue);
+      this.implementAction(this.insertElement.bind(this), insertedValue);
+      this.animationManager.skipForward();
+    }
+    this.animationManager.clearHistory();
+    this.animationManager.animatedObjects.draw();
   };
 };
 
@@ -121,16 +156,22 @@ BST.prototype.addControls = function () {
   this.insertButton = addControlToAlgorithmBar("Button", "Insert");
   this.insertButton.onclick = this.insertCallback.bind(this);
 
-  this.deleteButton = addControlToAlgorithmBar("Button", "Delete");
+  this.deleteButton = addControlToAlgorithmBar("Button", "Remove");
   this.deleteButton.onclick = this.deleteCallback.bind(this);
 
   this.findButton = addControlToAlgorithmBar("Button", "Find");
   this.findButton.onclick = this.findCallback.bind(this);
 
+  this.rotateLeftButton = addControlToAlgorithmBar("Button", "Rotate Left");
+  this.rotateLeftButton.onclick = this.rotateLeftCallback.bind(this);
+
+  this.rotateRightButton = addControlToAlgorithmBar("Button", "Rotate Right");
+  this.rotateRightButton.onclick = this.rotateRightCallback.bind(this);
+
   this.clearButton = addControlToAlgorithmBar("Button", "Clear");
   this.clearButton.onclick = this.clearCallback.bind(this);
 
-  this.insertRandomButton = addControlToAlgorithmBar("Button", "Insert X Random");
+  this.insertRandomButton = addControlToAlgorithmBar("Button", "Insert Random Values");
   this.insertRandomButton.onclick = this.insertRandomCallback.bind(this);
 
   addSeparatorToAlgorithmBar();
@@ -143,6 +184,232 @@ BST.prototype.addControls = function () {
 
   this.printpostButton = addControlToAlgorithmBar("Button", "Print PostOrder");
   this.printpostButton.onclick = this.print.bind(this);
+};
+
+
+BST.prototype.rotateLeftCallback = function (event) {
+  var rotateValue = this.normalizeNumber(this.inputField.value, 4);
+  this.inputField.value = "";
+  if (rotateValue != "") {
+    this.implementAction(this.rotateLeftAtValue.bind(this), rotateValue);
+  }
+};
+
+BST.prototype.rotateRightCallback = function (event) {
+  var rotateValue = this.normalizeNumber(this.inputField.value, 4);
+  this.inputField.value = "";
+  if (rotateValue != "") {
+    this.implementAction(this.rotateRightAtValue.bind(this), rotateValue);
+  }
+};
+
+BST.prototype.findNode = function (tree, value) {
+  var current = tree;
+  while (current != null) {
+    if (value == current.data) {
+      return current;
+    } else if (value < current.data) {
+      current = current.left;
+    } else {
+      current = current.right;
+    }
+  }
+  return null;
+};
+
+BST.prototype.rotateLeftAtValue = function (value) {
+  this.commands = [];
+
+  if (this.treeRoot == null) {
+    this.cmd("SetMessage", "Tree is empty");
+    this.cmd("Step");
+    this.cmd("SetMessage", "");
+    return this.commands;
+  }
+
+  var x = this.findNode(this.treeRoot, value);
+  if (x == null) {
+    this.cmd("SetMessage", "Cannot rotate: " + value + " not found");
+    this.cmd("Step");
+    this.cmd("SetMessage", "");
+    return this.commands;
+  }
+
+  this.singleRotateLeft(x);
+  this.cmd("SetMessage", "");
+  return this.commands;
+};
+
+BST.prototype.rotateRightAtValue = function (value) {
+  this.commands = [];
+
+  if (this.treeRoot == null) {
+    this.cmd("SetMessage", "Tree is empty");
+    this.cmd("Step");
+    this.cmd("SetMessage", "");
+    return this.commands;
+  }
+
+  var x = this.findNode(this.treeRoot, value);
+  if (x == null) {
+    this.cmd("SetMessage", "Cannot rotate: " + value + " not found");
+    this.cmd("Step");
+    this.cmd("SetMessage", "");
+    return this.commands;
+  }
+
+  this.singleRotateRight(x);
+  this.cmd("SetMessage", "");
+  return this.commands;
+};
+
+// Single rotation helpers (adapted to BST's pointer + animation style)
+BST.prototype.singleRotateLeft = function (x) {
+  var y = x.right;
+  if (y == null) {
+    this.cmd("SetMessage", "Cannot rotate left at " + x.data + ": no right child");
+    this.cmd("SetHighlight", x.graphicID, 1);
+    this.cmd("Step");
+    this.cmd("SetHighlight", x.graphicID, 0);
+    return;
+  }
+
+  var B = y.left;
+  var p = x.parent;
+  var xWasLeftChild = p != null && p.left == x;
+
+  this.cmd("SetMessage", "Rotate left at " + x.data + ": pull up " + y.data);
+  this.cmd("SetHighlight", x.graphicID, 1);
+  this.cmd("SetHighlight", y.graphicID, 1);
+  this.cmd("Step");
+
+  if (B != null) {
+    this.cmd(
+      "SetMessage",
+      "Subtree " + B.data + " becomes the right subtree of " + x.data,
+    );
+    this.cmd("SetHighlight", B.graphicID, 1);
+    this.cmd("SetEdgeHighlight", y.graphicID, B.graphicID, 1);
+    this.cmd("Step");
+    this.cmd("SetEdgeHighlight", y.graphicID, B.graphicID, 0);
+    this.cmd("SetHighlight", B.graphicID, 0);
+  }
+
+  // Rewire parent -> (x) to parent -> (y)
+  if (p == null) {
+    this.cmd("Disconnect", 0, x.graphicID);
+    this.cmd("Connect", 0, y.graphicID, BST.LINK_COLOR);
+    this.treeRoot = y;
+    y.parent = null;
+  } else {
+    this.cmd("Disconnect", p.graphicID, x.graphicID);
+    this.cmd("Connect", p.graphicID, y.graphicID, BST.LINK_COLOR);
+    y.parent = p;
+    if (xWasLeftChild) {
+      p.left = y;
+    } else {
+      p.right = y;
+    }
+  }
+
+  // x loses y as right child
+  this.cmd("Disconnect", x.graphicID, y.graphicID);
+
+  // y adopts x as left child
+  this.cmd("Connect", y.graphicID, x.graphicID, BST.LINK_COLOR);
+
+  // Move subtree B
+  if (B != null) {
+    this.cmd("Disconnect", y.graphicID, B.graphicID);
+    this.cmd("Connect", x.graphicID, B.graphicID, BST.LINK_COLOR);
+  }
+
+  // Pointer updates
+  x.parent = y;
+  x.right = B;
+  if (B != null) {
+    B.parent = x;
+  }
+  y.left = x;
+
+  this.cmd("SetHighlight", x.graphicID, 0);
+  this.cmd("SetHighlight", y.graphicID, 0);
+
+  this.resizeTree();
+};
+
+BST.prototype.singleRotateRight = function (x) {
+  var y = x.left;
+  if (y == null) {
+    this.cmd("SetMessage", "Cannot rotate right at " + x.data + ": no left child");
+    this.cmd("SetHighlight", x.graphicID, 1);
+    this.cmd("Step");
+    this.cmd("SetHighlight", x.graphicID, 0);
+    return;
+  }
+
+  var B = y.right;
+  var p = x.parent;
+  var xWasLeftChild = p != null && p.left == x;
+
+  this.cmd("SetMessage", "Rotate right at " + x.data + ": pull up " + y.data);
+  this.cmd("SetHighlight", x.graphicID, 1);
+  this.cmd("SetHighlight", y.graphicID, 1);
+  this.cmd("Step");
+
+  if (B != null) {
+    this.cmd(
+      "SetMessage",
+      "Subtree " + B.data + " becomes the left subtree of " + x.data,
+    );
+    this.cmd("SetHighlight", B.graphicID, 1);
+    this.cmd("SetEdgeHighlight", y.graphicID, B.graphicID, 1);
+    this.cmd("Step");
+    this.cmd("SetEdgeHighlight", y.graphicID, B.graphicID, 0);
+    this.cmd("SetHighlight", B.graphicID, 0);
+  }
+
+  // Rewire parent -> (x) to parent -> (y)
+  if (p == null) {
+    this.cmd("Disconnect", 0, x.graphicID);
+    this.cmd("Connect", 0, y.graphicID, BST.LINK_COLOR);
+    this.treeRoot = y;
+    y.parent = null;
+  } else {
+    this.cmd("Disconnect", p.graphicID, x.graphicID);
+    this.cmd("Connect", p.graphicID, y.graphicID, BST.LINK_COLOR);
+    y.parent = p;
+    if (xWasLeftChild) {
+      p.left = y;
+    } else {
+      p.right = y;
+    }
+  }
+
+  // x loses y as left child
+  this.cmd("Disconnect", x.graphicID, y.graphicID);
+
+  // y adopts x as right child
+  this.cmd("Connect", y.graphicID, x.graphicID, BST.LINK_COLOR);
+
+  // Move subtree B
+  if (B != null) {
+    this.cmd("Disconnect", y.graphicID, B.graphicID);
+    this.cmd("Connect", x.graphicID, B.graphicID, BST.LINK_COLOR);
+  }
+
+  // Pointer updates
+  x.parent = y;
+  x.left = B;
+  if (B != null) {
+    B.parent = x;
+  }
+  y.right = x;
+
+  this.cmd("SetHighlight", x.graphicID, 0);
+  this.cmd("SetHighlight", y.graphicID, 0);
+
+  this.resizeTree();
 };
 
 BST.prototype.reset = function () {
@@ -209,7 +476,7 @@ BST.prototype.clearData = function () {
 
 
 BST.prototype.insertRandomCallback = function (event) {
-  var numToInsert = this.inputField.value;
+  var numToInsert = 10; // this.inputField.value;
   for (let i = 0; i < numToInsert; i++) {
     const insertedValue = Math.floor(1 + Math.random() * 999);
     this.implementAction(this.insertElement.bind(this), insertedValue);
@@ -295,9 +562,10 @@ BST.prototype.printTreeRec = function (tree, order) {
     this.printRight(tree, order);
   }
 
+  this.cmd("SetHighlight", tree.graphicID, 1);
   this.cmd("SetMessage", "Done with " + tree.data + " return to parent");
-  this.cmd("SetHighlight", tree.graphicID, 0);
   this.cmd("Step");
+  this.cmd("SetHighlight", tree.graphicID, 0);
 };
 
 BST.prototype.findCallback = function (event) {
@@ -607,7 +875,7 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
       else {
         this.cmd(
           "SetMessage",
-          "Node to delete has two childern.  \nFind largest node in left subtree.",
+          "Node to delete has two childern.  \nFind smallest node in right subtree.",
         );
         this.cmd("Step");
 
@@ -621,25 +889,25 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           tree.y,
         );
         var tmp = tree;
-        tmp = tree.left;
+        tmp = tree.right;
         this.cmd("Move", this.highlightID, tmp.x, tmp.y);
         this.cmd(
           "SetMessage",
-          "Go to left subtree.",
+          "Go to right subtree.",
         );
         this.cmd("Step");
-        while (tmp.right != null) {
-          tmp = tmp.right;
+        while (tmp.left != null) {
+          tmp = tmp.left;
           this.cmd(
             "SetMessage",
-            "Move right to find largest value.",
+            "Move left to find smallest value.",
           );
           this.cmd("Move", this.highlightID, tmp.x, tmp.y);
           this.cmd("Step");
         }
         this.cmd(
           "SetMessage",
-          "No right child found.  Largest value is " + tmp.data + ".",
+          "No left child found.  Smallest value is " + tmp.data + ".",
         );
         this.cmd("Step");
         this.cmd("SetText", tree.graphicID, " ");
@@ -650,7 +918,7 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
         this.cmd("Move", labelID, tree.x, tree.y);
         this.cmd(
           "SetMessage",
-          "Copy largest value of left subtree into node to delete.",
+          "Copy smallest value of right subtree over value being removed.",
         );
 
         this.cmd("Step");
@@ -658,38 +926,16 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
         this.cmd("Delete", labelID);
         this.cmd("SetText", tree.graphicID, tree.data);
         this.cmd("Delete", this.highlightID);
-        this.cmd("SetMessage", "Remove node whose value we copied.\nParent adopts deleted node's children.");
+        this.cmd(
+          "SetMessage",
+          "Now remove the original node we copied from (in the right subtree).",
+        );
+        this.cmd("Step");
 
-        this.cmd("Disconnect", tmp.parent.graphicID, tmp.graphicID);
-
-        if (tmp.left == null) {
-          if (tmp.parent != tree) {
-            tmp.parent.right = null;
-          } else {
-            tree.left = null;
-          }
-          this.cmd("Delete", tmp.graphicID);
-          this.resizeTree();
-        } else {
-          this.cmd(
-            "Connect",
-            tmp.parent.graphicID,
-            tmp.left.graphicID,
-            BST.LINK_COLOR,
-          );
-          this.cmd("Step");
-          
-          //this.cmd("Disconnect", tmp.graphicID, tmp.left.graphicID);
-          this.cmd("Delete", tmp.graphicID);
-          if (tmp.parent != tree) {
-            tmp.parent.right = tmp.left;
-            tmp.left.parent = tmp.parent;
-          } else {
-            tree.left = tmp.left;
-            tmp.left.parent = tree;
-          }
-          this.resizeTree();
-        }
+        // The copied value came from the minimum of the right subtree.
+        // Deleting that value from tree.right will remove the duplicate node
+        // using the standard animated delete cases (0/1 child).
+        this.treeDelete(tree.right, tree.data);
       }
     } else if (valueToDelete < tree.data) {
       
@@ -715,17 +961,11 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
 };
 
 BST.prototype.resizeTree = function () {
+  // Keep the root node fixed relative to the root pointer.
+  // Children are laid out relative to this fixed x position.
   var startingPoint = this.startingX;
   this.resizeWidths(this.treeRoot);
   if (this.treeRoot != null) {
-    if (this.treeRoot.leftWidth > startingPoint) {
-      startingPoint = this.treeRoot.leftWidth;
-    } else if (this.treeRoot.rightWidth > startingPoint) {
-      startingPoint = Math.max(
-        this.treeRoot.leftWidth,
-        2 * startingPoint - this.treeRoot.rightWidth,
-      );
-    }
     this.setNewPositions(this.treeRoot, startingPoint, BST.STARTING_Y, 0);
     this.animateNewPositions(this.treeRoot);
     this.cmd("Step");

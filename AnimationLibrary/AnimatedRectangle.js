@@ -87,6 +87,44 @@ AnimatedRectangle.prototype.remove = function () {
 };
 
 
+AnimatedRectangle.prototype.updateRectangle = function () {
+  if (!this.svgRect) {
+    return;
+  }
+
+  // When layers are toggled, we need to actually hide/show the SVG nodes.
+  const display = this.addedToScene ? "block" : "none";
+  this.svgRect.setAttributeNS(null, "display", display);
+  if (this.svgText) {
+    this.svgText.setAttributeNS(null, "display", display);
+  }
+
+  if (!this.addedToScene) {
+    return;
+  }
+
+  const bg = this.backgroundColor;
+  const fg = this.highlighted ? "var(--svgColor--highlight)" : this.foregroundColor;
+  const sw = this.highlighted ? 3 : 1;
+
+  this.svgRect.setAttributeNS(
+    null,
+    "style",
+    `fill: ${bg}; stroke: ${fg}; stroke-width: ${sw}px;`,
+  );
+  this.svgRect.setAttributeNS(null, "opacity", this.alpha);
+
+  if (this.svgText) {
+    this.svgText.setAttributeNS(
+      null,
+      "style",
+      `fill: ${fg}; stroke: none; stroke-width: 1px;`,
+    );
+    this.svgText.setAttributeNS(null, "opacity", this.alpha);
+  }
+};
+
+
 AnimatedRectangle.prototype.getSVGComponent = function () {
   return this.svgRect;
 };
@@ -186,7 +224,16 @@ AnimatedRectangle.prototype.getHeight = function () {
 
 // TODO:  Fix me!
 AnimatedRectangle.prototype.draw = function (context) {
+  // When layers are toggled, we still get draw() calls for objects that are
+  // not on the active layer. In that case we must explicitly hide any existing
+  // SVG elements instead of returning early.
   if (!this.addedToScene) {
+    if (this.svgRect) {
+      this.svgRect.setAttributeNS(null, "display", "none");
+    }
+    if (this.svgText) {
+      this.svgText.setAttributeNS(null, "display", "none");
+    }
     return;
   }
 
@@ -199,11 +246,7 @@ AnimatedRectangle.prototype.draw = function (context) {
   if (!this.svgRect) {
     var svgns = "http://www.w3.org/2000/svg";
     var rect = document.createElementNS(svgns, "rect");
-    rect.setAttributeNS(
-      null,
-      "style",
-      'fill: var(--svgFillColor); stroke: var(--svgColor);',
-    );
+    rect.setAttributeNS(null, "style", "fill: #FFF0; stroke: var(--svgColor);");
 
     if(this.layer !== 0)
       context.svg.getElementById(`layer_${this.layer}`).appendChild(rect);
@@ -217,13 +260,15 @@ AnimatedRectangle.prototype.draw = function (context) {
     var text = document.createElementNS(svgns, "text");
     text.setAttributeNS(null, "dominant-baseline", "middle");
     text.setAttributeNS(null, "text-anchor", svgJustify);
-    text.setAttributeNS(
-      null,
-      "style",
-      "fill: var(--svgColor); stroke: none; stroke-width: 1px;",
-    );
+    text.setAttributeNS(null, "style", "fill: var(--svgColor); stroke: none; stroke-width: 1px;");
     this.svgText = text;
     this.svgRect.after(text);
+  }
+
+  // Ensure SVG elements are visible again if we were previously hidden.
+  this.svgRect.setAttributeNS(null, "display", "block");
+  if (this.svgText) {
+    this.svgText.setAttributeNS(null, "display", "block");
   }
 
   var startX;
@@ -264,6 +309,9 @@ AnimatedRectangle.prototype.draw = function (context) {
   else
     this.svgText.textContent = this.label;
 
+  // Keep SVG style in sync with SetBackgroundColor/SetForegroundColor/Highlight.
+  this.updateRectangle();
+
   context.globalAlpha = this.alpha;
   context.lineWidth = 1;
 
@@ -289,17 +337,6 @@ AnimatedRectangle.prototype.draw = function (context) {
     context.closePath();
     context.stroke();
     context.fill();
-    this.svgRect.setAttributeNS(
-      null,
-      "style",
-      'fill: var(--svgFillColor); stroke: var(--svgColor--highlight); stroke-width: 3px;',
-    );
-  } else {
-    this.svgRect.setAttributeNS(
-      null,
-      "style",
-      'fill: var(--svgFillColor); stroke: var(--svgColor); stroke-width: 1px;',
-    );
   }
 
 
@@ -359,6 +396,17 @@ AnimatedRectangle.prototype.createUndoDelete = function () {
 
 AnimatedRectangle.prototype.setHighlight = function (value) {
   this.highlighted = value;
+  this.updateRectangle();
+};
+
+AnimatedRectangle.prototype.setBackgroundColor = function (newColor) {
+  AnimatedObject.prototype.setBackgroundColor.call(this, newColor);
+  this.updateRectangle();
+};
+
+AnimatedRectangle.prototype.setForegroundColor = function (newColor) {
+  AnimatedObject.prototype.setForegroundColor.call(this, newColor);
+  this.updateRectangle();
 };
 
 function UndoDeleteRectangle(

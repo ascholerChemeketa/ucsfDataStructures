@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Expression Tree Visualization</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+
+  <body>
+    <script type="module">
+      import { ExpressionTree } from "./dist/entry.js";
+
+      // Example:
+      //   (+ (- 5 6) (* 1 4))
+      let anim = new ExpressionTree({initialData: {"+": [{"-" : [5, 6]},{"*":[1, 4]}]} });
+
+    </script>
+  </body>
+</html>

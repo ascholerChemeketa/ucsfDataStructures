@@ -24,22 +24,34 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
 import {
-  Algorithm,
-  addControlToAlgorithmBar,
-} from "../AlgorithmLibrary/Algorithm.js";
+  initAnimationManager,
+  initCanvas,
+} from "../AnimationLibrary/AnimationMain.js";
+import { Algorithm, addControlToAlgorithmBar } from "./Algorithm.js";
 
-export function HeapSort(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+export function HeapSort(arg) {
+  // New-style usage: `new HeapSort({ ...opts })` (preferred)
+  // Legacy usage: `new HeapSort(canvas)`
+  let am;
+  if (arg && typeof arg.getContext === "function") {
+    am = initCanvas(arg);
+  } else {
+    const opts = arg || {};
+    am = initAnimationManager({
+      title: opts.title || "Heap Sort",
+      height: opts.height || 500,
+      ...opts,
+    });
+  }
+  this.init(am);
 }
 
 HeapSort.prototype = new Algorithm();
 HeapSort.prototype.constructor = HeapSort;
 HeapSort.superclass = Algorithm.prototype;
 
-var ARRAY_SIZE = 32;
+var ARRAY_SIZE = 15;
 var ARRAY_ELEM_WIDTH = 30;
 var ARRAY_ELEM_HEIGHT = 25;
 var ARRAY_INITIAL_X = 30;
@@ -47,24 +59,79 @@ var ARRAY_INITIAL_X = 30;
 var ARRAY_Y_POS = 50;
 var ARRAY_LABEL_Y_POS = 70;
 
+var DEFAULT_ARRAY_BACKGROUND = "#FFFFFF";
+var SORTED_ARRAY_BACKGROUND = "#bdbdbdff";
+
+// 0-based heap: indices 0..(HEAP_CAPACITY-1)
+var HEAP_CAPACITY = ARRAY_SIZE;
+var HEAP_ROOT_UNDER_ARRAY_INDEX = 7;
+
+function buildHeapXPositions(rootX) {
+  // 0-based heap indices: 0..30 => depths 0..4.
+  // Use offsets that keep the leftmost node >= 0 when rootX is ~180.
+  const offsetsByDepth = [0, 96, 48, 24, 12];
+  const xPositions = new Array(ARRAY_SIZE);
+  for (let i = 0; i < ARRAY_SIZE; i++) xPositions[i] = 0;
+
+  xPositions[0] = rootX;
+  for (let i = 1; i < HEAP_CAPACITY; i++) {
+    const parent = Math.floor((i - 1) / 2);
+    const depth = Math.floor(Math.log2(i + 1));
+    const offset = offsetsByDepth[depth] || 0;
+    // For 0-based heaps, left child is odd (2p+1) and right child is even (2p+2).
+    const isRight = i % 2 === 0;
+    xPositions[i] = xPositions[parent] + (isRight ? offset : -offset);
+  }
+  return xPositions;
+}
+
+function buildHeapYPositions() {
+  const yPositions = new Array(ARRAY_SIZE);
+  for (let i = 0; i < ARRAY_SIZE; i++) yPositions[i] = 0;
+
+  // Match the old levels: root=100, then +70 per depth.
+  for (let i = 0; i < HEAP_CAPACITY; i++) {
+    const depth = Math.floor(Math.log2(i + 1));
+    yPositions[i] = 120 + depth * 70;
+  }
+  return yPositions;
+}
+
 HeapSort.prototype.init = function (am) {
   var sc = HeapSort.superclass;
   var fn = sc.init;
   fn.call(this, am);
   this.addControls();
   this.nextIndex = 0;
-  this.HeapXPositions = [
-    0, 450, 250, 650, 150, 350, 550, 750, 100, 200, 300, 400, 500, 600, 700,
-    800, 75, 125, 175, 225, 275, 325, 375, 425, 475, 525, 575, 625, 675, 725,
-    775, 825,
-  ];
-  this.HeapYPositions = [
-    0, 100, 170, 170, 240, 240, 240, 240, 310, 310, 310, 310, 310, 310, 310,
-    310, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
-    380, 380,
-  ];
+  // this.HeapXPositions = [
+  //   0, 450, 250, 650, 150, 350, 550, 750, 100, 200, 300, 400, 500, 600, 700,
+  //   800, 75, 125, 175, 225, 275, 325, 375, 425, 475, 525, 575, 625, 675, 725,
+  //   775, 825,
+  // ];
+  // this.HeapYPositions = [
+  //   0, 100, 170, 170, 240, 240, 240, 240, 310, 310, 310, 310, 310, 310, 310,
+  //   310, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
+  //   380, 380,
+  // ];
+  
+  const heapRootX = ARRAY_INITIAL_X + HEAP_ROOT_UNDER_ARRAY_INDEX * ARRAY_ELEM_WIDTH;
+  this.HeapXPositions = buildHeapXPositions(heapRootX);
+  this.HeapYPositions = buildHeapYPositions();
+
   this.commands = [];
   this.createArray();
+
+  // Programmatic action bindings (used by tests / external controllers)
+  this.doHeapify = function () {
+    this.implementAction(this.heapify.bind(this), "");
+  };
+  this.doSort = function () {
+    this.implementAction(this.heapsort.bind(this), "");
+  };
+
+  // Heapification status: only allow Heap Sort after Heapify
+  this.isHeapified = false;
+  this.heapsortButton.disabled = true;
 
   /*this.nextIndex = 0;
 	this.commands = [];
@@ -80,6 +147,8 @@ HeapSort.prototype.addControls = function () {
     "Randomize Array",
   );
   this.randomizeArrayButton.onclick = this.randomizeCallback.bind(this);
+  this.heapifyButton = addControlToAlgorithmBar("Button", "Heapify");
+  this.heapifyButton.onclick = this.heapifyCallback.bind(this);
   this.heapsortButton = addControlToAlgorithmBar("Button", "Heap Sort");
   this.heapsortButton.onclick = this.heapsortCallback.bind(this);
 };
@@ -92,8 +161,10 @@ HeapSort.prototype.createArray = function () {
   this.ArrayXPositions = new Array(ARRAY_SIZE);
   this.oldData = new Array(ARRAY_SIZE);
   this.currentHeapSize = 0;
+  this.heapDrawn = false;
+  this.isHeapified = false;
 
-  for (var i = 1; i < ARRAY_SIZE; i++) {
+  for (var i = 0; i < ARRAY_SIZE; i++) {
     this.arrayData[i] = Math.floor(1 + Math.random() * 999);
     this.oldData[i] = this.arrayData[i];
 
@@ -110,10 +181,11 @@ HeapSort.prototype.createArray = function () {
       this.ArrayXPositions[i],
       ARRAY_Y_POS,
     );
+    this.cmd("SetBackgroundColor", this.arrayRects[i], DEFAULT_ARRAY_BACKGROUND);
     this.cmd(
       "CreateLabel",
       this.arrayLabels[i],
-      i - 1,
+      i,
       this.ArrayXPositions[i],
       ARRAY_LABEL_Y_POS,
     );
@@ -133,43 +205,112 @@ HeapSort.prototype.createArray = function () {
 };
 
 HeapSort.prototype.heapsortCallback = function (event) {
-  this.commands = this.buildHeap("");
-  for (var i = ARRAY_SIZE - 1; i > 1; i--) {
-    this.swap(i, 1);
-    this.cmd("SetAlpha", this.arrayRects[i], 0.2);
-    this.cmd("Delete", this.circleObjs[i]);
-    this.currentHeapSize = i - 1;
-    this.pushDown(1);
-  }
-  for (i = 1; i < ARRAY_SIZE; i++) {
-    this.cmd("SetAlpha", this.arrayRects[i], 1);
-  }
-  this.cmd("Delete", this.circleObjs[1]);
-  this.animationManager.StartNewAnimation(this.commands);
+  this.implementAction(this.heapsort.bind(this), "");
+};
+
+HeapSort.prototype.heapifyCallback = function (event) {
+  this.implementAction(this.heapify.bind(this), "");
 };
 
 HeapSort.prototype.randomizeCallback = function (ignored) {
-  this.randomizeArray();
+  this.implementAction(this.randomizeArray.bind(this), "");
 };
 
 HeapSort.prototype.randomizeArray = function () {
   this.commands = new Array();
-  for (var i = 1; i < ARRAY_SIZE; i++) {
+  this.clearHeapDrawing();
+  this.isHeapified = false;
+  for (var i = 0; i < ARRAY_SIZE; i++) {
     this.arrayData[i] = Math.floor(1 + Math.random() * 999);
     this.cmd("SetText", this.arrayRects[i], this.arrayData[i]);
+    this.cmd("SetAlpha", this.arrayRects[i], 1);
+    this.cmd("SetBackgroundColor", this.arrayRects[i], DEFAULT_ARRAY_BACKGROUND);
     this.oldData[i] = this.arrayData[i];
   }
-  this.animationManager.StartNewAnimation(this.commands);
-  this.animationManager.skipForward();
-  this.animationManager.clearHistory();
+  return this.commands;
 };
 
 HeapSort.prototype.reset = function () {
-  for (var i = 1; i < ARRAY_SIZE; i++) {
+  for (var i = 0; i < ARRAY_SIZE; i++) {
     this.arrayData[i] = this.oldData[i];
     this.cmd("SetText", this.arrayRects[i], this.arrayData[i]);
+    this.cmd("SetAlpha", this.arrayRects[i], 1);
+    this.cmd("SetBackgroundColor", this.arrayRects[i], DEFAULT_ARRAY_BACKGROUND);
   }
+  this.currentHeapSize = 0;
+  this.heapDrawn = false;
+  this.isHeapified = false;
   this.commands = new Array();
+};
+
+HeapSort.prototype.heapsort = function (ignored) {
+  this.commands = new Array();
+
+  // Only enabled when heapified; keep as a safety check.
+  if (!this.isHeapified) {
+    this.cmd(
+      "SetMessage",
+      "Heap Sort is disabled until the array is heapified.",
+    );
+    return this.commands;
+  }
+
+  // Data is already heapified; do NOT rebuild the heap here.
+  // Reset any prior sorted highlighting.
+  for (var a = 0; a < ARRAY_SIZE; a++) {
+    this.cmd("SetAlpha", this.arrayRects[a], 1);
+    this.cmd("SetBackgroundColor", this.arrayRects[a], DEFAULT_ARRAY_BACKGROUND);
+  }
+
+  this.cmd("SetMessage", "Starting heapsort...");
+  this.cmd("Step");
+
+  for (var i = ARRAY_SIZE - 1; i > 0; i--) {
+    this.cmd("SetMessage", "Removing max value");
+    this.cmd("Step");
+    this.swap(i, 0);
+    
+  this.cmd("SetMessage", "Reduce logical heap size by 1");
+    this.cmd("SetBackgroundColor", this.arrayRects[i], SORTED_ARRAY_BACKGROUND);
+    this.cmd("Delete", this.circleObjs[i]);
+    this.currentHeapSize = i;
+    
+  this.cmd("Step");
+    this.pushDown(0);
+  }
+  // After the final extraction, index 0 is also in sorted position.
+  this.cmd("SetBackgroundColor", this.arrayRects[0], SORTED_ARRAY_BACKGROUND);
+  this.cmd("Delete", this.circleObjs[0]);
+  this.currentHeapSize = 0;
+  this.heapDrawn = false;
+  this.isHeapified = false;
+  return this.commands;
+};
+
+HeapSort.prototype.heapify = function (ignored) {
+  this.commands = new Array();
+  this.clearHeapDrawing();
+  this.isHeapified = false;
+  for (var i = 0; i < ARRAY_SIZE; i++) {
+    this.cmd("SetAlpha", this.arrayRects[i], 1);
+    this.cmd("SetBackgroundColor", this.arrayRects[i], DEFAULT_ARRAY_BACKGROUND);
+  }
+  this.buildHeap("");
+  this.cmd("SetMessage", "Heapify complete: array now satisfies heap order");
+  this.isHeapified = true;
+  return this.commands;
+};
+
+HeapSort.prototype.clearHeapDrawing = function () {
+  if (!this.heapDrawn) {
+    this.currentHeapSize = 0;
+    return;
+  }
+  for (var i = 0; i < ARRAY_SIZE; i++) {
+    this.cmd("Delete", this.circleObjs[i]);
+  }
+  this.currentHeapSize = 0;
+  this.heapDrawn = false;
 };
 
 HeapSort.prototype.swap = function (index1, index2) {
@@ -222,6 +363,10 @@ HeapSort.prototype.swap = function (index1, index2) {
   var tmp = this.arrayData[index1];
   this.arrayData[index1] = this.arrayData[index2];
   this.arrayData[index2] = tmp;
+  this.cmd(
+    "SetMessage",
+    "Swap: values between indices " + index1 + " and " + index2,
+  );
   this.cmd("Step");
   this.cmd("SetText", this.arrayRects[index1], this.arrayData[index1]);
   this.cmd("SetText", this.arrayRects[index2], this.arrayData[index2]);
@@ -239,34 +384,52 @@ HeapSort.prototype.setIndexHighlight = function (index, highlightVal) {
 };
 
 HeapSort.prototype.pushDown = function (index) {
-  var smallestIndex;
+  var largestIndex;
 
   while (true) {
-    if (index * 2 > this.currentHeapSize) {
+    const left = 2 * index + 1;
+    const right = 2 * index + 2;
+
+    if (left >= this.currentHeapSize) {
       return;
     }
-
-    smallestIndex = 2 * index;
-
-    if (index * 2 + 1 <= this.currentHeapSize) {
-      this.setIndexHighlight(2 * index, 1);
-      this.setIndexHighlight(2 * index + 1, 1);
+          this.cmd(
+        "SetMessage",
+        "Heapify down at " + index,
+      );
+      this.setIndexHighlight(index, 1);
       this.cmd("Step");
-      this.setIndexHighlight(2 * index, 0);
-      this.setIndexHighlight(2 * index + 1, 0);
-      if (this.arrayData[2 * index + 1] > this.arrayData[2 * index]) {
-        smallestIndex = 2 * index + 1;
+      this.setIndexHighlight(index, 0);
+
+    largestIndex = left;
+
+    if (right < this.currentHeapSize) {
+      this.cmd(
+        "SetMessage",
+        "Heapify down: compare left and right children to choose the larger child",
+      );
+      this.setIndexHighlight(left, 1);
+      this.setIndexHighlight(right, 1);
+      this.cmd("Step");
+      this.setIndexHighlight(left, 0);
+      this.setIndexHighlight(right, 0);
+      if (this.arrayData[right] > this.arrayData[left]) {
+        largestIndex = right;
       }
     }
+    this.cmd(
+      "SetMessage",
+      "Heapify down: compare current node with selected child",
+    );
     this.setIndexHighlight(index, 1);
-    this.setIndexHighlight(smallestIndex, 1);
+    this.setIndexHighlight(largestIndex, 1);
     this.cmd("Step");
     this.setIndexHighlight(index, 0);
-    this.setIndexHighlight(smallestIndex, 0);
+    this.setIndexHighlight(largestIndex, 0);
 
-    if (this.arrayData[smallestIndex] > this.arrayData[index]) {
-      this.swap(smallestIndex, index);
-      index = smallestIndex;
+    if (this.arrayData[largestIndex] > this.arrayData[index]) {
+      this.swap(largestIndex, index);
+      index = largestIndex;
     } else {
       return;
     }
@@ -274,8 +437,7 @@ HeapSort.prototype.pushDown = function (index) {
 };
 
 HeapSort.prototype.buildHeap = function (ignored) {
-  this.commands = new Array();
-  for (var i = 1; i < ARRAY_SIZE; i++) {
+  for (var i = 0; i < ARRAY_SIZE; i++) {
     this.cmd(
       "CreateCircle",
       this.circleObjs[i],
@@ -284,18 +446,24 @@ HeapSort.prototype.buildHeap = function (ignored) {
       this.HeapYPositions[i],
     );
     this.cmd("SetText", this.arrayRects[i], this.arrayData[i]);
-    if (i > 1) {
+    if (i > 0) {
       this.cmd(
         "Connect",
-        this.circleObjs[Math.floor(i / 2)],
+        this.circleObjs[Math.floor((i - 1) / 2)],
         this.circleObjs[i],
       );
     }
   }
+
+  this.currentHeapSize = ARRAY_SIZE;
+  var nextElem = Math.floor((this.currentHeapSize - 2) / 2);
+  this.cmd(
+    "SetMessage",
+    "Heapify: Calculate parent index of last element: " + nextElem,
+  );
   this.cmd("Step");
-  this.currentHeapSize = ARRAY_SIZE - 1;
-  var nextElem = this.currentHeapSize;
-  while (nextElem > 0) {
+  this.heapDrawn = true;
+  while (nextElem >= 0) {
     this.pushDown(nextElem);
     nextElem = nextElem - 1;
   }
@@ -305,16 +473,11 @@ HeapSort.prototype.buildHeap = function (ignored) {
 HeapSort.prototype.disableUI = function (event) {
   this.heapsortButton.disabled = true;
   this.randomizeArrayButton.disabled = true;
+  this.heapifyButton.disabled = true;
 };
 
 HeapSort.prototype.enableUI = function (event) {
-  this.heapsortButton.disabled = false;
+  this.heapsortButton.disabled = !this.isHeapified;
   this.randomizeArrayButton.disabled = false;
+  this.heapifyButton.disabled = false;
 };
-
-var currentAlg;
-
-function init() {
-  var animManag = initCanvas(canvas);
-  currentAlg = new HeapSort(animManag, canvas.width, canvas.height);
-}

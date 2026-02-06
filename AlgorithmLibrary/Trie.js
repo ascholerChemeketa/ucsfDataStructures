@@ -25,29 +25,45 @@
 // or implied, of the University of San Francisco
 
 // Constants.
+import { initAnimationManager } from "../AnimationLibrary/AnimationMain.js";
+import {
+  Algorithm,
+  addControlToAlgorithmBar,
+  addSeparatorToAlgorithmBar,
+} from "../AlgorithmLibrary/Algorithm.js";
 
+// Visual constants
 Trie.NODE_WIDTH = 30;
-
-Trie.LINK_COLOR = "#007700";
-Trie.HIGHLIGHT_CIRCLE_COLOR = "#007700";
-Trie.FOREGROUND_COLOR = "#007700";
-Trie.BACKGROUND_COLOR = "#CCFFCC";
-Trie.TRUE_COLOR = "#CCFFCC";
+Trie.FOREGROUND_COLOR = "var(--svgColor)";
+Trie.LINK_COLOR = Trie.FOREGROUND_COLOR;
+Trie.HIGHLIGHT_CIRCLE_COLOR = Trie.FOREGROUND_COLOR;
+Trie.BACKGROUND_COLOR = "#d3f0d2ff";
+Trie.TRUE_COLOR = "#d3f0d2ff";
 Trie.PRINT_COLOR = Trie.FOREGROUND_COLOR;
 Trie.FALSE_COLOR = "#FFFFFF";
 Trie.WIDTH_DELTA = 50;
 Trie.HEIGHT_DELTA = 50;
-Trie.STARTING_Y = 80;
-Trie.LeftMargin = 300;
+Trie.STARTING_Y = 50;
+Trie.LeftMargin = 100;
 Trie.NEW_NODE_Y = 100;
 Trie.NEW_NODE_X = 50;
 Trie.FIRST_PRINT_POS_X = 50;
 Trie.PRINT_VERTICAL_GAP = 20;
 Trie.PRINT_HORIZONTAL_GAP = 50;
 
-function Trie(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+export function Trie(opts = {}) {
+  if (!opts.title) opts.title = "Trie (Prefix Tree)";
+  opts.centered = true;
+
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+
+  let am = initAnimationManager(opts);
+  this.init(am, 1000, 400);
+
+  this.addControls();
 }
 
 Trie.prototype = new Algorithm();
@@ -56,13 +72,12 @@ Trie.superclass = Algorithm.prototype;
 
 Trie.prototype.init = function (am, w, h) {
   var sc = Trie.superclass;
-  this.startingX = w / 2;
+  this.startingX = 200; // w / 2;
   this.first_print_pos_y = h - 2 * Trie.PRINT_VERTICAL_GAP;
   this.print_max = w - 10;
 
   var fn = sc.init;
   fn.call(this, am);
-  this.addControls();
   this.nextIndex = 0;
   this.commands = [];
   this.cmd("CreateLabel", 0, "", 20, 10, 0);
@@ -75,29 +90,18 @@ Trie.prototype.init = function (am, w, h) {
 };
 
 Trie.prototype.addControls = function () {
-  this.insertField = addControlToAlgorithmBar("Text", "");
-  this.insertField.onkeypress = this.returnSubmit(
-    this.insertField,
+  addSeparatorToAlgorithmBar();
+  this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+  this.inputField.onkeydown = this.returnSubmit(
+    this.inputField,
     this.insertCallback.bind(this),
-    12,
+    24,
     false,
   );
   this.insertButton = addControlToAlgorithmBar("Button", "Insert");
   this.insertButton.onclick = this.insertCallback.bind(this);
-  this.deleteField = addControlToAlgorithmBar("Text", "");
-  this.deleteField.onkeydown = this.returnSubmit(
-    this.deleteField,
-    this.deleteCallback.bind(this),
-    12,
-  );
-  this.deleteButton = addControlToAlgorithmBar("Button", "Delete");
+  this.deleteButton = addControlToAlgorithmBar("Button", "Remove");
   this.deleteButton.onclick = this.deleteCallback.bind(this);
-  this.findField = addControlToAlgorithmBar("Text", "");
-  this.findField.onkeydown = this.returnSubmit(
-    this.findField,
-    this.findCallback.bind(this),
-    12,
-  );
   this.findButton = addControlToAlgorithmBar("Button", "Find");
   this.findButton.onclick = this.findCallback.bind(this);
   this.printButton = addControlToAlgorithmBar("Button", "Print");
@@ -109,22 +113,22 @@ Trie.prototype.reset = function () {
   this.root = null;
 };
 
-Trie.prototype.insertCallback = function (event) {
-  var insertedValue = this.insertField.value.toUpperCase();
+Trie.prototype.insertCallback = function () {
+  var insertedValue = this.inputField.value.toUpperCase();
   insertedValue = insertedValue.replace(/[^a-z]/gi, "");
 
   if (insertedValue != "") {
     // set text value
-    this.insertField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.add.bind(this), insertedValue);
   }
 };
 
-Trie.prototype.deleteCallback = function (event) {
-  var deletedValue = this.deleteField.value.toUpperCase();
+Trie.prototype.deleteCallback = function () {
+  var deletedValue = this.inputField.value.toUpperCase();
   deletedValue = deletedValue.replace(/[^a-z]/gi, "");
   if (deletedValue != "") {
-    this.deleteField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.deleteElement.bind(this), deletedValue);
   }
 };
@@ -133,10 +137,10 @@ Trie.prototype.printCallback = function (event) {
   this.implementAction(this.printTree.bind(this), "");
 };
 
-Trie.prototype.findCallback = function (event) {
-  var findValue = this.findField.value.toUpperCase();
-  finndValue = findValue.replace(/[^a-z]/gi, "");
-  this.findField.value = "";
+Trie.prototype.findCallback = function () {
+  var findValue = this.inputField.value.toUpperCase();
+  findValue = findValue.replace(/[^a-z]/gi, "");
+  this.inputField.value = "";
   this.implementAction(this.findElement.bind(this), findValue);
 };
 
@@ -238,20 +242,19 @@ Trie.prototype.findElement = function (word) {
   this.commands = [];
 
   this.commands = new Array();
-  this.cmd("SetText", 0, "Finding: ");
-  this.cmd("SetText", 1, '"' + word + '"');
+  this.cmd("SetMessage", "Finding: '" + word + "' ");
   this.cmd("AlignRight", 1, 0);
   this.cmd("Step");
 
   var node = this.doFind(this.root, word);
   if (node != null) {
-    this.cmd("SetText", 0, 'Found "' + word + '"');
+    this.cmd("SetMessage", 'Found "' + word + '"');
   } else {
-    this.cmd("SetText", 0, '"' + word + '" not Found');
+    this.cmd("SetMessage", '"' + word + '" not Found');
   }
 
-  this.cmd("SetText", 1, "");
-  this.cmd("SetText", 2, "");
+  this.cmd("SetMessage", "");
+  this.cmd("SetMessage", "");
 
   return this.commands;
 };
@@ -265,8 +268,7 @@ Trie.prototype.doFind = function (tree, s) {
   if (s.length == 0) {
     if (tree.isword == true) {
       this.cmd(
-        "SetText",
-        2,
+        "SetMessage",
         "Reached the end of the string \nCurrent node is True\nWord is in the tree",
       );
       this.cmd("Step");
@@ -274,8 +276,7 @@ Trie.prototype.doFind = function (tree, s) {
       return tree;
     } else {
       this.cmd(
-        "SetText",
-        2,
+        "SetMessage",
         "Reached the end of the string \nCurrent node is False\nWord is Not the tree",
       );
       this.cmd("Step");
@@ -287,8 +288,7 @@ Trie.prototype.doFind = function (tree, s) {
     var index = s.charCodeAt(0) - "A".charCodeAt(0);
     if (tree.children[index] == null) {
       this.cmd(
-        "SetText",
-        2,
+        "SetMessage",
         "Child " + s.charAt(0) + " does not exist\nWord is Not the tree",
       );
       this.cmd("Step");
@@ -304,8 +304,7 @@ Trie.prototype.doFind = function (tree, s) {
     );
     this.cmd("SetWidth", this.highlightID, Trie.NODE_WIDTH);
     this.cmd(
-      "SetText",
-      2,
+      "SetMessage",
       "Making recursive call to " +
         s.charAt(0) +
         " child, passing in " +
@@ -314,7 +313,7 @@ Trie.prototype.doFind = function (tree, s) {
     this.cmd("Step");
     this.cmd("SetHighlight", tree.graphicID, 0);
     this.cmd("SetHighlightIndex", 1, -1);
-    this.cmd("SetText", 1, '"' + s.substring(1) + '"');
+    this.cmd("SetMessage", '"' + s.substring(1) + '"');
 
     this.cmd(
       "Move",
@@ -337,8 +336,7 @@ Trie.prototype.insert = function (elem, tree) {};
 
 Trie.prototype.deleteElement = function (word) {
   this.commands = [];
-  this.cmd("SetText", 0, "Deleting: ");
-  this.cmd("SetText", 1, '"' + word + '"');
+  this.cmd("SetMessage", "Deleting: '" + word + "' ");
   this.cmd("AlignRight", 1, 0);
   this.cmd("Step");
 
@@ -346,8 +344,7 @@ Trie.prototype.deleteElement = function (word) {
   if (node != null) {
     this.cmd("SetHighlight", node.graphicID, 1);
     this.cmd(
-      "SetText",
-      2,
+      "SetMessage",
       'Found "' + word + '", setting value in tree to False',
     );
     this.cmd("step");
@@ -357,14 +354,14 @@ Trie.prototype.deleteElement = function (word) {
     this.cleanupAfterDelete(node);
     this.resizeTree();
   } else {
-    this.cmd("SetText", 2, '"' + word + '" not in tree, nothing to delete');
+    this.cmd("SetMessage", '"' + word + '" not in tree, nothing to delete');
     this.cmd("step");
     this.cmd("SetHighlightIndex", 1, -1);
   }
 
-  this.cmd("SetText", 0, "");
-  this.cmd("SetText", 1, "");
-  this.cmd("SetText", 2, "");
+  this.cmd("SetMessage", "");
+  this.cmd("SetMessage", "");
+  this.cmd("SetMessage", "");
   return this.commands;
 };
 
@@ -386,8 +383,7 @@ Trie.prototype.cleanupAfterDelete = function (tree) {
 
   if (children == 0 && !tree.isword) {
     this.cmd(
-      "SetText",
-      2,
+      "SetMessage",
       'Deletion left us with a "False" leaf\nRemoving false leaf',
     );
     this.cmd("SetHighlight", tree.graphicID, 1);
@@ -421,8 +417,7 @@ Trie.prototype.resizeTree = function () {
 
 Trie.prototype.add = function (word) {
   this.commands = new Array();
-  this.cmd("SetText", 0, "Inserting; ");
-  this.cmd("SetText", 1, '"' + word + '"');
+  this.cmd("SetMessage", "Inserting '" + word + "'");
   this.cmd("AlignRight", 1, 0);
   this.cmd("Step");
   if (this.root == null) {
@@ -436,7 +431,7 @@ Trie.prototype.add = function (word) {
     this.cmd("SetForegroundColor", this.nextIndex, Trie.FOREGROUND_COLOR);
     this.cmd("SetBackgroundColor", this.nextIndex, Trie.FALSE_COLOR);
     this.cmd("SetWidth", this.nextIndex, Trie.NODE_WIDTH);
-    this.cmd("SetText", 2, "Creating a new root");
+    this.cmd("SetMessage", "Creating a new root");
     this.root = new TrieNode(
       "",
       this.nextIndex,
@@ -445,14 +440,14 @@ Trie.prototype.add = function (word) {
     );
     this.cmd("Step");
     this.resizeTree();
-    this.cmd("SetText", 2, "");
+    this.cmd("SetMessage", "");
     this.highlightID = this.nextIndex++;
     this.nextIndex += 1;
   }
   this.addR(word.toUpperCase(), this.root);
-  this.cmd("SetText", 0, "");
-  this.cmd("SetText", 1, "");
-  this.cmd("SetText", 2, "");
+  this.cmd("SetMessage", "");
+  this.cmd("SetMessage", "");
+  this.cmd("SetMessage", "");
 
   return this.commands;
 };
@@ -462,8 +457,7 @@ Trie.prototype.addR = function (s, tree) {
 
   if (s.length == 0) {
     this.cmd(
-      "SetText",
-      2,
+      "SetMessage",
       "Reached the end of the string \nSet current node to true",
     );
     this.cmd("Step");
@@ -487,8 +481,7 @@ Trie.prototype.addR = function (s, tree) {
       this.cmd("SetBackgroundColor", this.nextIndex, Trie.FALSE_COLOR);
       this.cmd("SetWidth", this.nextIndex, Trie.NODE_WIDTH);
       this.cmd(
-        "SetText",
-        2,
+        "SetMessage",
         "Child " + s.charAt(0) + " does not exist.  Creating ... ",
       );
       tree.children[index] = new TrieNode(
@@ -510,7 +503,7 @@ Trie.prototype.addR = function (s, tree) {
 
       this.cmd("Step");
       this.resizeTree();
-      this.cmd("SetText", 2, "");
+      this.cmd("SetMessage", "");
       this.nextIndex += 1;
       this.highlightID = this.nextIndex++;
     }
@@ -523,8 +516,7 @@ Trie.prototype.addR = function (s, tree) {
     );
     this.cmd("SetWidth", this.highlightID, Trie.NODE_WIDTH);
     this.cmd(
-      "SetText",
-      2,
+      "SetMessage",
       "Making recursive call to " +
         s.charAt(0) +
         ' child, passing in "' +
@@ -534,7 +526,7 @@ Trie.prototype.addR = function (s, tree) {
     this.cmd("Step");
     this.cmd("SetHighlight", tree.graphicID, 0);
     this.cmd("SetHighlightIndex", 1, -1);
-    this.cmd("SetText", 1, '"' + s.substring(1) + '"');
+    this.cmd("SetMessage", '"' + s.substring(1) + '"');
 
     this.cmd(
       "Move",
@@ -602,29 +594,28 @@ function TrieNode(val, id, initialX, initialY) {
   this.parent = null;
 }
 
-Trie.prototype.disableUI = function (event) {
-  this.insertField.disabled = true;
-  this.insertButton.disabled = true;
-  this.deleteField.disabled = true;
-  this.deleteButton.disabled = true;
-  this.findField.disabled = true;
-  this.findButton.disabled = true;
-  this.printButton.disabled = true;
+Trie.prototype.disableUI = function () {
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.deleteButton,
+    this.findButton,
+    this.printButton,
+  ];
+  for (const el of ctrls) {
+    if (el) el.disabled = true;
+  }
 };
 
-Trie.prototype.enableUI = function (event) {
-  this.insertField.disabled = false;
-  this.insertButton.disabled = false;
-  this.deleteField.disabled = false;
-  this.deleteButton.disabled = false;
-  this.findField.disabled = false;
-  this.findButton.disabled = false;
-  this.printButton.disabled = false;
+Trie.prototype.enableUI = function () {
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.deleteButton,
+    this.findButton,
+    this.printButton,
+  ];
+  for (const el of ctrls) {
+    if (el) el.disabled = false;
+  }
 };
-
-var currentAlg;
-
-function init() {
-  var animManag = initCanvas(canvas);
-  currentAlg = new Trie(animManag, canvas.width, canvas.height);
-}

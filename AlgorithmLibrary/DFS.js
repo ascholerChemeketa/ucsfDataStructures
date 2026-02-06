@@ -24,7 +24,10 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import {
+  initAnimationManager,
+  initCanvas,
+} from "../AnimationLibrary/AnimationMain.js";
 import {
   addControlToAlgorithmBar,
   addLabelToAlgorithmBar,
@@ -35,8 +38,8 @@ var AUX_ARRAY_WIDTH = 25;
 var AUX_ARRAY_HEIGHT = 25;
 var AUX_ARRAY_START_Y = 50;
 
-var VISITED_START_X = 475;
-var PARENT_START_X = 400;
+var VISITED_START_X = 200;
+var PARENT_START_X = 275;
 
 var HIGHLIGHT_CIRCLE_COLOR = "#000000";
 var DFS_TREE_COLOR = "#0000FF";
@@ -46,9 +49,50 @@ var QUEUE_START_X = 30;
 var QUEUE_START_Y = 50;
 var QUEUE_SPACING = 30;
 
+var DFS_CALLSTACK_FONT_SIZE_PERCENT = 80;
+
 export function DFS(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+  // New-style usage: `new DFS({ ...opts })` (preferred)
+  // Legacy usage: `new DFS(canvas)`
+  let am;
+  let w;
+  let h;
+
+  if (canvas && typeof canvas.getContext === "function") {
+    const legacyCanvas = canvas;
+    am = initCanvas(legacyCanvas, null, "Depth-First Search", false, {
+      viewWidth: legacyCanvas.width,
+      viewHeight: legacyCanvas.height,
+    });
+    w = legacyCanvas.width;
+    h = legacyCanvas.height;
+  } else {
+    const opts = canvas || {};
+    const viewWidth =
+      Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
+        ? opts.viewWidth
+        : Number.isFinite(opts.width) && opts.width > 0
+          ? opts.width
+          : 1000;
+    const viewHeight =
+      Number.isFinite(opts.viewHeight) && opts.viewHeight > 0
+        ? opts.viewHeight
+        : Number.isFinite(opts.height) && opts.height > 0
+          ? opts.height
+          : 500;
+
+    am = initAnimationManager({
+      title: opts.title || "Depth-First Search",
+      height: opts.height || viewHeight,
+      viewWidth,
+      viewHeight,
+      ...opts,
+    });
+    w = viewWidth;
+    h = viewHeight;
+  }
+
+  this.init(am, w, h);
 }
 
 DFS.prototype = new Graph();
@@ -58,6 +102,7 @@ DFS.superclass = Graph.prototype;
 DFS.prototype.addControls = function () {
   addLabelToAlgorithmBar("Start Vertex: ");
   this.startField = addControlToAlgorithmBar("Text", "");
+  this.startField.setAttribute("placeholder", "Vertex #");
   this.startField.onkeydown = this.returnSubmit(
     this.startField,
     this.startCallback.bind(this),
@@ -161,6 +206,7 @@ DFS.prototype.startCallback = function (event) {
 
 DFS.prototype.doDFS = function (startVetex) {
   this.visited = new Array(this.size);
+  this.parent = new Array(this.size);
   this.commands = new Array();
   if (this.messageID != null) {
     for (var i = 0; i < this.messageID.length; i++) {
@@ -173,8 +219,10 @@ DFS.prototype.doDFS = function (startVetex) {
     this.cmd("SetText", this.visitedID[i], "f");
     this.cmd("SetText", this.parentID[i], "");
     this.visited[i] = false;
+    this.parent[i] = -1;
   }
   var vertex = parseInt(startVetex);
+  this.parent[vertex] = -1;
   this.cmd(
     "CreateHighlightCircle",
     this.highlightCircleL,
@@ -206,6 +254,17 @@ DFS.prototype.doDFS = function (startVetex) {
   this.cmd("Delete", this.highlightCircleL);
   this.cmd("Delete", this.highlightCircleAL);
   this.cmd("Delete", this.highlightCircleAM);
+
+  this.cmd(
+    "SetMessage",
+    "DFS complete. Search tree highlighted.",
+  );
+  for (i = 0; i < this.size; i++) {
+    if (this.parent[i] >= 0) {
+      this.highlightEdge(this.parent[i], i, 1);
+    }
+  }
+  this.cmd("Step");
   return this.commands;
 };
 
@@ -220,33 +279,45 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
     messageX,
     this.messageY,
     0,
+    DFS_CALLSTACK_FONT_SIZE_PERCENT,
   );
   this.messageY = this.messageY + 20;
   if (!this.visited[startVertex]) {
     this.visited[startVertex] = true;
     this.cmd("SetText", this.visitedID[startVertex], "T");
+    this.cmd("SetMessage", `Visit ${startVertex}; mark visited.`);
     this.cmd("Step");
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[startVertex][neighbor] > 0) {
         this.highlightEdge(startVertex, neighbor, 1);
         this.cmd("SetHighlight", this.visitedID[neighbor], 1);
         if (this.visited[neighbor]) {
-          nextMessage = this.nextIndex;
+          // nextMessage = this.nextIndex;
+          // this.cmd(
+          //   "CreateLabel",
+          //   nextMessage,
+          //   "Vertex " + String(neighbor) + " already visited.",
+          //   messageX,
+          //   this.messageY,
+          //   0,
+          //   DFS_CALLSTACK_FONT_SIZE_PERCENT,
+          // );
           this.cmd(
-            "CreateLabel",
-            nextMessage,
-            "Vertex " + String(neighbor) + " already visited.",
-            messageX,
-            this.messageY,
-            0,
+            "SetMessage",
+            `Explore edge ${startVertex} -> ${neighbor}; neighbor already visited (skip).`,
+          );
+        } else {
+          this.cmd(
+            "SetMessage",
+            `Explore edge ${startVertex} -> ${neighbor}; neighbor unvisited (recurse).`,
           );
         }
         this.cmd("Step");
         this.highlightEdge(startVertex, neighbor, 0);
         this.cmd("SetHighlight", this.visitedID[neighbor], 0);
-        if (this.visited[neighbor]) {
-          this.cmd("Delete", nextMessage);
-        }
+        // if (this.visited[neighbor]) {
+        //   this.cmd("Delete", nextMessage);
+        // }
 
         if (!this.visited[neighbor]) {
           this.cmd(
@@ -282,18 +353,24 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
             this.adj_matrix_y_start + neighbor * this.adj_matrix_height,
           );
 
+          this.parent[neighbor] = startVertex;
           this.cmd("SetText", this.parentID[neighbor], startVertex);
-          this.cmd("Step");
-          this.dfsVisit(neighbor, messageX + 20);
-          nextMessage = this.nextIndex;
           this.cmd(
-            "CreateLabel",
-            nextMessage,
-            "Returning from recursive call: DFS(" + String(neighbor) + ")",
-            messageX + 20,
-            this.messageY,
-            0,
+            "SetMessage",
+            `Discover ${neighbor}; set parent to ${startVertex} and recurse into DFS(${neighbor}).`,
           );
+          this.cmd("Step");
+          this.dfsVisit(neighbor, messageX + 10);
+          // nextMessage = this.nextIndex;
+          // this.cmd(
+          //   "CreateLabel",
+          //   nextMessage,
+          //   "Returning from recursive call: DFS(" + String(neighbor) + ")",
+          //   messageX + 5,
+          //   this.messageY,
+          //   0,
+          //   DFS_CALLSTACK_FONT_SIZE_PERCENT,
+          // );
 
           this.cmd(
             "Move",
@@ -313,9 +390,17 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
             this.adj_matrix_x_start - this.adj_matrix_width,
             this.adj_matrix_y_start + startVertex * this.adj_matrix_height,
           );
+          this.cmd(
+            "SetMessage",
+            `Returned to DFS(${startVertex}) from DFS(${neighbor}); continue scanning neighbors.`,
+          );
           this.cmd("Step");
-          this.cmd("Delete", nextMessage);
+          // this.cmd("Delete", nextMessage);
         }
+        this.cmd(
+          "SetMessage",
+          `Finished processing edge ${startVertex} -> ${neighbor}.`,
+        );
         this.cmd("Step");
       }
     }

@@ -24,7 +24,10 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import {
+  initAnimationManager,
+  initCanvas,
+} from "../AnimationLibrary/AnimationMain.js";
 import {
   addControlToAlgorithmBar,
   addLabelToAlgorithmBar,
@@ -42,8 +45,52 @@ var MESSAGE_LABEL_1_Y = 10;
 var HIGHLIGHT_CIRCLE_COLOR = "#000000";
 
 export function DijkstraPrim(canvas, runningDijkstra) {
-  let am = initCanvas(canvas);
-  this.init(am, runningDijkstra, canvas.width, canvas.height);
+  // New-style usage: `new DijkstraPrim({ ...opts })` (preferred)
+  // Legacy usage: `new DijkstraPrim(canvas, runningDijkstra)`
+  let am;
+  let w;
+  let h;
+
+  if (canvas && typeof canvas.getContext === "function") {
+    const legacyCanvas = canvas;
+    const title = runningDijkstra ? "Dijkstra Shortest Path" : "Prim MST";
+    am = initCanvas(legacyCanvas, null, title, false, {
+      viewWidth: legacyCanvas.width,
+      viewHeight: legacyCanvas.height,
+    });
+    w = legacyCanvas.width;
+    h = legacyCanvas.height;
+  } else {
+    const opts = canvas || {};
+    const runDijkstra =
+      typeof opts.runningDijkstra === "boolean" ? opts.runningDijkstra : true;
+
+    const viewWidth =
+      Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
+        ? opts.viewWidth
+        : Number.isFinite(opts.width) && opts.width > 0
+          ? opts.width
+          : 1000;
+    const viewHeight =
+      Number.isFinite(opts.viewHeight) && opts.viewHeight > 0
+        ? opts.viewHeight
+        : Number.isFinite(opts.height) && opts.height > 0
+          ? opts.height
+          : 500;
+
+    am = initAnimationManager({
+      title: opts.title || (runDijkstra ? "Dijkstra Shortest Path" : "Prim MST"),
+      height: opts.height || viewHeight,
+      viewWidth,
+      viewHeight,
+      ...opts,
+    });
+    w = viewWidth;
+    h = viewHeight;
+    runningDijkstra = runDijkstra;
+  }
+
+  this.init(am, runningDijkstra, w, h);
 }
 
 DijkstraPrim.prototype = new Graph();
@@ -200,6 +247,10 @@ DijkstraPrim.prototype.findCheapestUnknown = function () {
     var x = 3;
     x = x + 2;
   }
+  this.cmd(
+    "SetMessage",
+    "Scan all unknown vertices and select the smallest tentative distance.",
+  );
   this.cmd("Step");
   for (var i = 0; i < this.size; i++) {
     if (!this.known[i]) {
@@ -246,6 +297,7 @@ DijkstraPrim.prototype.doDijkstraPrim = function (startVertex) {
     this.cmd("SetHighlight", this.distanceID[current], 1);
 
     this.cmd("SetHighlight", this.circleID[current], 1);
+    this.cmd("SetMessage", `Select vertex ${current} as next cheapest unknown.`);
     this.cmd("Step");
     this.cmd("SetHighlight", this.distanceID[current], 0);
     this.cmd("SetText", this.message1ID, "Setting known field to True");
@@ -253,6 +305,7 @@ DijkstraPrim.prototype.doDijkstraPrim = function (startVertex) {
     this.known[current] = true;
     this.cmd("SetText", this.knownID[current], "T");
     this.cmd("SetTextColor", this.knownID[current], "#AAAAAA");
+    this.cmd("SetMessage", `Mark vertex ${current} as known (finalize its value).`);
     this.cmd("Step");
     this.cmd("SetHighlight", this.knownID[current], 0);
     this.cmd(
@@ -272,6 +325,10 @@ DijkstraPrim.prototype.doDijkstraPrim = function (startVertex) {
             TABLE_START_Y + neighbor * TABLE_ENTRY_HEIGHT,
           );
           this.cmd("SetHighlight", this.knownID[neighbor], 1);
+          this.cmd(
+            "SetMessage",
+            `Edge ${current} -> ${neighbor}: neighbor already known; skip update.`,
+          );
         } else {
           this.cmd("SetHighlight", this.distanceID[current], 1);
           this.cmd("SetHighlight", this.distanceID[neighbor], 1);
@@ -338,6 +395,18 @@ DijkstraPrim.prototype.doDijkstraPrim = function (startVertex) {
               );
             }
           }
+
+          if (this.runningDijkstra) {
+            this.cmd(
+              "SetMessage",
+              `Relax edge ${current} -> ${neighbor}: check if dist[${neighbor}] > dist[${current}] + w(${current},${neighbor}).`,
+            );
+          } else {
+            this.cmd(
+              "SetMessage",
+              `Update Prim candidate for ${neighbor}: check if cost[${neighbor}] > w(${current},${neighbor}).`,
+            );
+          }
         }
 
         this.cmd("Step");
@@ -384,6 +453,22 @@ DijkstraPrim.prototype.doDijkstraPrim = function (startVertex) {
     this.highlightTree();
   }
 
+  // Highlight all edges implied by the predecessor/path table.
+  this.cmd(
+    "SetMessage",
+    "Algorithm complete; highlight all edges in the predecessor table.",
+  );
+  for (i = 0; i < this.size; i++) {
+    if (this.path[i] >= 0) {
+      this.highlightEdge(this.path[i], i, 1);
+      if (!this.runningDijkstra) {
+        // Prim: graph is undirected, so highlight both directions for consistency.
+        this.highlightEdge(i, this.path[i], 1);
+      }
+    }
+  }
+  this.cmd("Step");
+
   this.cmd("SetText", this.message1ID, "");
   return this.commands;
 };
@@ -413,6 +498,10 @@ DijkstraPrim.prototype.createPaths = function () {
       var nextInPath = vertex;
       while (nextInPath >= 0) {
         this.cmd("SetHighlight", this.pathID[nextInPath], 1);
+        this.cmd(
+          "SetMessage",
+          `Trace predecessor for vertex ${vertex}: next = ${nextInPath}.`,
+        );
         this.cmd("Step");
         if (this.path[nextInPath] != -1) {
           nextLabelID = this.nextIndex++;
@@ -440,6 +529,10 @@ DijkstraPrim.prototype.createPaths = function () {
               TABLE_START_Y + vertex * TABLE_ENTRY_HEIGHT,
             );
           }
+          this.cmd(
+            "SetMessage",
+            `Extend path display for vertex ${vertex} by adding predecessor ${this.path[nextInPath]}.`,
+          );
           this.cmd("Step");
           pathList.push(nextLabelID);
         }
@@ -457,6 +550,10 @@ DijkstraPrim.prototype.highlightTree = function () {
       this.cmd("SetHighlight", this.pathID[vertex], 1);
       this.highlightEdge(vertex, this.path[vertex], 1);
       this.highlightEdge(this.path[vertex], vertex, 1);
+      this.cmd(
+        "SetMessage",
+        `Tree edge ${this.path[vertex]} - ${vertex} is selected in the MST.`,
+      );
       this.cmd("Step");
       this.cmd("SetHighlight", this.vertexID[vertex], 0);
       this.cmd("SetHighlight", this.pathID[vertex], 0);

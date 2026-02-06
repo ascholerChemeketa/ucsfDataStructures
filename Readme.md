@@ -1,4 +1,47 @@
-https://www.cs.usfca.edu/~galles/visualization/source.html
+# Data Structures and Algorithms Visualization
+
+This is a fork of David Galles' JavaScript visualization library for data structures and algorithms. The original library can be found at:
+
+https://www.cs.usfca.edu/~galles/visualization/
+
+Significant UI modifications have been made to the original library, and some algorithms have been added or removed.
+
+Algorithms that have not been updated to use the new animation system have been moved to the `AlgorithmLibrary/Legacy` directory.
+
+
+- [AVLtree.html](AVLtree.html)
+- [BFS.html](BFS.html)
+- [BST.html](BST.html)
+- [BSTCopy.html](BSTCopy.html)
+- [BSTIterator.html](BSTIterator.html)
+- [BTree.html](BTree.html)
+- [ClosedHash.html](ClosedHash.html)
+- [ClosedHashBucket.html](ClosedHashBucket.html)
+- [ConnectedComponent.html](ConnectedComponent.html)
+- [DFS.html](DFS.html)
+- [Dijkstra.html](Dijkstra.html)
+- [DoublyLinkedList.html](DoublyLinkedList.html)
+- [ExpressionTree.html](ExpressionTree.html)
+- [Heap.html](Heap.html)
+- [HeapSort.html](HeapSort.html)
+- [iframeTest.html](iframeTest.html)
+- [Kruskal.html](Kruskal.html)
+- [LinkedList.html](LinkedList.html)
+- [LinkedListSimple.html](LinkedListSimple.html)
+- [LinkedListTailPtr.html](LinkedListTailPtr.html)
+- [OpenHash.html](OpenHash.html)
+- [Prim.html](Prim.html)
+- [QueueArray.html](QueueArray.html)
+- [QueueLL.html](QueueLL.html)
+- [RedBlack.html](RedBlack.html)
+- [SkipList.html](SkipList.html)
+- [SplayTree.html](SplayTree.html)
+- [StackArray.html](StackArray.html)
+- [StackLL.html](StackLL.html)
+- [TopoSortDFS.html](TopoSortDFS.html)
+- [Treap.html](Treap.html)
+- [Trie.html](Trie.html)
+- [TST.html](TST.html)
 
 ```text
 // Copyright 2011 David Galles, University of San Francisco. All rights reserved.

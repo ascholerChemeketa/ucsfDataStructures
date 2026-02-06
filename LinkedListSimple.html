@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Linked List (Simple) Visualization</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+
+  <body>
+    <script type="module">
+      import { LinkedListSimple } from "./dist/entry.js";
+
+      // Starts with a few sample values.
+      // let anim = new LinkedListSimple({ initialData: [200, 100, 50, 101, 120] });
+      let anim = new LinkedListSimple({ initialData: [10] });
+      
+      anim.doInsertFront(6);
+      // anim.doDeleteFront();
+      // anim.doFind(100);
+    </script>
+  </body>
+</html>

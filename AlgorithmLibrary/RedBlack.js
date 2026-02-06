@@ -42,7 +42,7 @@ export function RedBlack(opts = {}) {
   opts.heightMobileSingle = 350;
 
   let am = initAnimationManager(opts);
-  this.init(am, 800, 400);
+  this.init(am, 600, 400);
 
   this.addControls();
 
@@ -56,79 +56,6 @@ export function RedBlack(opts = {}) {
   }
 }
 
-
-RedBlack.prototype = new Algorithm();
-RedBlack.prototype.constructor = RedBlack;
-RedBlack.superclass = Algorithm.prototype;
-
-RedBlack.prototype.init = function (am, w, h) {
-  var sc = RedBlack.superclass;
-  var fn = sc.init;
-  fn.call(this, am);
-  this.nextIndex = 0;
-  this.commands = [];
-  this.groupBoxes = {};
-  this.rootIndex = 0;
-  this.startingX = w / 2;
-  this.print_max = w - PRINT_HORIZONTAL_GAP;
-  this.first_print_pos_y = h - 2 * PRINT_VERTICAL_GAP;
-  
-  this.cmd("CreateRectangle", this.nextIndex++, "", 50, 25, this.startingX - 70, EXPLANITORY_TEXT_Y + 20);
-  this.cmd("SetNull", this.rootIndex, 1);
-	this.cmd("CreateLabel", this.nextIndex++, "root", this.startingX - 120, EXPLANITORY_TEXT_Y + 20);
-
-  this.animationManager.StartNewAnimation(this.commands);
-  this.animationManager.skipForward();
-  this.animationManager.clearHistory();
-  
-  this.doInsert = function (val) {
-    this.implementAction( this.insertElement.bind(this), val);
-  };
-  this.doDelete = function (val) {
-    this.implementAction( this.deleteElement.bind(this), val);
-  };
-  this.doFind = function (val) {
-    this.implementAction( this.findElement.bind(this), val);
-  };
-  this.doPrint = function (order = "In") {
-    this.implementAction( this.printTree.bind(this), order);
-  };
-};
-
-RedBlack.prototype.addControls = function () {
-  addSeparatorToAlgorithmBar();
-  this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
-  this.inputField.onkeydown = this.returnSubmit(  
-    this.inputField,
-    this.insertCallback.bind(this),
-    6,
-  );
-  
-  this.insertButton = addControlToAlgorithmBar("Button", "Insert");
-  this.insertButton.onclick = this.insertCallback.bind(this);
-  
-  this.deleteButton = addControlToAlgorithmBar("Button", "Delete");
-  this.deleteButton.onclick = this.deleteCallback.bind(this);
-  
-  this.findButton = addControlToAlgorithmBar("Button", "Find");
-  this.findButton.onclick = this.findCallback.bind(this);
-  
-  addSeparatorToAlgorithmBar();
-  
-  this.printButton = addControlToAlgorithmBar("Button", "Print");
-  this.printButton.onclick = this.printCallback.bind(this);
-  
-  addSeparatorToAlgorithmBar();
-  
-  this.showNullLeaves = addCheckboxToAlgorithmBar("Show Null Leaves", 'NullLeavesCheck');
-  this.showNullLeaves.onclick = this.showNullLeavesCallback.bind(this);
-  this.showNullLeaves.checked = false;
-};
-
-RedBlack.prototype.reset = function () {
-  this.nextIndex = 2;
-  this.treeRoot = null;
-};
 
 var FIRST_PRINT_POS_X = 50;
 var PRINT_VERTICAL_GAP = 20;
@@ -159,6 +86,96 @@ var heightDelta = 60;
 var startingY = 50;
 
 var EXPLANITORY_TEXT_Y = 10;
+
+
+RedBlack.prototype = new Algorithm();
+RedBlack.prototype.constructor = RedBlack;
+RedBlack.superclass = Algorithm.prototype;
+
+RedBlack.prototype.init = function (am, w, h) {
+  var sc = RedBlack.superclass;
+  var fn = sc.init;
+  fn.call(this, am, w, h);
+  this.nextIndex = 0;
+  this.commands = [];
+  this.groupBoxes = {};
+  this.rootIndex = 0;
+  this.startingX = 100;  // w / 2;
+  this.print_max = w - PRINT_HORIZONTAL_GAP;
+  this.first_print_pos_y = h - 2 * PRINT_VERTICAL_GAP;
+  
+  this.cmd("CreateRectangle", this.nextIndex++, "", 50, 25, this.startingX - 70, EXPLANITORY_TEXT_Y + 20);
+  this.cmd("SetNull", this.rootIndex, 1);
+	this.cmd("CreateLabel", this.nextIndex++, "root", this.startingX - 120, EXPLANITORY_TEXT_Y + 20);
+
+  this.animationManager.StartNewAnimation(this.commands);
+  this.animationManager.skipForward();
+  this.animationManager.clearHistory();
+  
+  this.doInsert = function (val) {
+    this.implementAction( this.insertElement.bind(this), val);
+  };
+  this.doDelete = function (val) {
+    this.implementAction( this.deleteElement.bind(this), val);
+  };
+  this.doFind = function (val) {
+    this.implementAction( this.findElement.bind(this), val);
+  };
+  this.doPrint = function (order = "In") {
+    this.implementAction( this.printTree.bind(this), order);
+  };
+  this.doInsertRandom = function(count = 10, maxValue = 999) {
+    for (let i = 0; i < count; i++) {
+      const raw = Math.floor(1 + Math.random() * maxValue);
+      const insertedValue = this.normalizeNumber(String(raw), 4);
+      this.implementAction(this.insertElement.bind(this), insertedValue);
+      this.animationManager.skipForward();
+    }
+    this.animationManager.clearHistory();
+    this.animationManager.animatedObjects.draw();
+  };
+};
+
+RedBlack.prototype.addControls = function () {
+  addSeparatorToAlgorithmBar();
+  this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+  this.inputField.onkeydown = this.returnSubmit(  
+    this.inputField,
+    this.insertCallback.bind(this),
+    6,
+  );
+  
+  this.insertButton = addControlToAlgorithmBar("Button", "Insert");
+  this.insertButton.onclick = this.insertCallback.bind(this);
+  
+  this.deleteButton = addControlToAlgorithmBar("Button", "Remove");
+  this.deleteButton.onclick = this.deleteCallback.bind(this);
+  
+  this.findButton = addControlToAlgorithmBar("Button", "Find");
+  this.findButton.onclick = this.findCallback.bind(this);
+
+  this.clearButton = addControlToAlgorithmBar("Button", "Clear");
+  this.clearButton.onclick = this.clearCallback.bind(this);
+
+  this.insertRandomButton = addControlToAlgorithmBar("Button", "Insert Random Values");
+  this.insertRandomButton.onclick = this.insertRandomCallback.bind(this);
+  
+  addSeparatorToAlgorithmBar();
+  
+  this.printButton = addControlToAlgorithmBar("Button", "Print");
+  this.printButton.onclick = this.printCallback.bind(this);
+  
+  addSeparatorToAlgorithmBar();
+  
+  this.showNullLeaves = addCheckboxToAlgorithmBar("Show Null Leaves", 'NullLeavesCheck');
+  this.showNullLeaves.onclick = this.showNullLeavesCallback.bind(this);
+  this.showNullLeaves.checked = false;
+};
+
+RedBlack.prototype.reset = function () {
+  this.nextIndex = 2;
+  this.treeRoot = null;
+};
 
 RedBlack.prototype.insertCallback = function (event) {
   var insertedValue = this.inputField.value;
@@ -193,49 +210,117 @@ RedBlack.prototype.printCallback = function (event) {
   this.implementAction(this.printTree.bind(this), "");
 };
 
+RedBlack.prototype.clearCallback = function (event) {
+  this.implementAction(this.clearData.bind(this), "");
+};
+
+RedBlack.prototype.clearData = function () {
+  if (this.treeRoot == null) return;
+
+  this.commands = [];
+
+  function clearTree(tree, handler) {
+    if (tree == null) return;
+    if (tree.left != null) {
+      clearTree(tree.left, handler);
+    }
+    if (tree.right != null) {
+      clearTree(tree.right, handler);
+    }
+    if (tree.containerBoxID) {
+      handler.cmd("Delete", tree.containerBoxID);
+      tree.containerBoxID = null;
+    }
+    handler.cmd("Delete", tree.graphicID);
+    if (tree.colorLabelID != null) {
+      handler.cmd("Delete", tree.colorLabelID);
+    }
+  }
+
+  clearTree(this.treeRoot, this);
+  this.treeRoot = null;
+  this.groupBoxes = {};
+  this.cmd("SetNull", this.rootIndex, 1);
+  this.cmd("SetMessage", "");
+  return this.commands;
+};
+
+RedBlack.prototype.insertRandomCallback = function (event) {
+  var numToInsert = 10; // this.inputField.value;
+  for (let i = 0; i < numToInsert; i++) {
+    const raw = Math.floor(1 + Math.random() * 999);
+    const insertedValue = this.normalizeNumber(String(raw), 4);
+    this.implementAction(this.insertElement.bind(this), insertedValue);
+    this.animationManager.skipForward();
+  }
+  this.animationManager.clearHistory();
+  this.animationManager.animatedObjects.draw();
+};
+
 
 RedBlack.prototype.updateGroupingsRec = function (tree, show) {
-  console.log("in", tree)
   if (tree.left != null && !tree.left.phantomLeaf) {
     this.updateGroupingsRec(tree.left, show);
   }
   if(tree.blackLevel == 1 && show) {
-    let minX = tree.x - NODE_SIZE;
-    let minY = tree.y - NODE_SIZE;
-    let maxX = tree.x + NODE_SIZE;
-    let maxY = tree.y + NODE_SIZE;
-    if(tree.left && tree.left.blackLevel == 0) {
-      minX = tree.left.x - NODE_SIZE;
-      maxY = tree.left.y + NODE_SIZE;
-    }
-    if(tree.right && tree.right.blackLevel == 0) {
-      maxX = tree.right.x + NODE_SIZE;
-      maxY = tree.right.y + NODE_SIZE;
-    }
-    maxY -= 5;
-    let width = maxX - minX;
-    let height = maxY - minY;
+    // Bounds should include:
+    // - the black node (circle)
+    // - its color label ("B")
+    // - any red children (circle + color label)
+    const OUTER_PAD = 8;
+    const LABEL_PAD_X = 10;
+    const LABEL_PAD_Y = 10;
+    const R = NODE_SIZE;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    const addNodeBounds = (n) => {
+      if (!n || n.phantomLeaf) return;
+
+      minX = Math.min(minX, n.x - R - OUTER_PAD);
+      maxX = Math.max(maxX, n.x + R + OUTER_PAD);
+      minY = Math.min(minY, n.y - R - OUTER_PAD);
+      maxY = Math.max(maxY, n.y + R + OUTER_PAD);
+
+      // The B/R label is positioned near (heightLabelX, heightLabelY)
+      // (computed during layout); include it in the group box.
+      const lx = Number.isFinite(n.heightLabelX) ? n.heightLabelX : n.x + 20;
+      const ly = Number.isFinite(n.heightLabelY) ? n.heightLabelY : n.y - 20;
+      minX = Math.min(minX, lx - LABEL_PAD_X - OUTER_PAD);
+      maxX = Math.max(maxX, lx + LABEL_PAD_X + OUTER_PAD);
+      minY = Math.min(minY, ly - LABEL_PAD_Y - OUTER_PAD);
+      maxY = Math.max(maxY, ly + LABEL_PAD_Y + OUTER_PAD);
+    };
+
+    addNodeBounds(tree);
+    if (tree.left && tree.left.blackLevel == 0) addNodeBounds(tree.left);
+    if (tree.right && tree.right.blackLevel == 0) addNodeBounds(tree.right);
+
+    const width = Math.max(0, maxX - minX);
+    const height = Math.max(0, maxY - minY);
 
     if(tree.containerBoxID) {
-      console.log("move" , tree.containerBoxID)
-      this.cmd("MOVE", tree.containerBoxID, minX, minY);
-      this.cmd("SETHEIGHT", tree.containerBoxID, height);
-      this.cmd("SETWIDTH", tree.containerBoxID, width);
+      this.cmd("Move", tree.containerBoxID, minX, minY);
+      this.cmd("SetHeight", tree.containerBoxID, height);
+      this.cmd("SetWidth", tree.containerBoxID, width);
     } else {
-      tree.containerBoxID = this.nextIndex + 1;
-      this.cmd("CreateRectangle", this.nextIndex++, "", width, height, minX, minY, "left", "top");
-      this.cmd("SetLayer", this.nextIndex - 1, -1);
-      //this.cmd("MOVE", this.nextIndex - 1, minX, minY);
-      console.log("CreateRectangle", this.nextIndex - 1, "", width, height, minX, minY);
-      console.log("SetMessage", "Box for " + tree.graphicID);
-      this.cmd("SetMessage", "Box for " + tree.graphicID);
+      const rectID = this.nextIndex++;
+      tree.containerBoxID = rectID;
+      this.cmd("CreateRectangle", rectID, "", width, height, minX, minY, "left", "top");
+      // Make it an outline only, and ensure it's on a visible layer.
+      this.cmd("SetBackgroundColor", rectID, "rgba(255, 255, 255, 0)");
+      this.cmd("SetForegroundColor", rectID, LINK_COLOR);
+      this.cmd("SetLayer", rectID, 0);
     }
 
   } else {
     //red - do we need to cleanup box?
     if(tree.containerBoxID) {
-      this.cmd("Delete", this.containerBoxID);
-      this.containerBoxID = null;
+      this.cmd("Delete", tree.containerBoxID);
+      tree.containerBoxID = null;
     }
   }
   if (tree.right != null && !tree.right.phantomLeaf) {
@@ -244,27 +329,109 @@ RedBlack.prototype.updateGroupingsRec = function (tree, show) {
 }
 
 RedBlack.prototype.updateGroupings = function (unused) {
-  console.log("updateGroupings", this.treeRoot)
-  console.log(this.recordAnimation)
   this.commands = [];
-  let show = this.showNullLeaves.checked;
-  if(this.treeRoot)
-    this.updateGroupingsRec(this.treeRoot, show);
-  console.log(this.commands)
+  this.updateGroupingsInternal();
   return this.commands;
 }
 
+RedBlack.prototype.updateGroupingsInternal = function () {
+  // Container boxes disabled (grouping rectangles around black node + red children)
+  // If any exist from a prior run, delete them.
+  const deleteBoxesRec = (tree) => {
+    if (tree == null) return;
+    if (tree.containerBoxID) {
+      this.cmd("Delete", tree.containerBoxID);
+      tree.containerBoxID = null;
+    }
+    if (tree.left != null && !tree.left.phantomLeaf) deleteBoxesRec(tree.left);
+    if (tree.right != null && !tree.right.phantomLeaf) deleteBoxesRec(tree.right);
+  };
+
+  if (this.treeRoot) deleteBoxesRec(this.treeRoot);
+};
+
+RedBlack.prototype.setNullLeafLayers = function (tree, layer) {
+  if (tree == null) return;
+  if (tree.phantomLeaf) {
+    this.cmd("SetLayer", tree.graphicID, layer);
+    if (tree.colorLabelID != null) {
+      this.cmd("SetLayer", tree.colorLabelID, layer);
+    }
+  }
+  this.setNullLeafLayers(tree.left, layer);
+  this.setNullLeafLayers(tree.right, layer);
+};
+
 RedBlack.prototype.showNullLeavesCallback = function (event) {
-  //this.commands = [];
-  this.implementAction(this.updateGroupings.bind(this), "") ;
-  //console.log("show layers callback");
-  // if (this.showNullLeaves.checked) {
-  //   console.log("show layers 0 1");
-  //   this.animationManager.setAllLayers([0, 1]);
-  // } else {
-  //   console.log("show layers 0");
-  //   this.animationManager.setAllLayers([0]);
-  // }
+  this.implementAction(this.toggleNullLeaves.bind(this), "");
+};
+
+RedBlack.prototype.deleteNullLeavesRec = function (tree) {
+  if (tree == null) return;
+
+  // Recurse only through real nodes.
+  if (tree.left != null && tree.left.phantomLeaf) {
+    // Important: remove the edge first, otherwise the line renderer may
+    // keep referencing a deleted endpoint.
+    this.cmd("Disconnect", tree.graphicID, tree.left.graphicID);
+    this.cmd("Delete", tree.left.graphicID);
+    if (tree.left.colorLabelID != null) {
+      this.cmd("Delete", tree.left.colorLabelID);
+    }
+    tree.left = null;
+  } else {
+    this.deleteNullLeavesRec(tree.left);
+  }
+
+  if (tree.right != null && tree.right.phantomLeaf) {
+    this.cmd("Disconnect", tree.graphicID, tree.right.graphicID);
+    this.cmd("Delete", tree.right.graphicID);
+    if (tree.right.colorLabelID != null) {
+      this.cmd("Delete", tree.right.colorLabelID);
+    }
+    tree.right = null;
+  } else {
+    this.deleteNullLeavesRec(tree.right);
+  }
+};
+
+RedBlack.prototype.ensureNullLeavesRec = function (tree) {
+  if (tree == null || tree.phantomLeaf) return;
+
+  if (tree.left == null) {
+    this.attachLeftNullLeaf(tree);
+  }
+  if (tree.right == null) {
+    this.attachRightNullLeaf(tree);
+  }
+
+  if (tree.left != null && !tree.left.phantomLeaf) {
+    this.ensureNullLeavesRec(tree.left);
+  }
+  if (tree.right != null && !tree.right.phantomLeaf) {
+    this.ensureNullLeavesRec(tree.right);
+  }
+};
+
+RedBlack.prototype.toggleNullLeaves = function (unused) {
+  this.commands = [];
+  let show = this.showNullLeaves && this.showNullLeaves.checked;
+
+  if (this.treeRoot) {
+    if (show) {
+      // Recreate any missing phantom leaves and show them.
+      this.ensureNullLeavesRec(this.treeRoot);
+      this.setNullLeafLayers(this.treeRoot, 0);
+    } else {
+      // If null leaves are currently visible, delete them from the SVG entirely.
+      this.deleteNullLeavesRec(this.treeRoot);
+      // this.cmd("Step");
+    }
+  }
+
+  // Re-layout so nodes remain visible when leaves are hidden/shown
+  this.resizeTree();
+  return this.commands;
 };
 
 RedBlack.prototype.printTree = function (unused) {
@@ -442,6 +609,7 @@ RedBlack.prototype.blackLevel = function (tree) {
 
 RedBlack.prototype.attachLeftNullLeaf = function (node) {
   // Add phantom left leaf
+  let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
   var treeNodeID = this.nextIndex++;
   var labelID = this.nextIndex++;
   this.cmd("CreateCircle", treeNodeID, "NULL\nLEAF", node.x, node.y);
@@ -452,18 +620,20 @@ RedBlack.prototype.attachLeftNullLeaf = function (node) {
     "CreateLabel",
     labelID,
     "",
-    this.startingX + 20,
-    startingY - 20,
+    node.x + 20,
+    node.y - 20,
   );
-  node.left = new RedBlackNode("", treeNodeID, labelID, this.startingX, startingY);
+  node.left = new RedBlackNode("", treeNodeID, labelID, node.x, node.y);
   node.left.phantomLeaf = true;
-  this.cmd("SetLayer", treeNodeID, 1);
+  this.cmd("SetLayer", treeNodeID, showNullLeaves ? 0 : 1);
+  this.cmd("SetLayer", labelID, showNullLeaves ? 0 : 1);
   node.left.blackLevel = 1;
   this.cmd("Connect", node.graphicID, treeNodeID, LINK_COLOR);
 };
 
 RedBlack.prototype.attachRightNullLeaf = function (node) {
   // Add phantom right leaf
+  let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
   let treeNodeID = this.nextIndex++;
   let labelID = this.nextIndex++;
   this.cmd("CreateCircle", treeNodeID, "NULL\nLEAF", node.x, node.y);
@@ -473,11 +643,12 @@ RedBlack.prototype.attachRightNullLeaf = function (node) {
     "CreateLabel",
     labelID,
     "",
-    this.startingX + 20,
-    startingY - 20,
+    node.x + 20,
+    node.y - 20,
   );
-  node.right = new RedBlackNode("", treeNodeID, labelID, this.startingX, startingY);
-  this.cmd("SetLayer", treeNodeID, 1);
+  node.right = new RedBlackNode("", treeNodeID, labelID, node.x, node.y);
+  this.cmd("SetLayer", treeNodeID, showNullLeaves ? 0 : 1);
+  this.cmd("SetLayer", labelID, showNullLeaves ? 0 : 1);
 
   node.right.phantomLeaf = true;
   node.right.blackLevel = 1;
@@ -533,7 +704,13 @@ RedBlack.prototype.insertElement = function (insertedValue) {
     treeNodeID = this.nextIndex++;
     let labelID = this.nextIndex++;
 
-    this.cmd("CreateCircle", treeNodeID, insertedValue, NODE_SIZE, startingY);
+    this.cmd(
+      "CreateCircle",
+      treeNodeID,
+      insertedValue,
+      this.startingX - 200,
+      startingY,
+    );
     this.cmd("SetForegroundColor", treeNodeID, FOREGROUND_RED);
     this.cmd("SetBackgroundColor", treeNodeID, BACKGROUND_RED);
     this.cmd("Step");
@@ -541,10 +718,17 @@ RedBlack.prototype.insertElement = function (insertedValue) {
       "CreateLabel",
       labelID,
       "R",
-      80,
-      80,
+      this.startingX - 180,
+      startingY - 20,
     );
-    var insertElem = new RedBlackNode(insertedValue, treeNodeID, labelID, 100, 100);
+
+    var insertElem = new RedBlackNode(
+      insertedValue,
+      treeNodeID,
+      labelID,
+      this.startingX - 200,
+      startingY,
+    );
 
     this.cmd("SetHighlight", insertElem.graphicID, 1);
     insertElem.height = 1;
@@ -881,6 +1065,20 @@ RedBlack.prototype.deleteElement = function (deletedValue) {
   this.cmd("SetMessage", " ");
   this.highlightID = this.nextIndex++;
   this.treeDelete(this.treeRoot, deletedValue);
+
+  // Ensure phantom leaves end in the correct visibility layer after delete/rotations.
+  let show = this.showNullLeaves && this.showNullLeaves.checked;
+  if (this.treeRoot) {
+    this.setNullLeafLayers(this.treeRoot, show ? 0 : 1);
+  }
+
+  // Final layout pass after any deletion, so widths/positions are consistent.
+  this.resizeTree();
+  if (this.treeRoot == null) {
+    // resizeTree() doesn't Step when the tree is empty; force a refresh.
+    this.cmd("Step");
+  }
+
   this.cmd("SetMessage", " ");
   // Do delete
   return this.commands;
@@ -890,6 +1088,7 @@ RedBlack.prototype.fixLeftNull = function (tree) {
   var treeNodeID = this.nextIndex++;
   let labelID = this.nextIndex++;
   var nullLeaf;
+  let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
   this.cmd("SetMessage", "Coloring 'Null Leaf' double black");
 
   this.cmd("CreateCircle", treeNodeID, "NULL\nLEAF", tree.x, tree.y);
@@ -903,6 +1102,9 @@ RedBlack.prototype.fixLeftNull = function (tree) {
     tree.x - 20,
     tree.y - 20,
   );
+  // Keep null leaves hidden when checkbox is unchecked (no flash during fixup)
+  this.cmd("SetLayer", treeNodeID, showNullLeaves ? 0 : 1);
+  this.cmd("SetLayer", labelID, showNullLeaves ? 0 : 1);
   nullLeaf = new RedBlackNode("NULL\nLEAF", treeNodeID, labelID, tree.x, tree.y);
   nullLeaf.blackLevel = 2;
   nullLeaf.parent = tree;
@@ -912,7 +1114,7 @@ RedBlack.prototype.fixLeftNull = function (tree) {
 
   this.resizeTree();
   this.fixExtraBlackChild(tree, true);
-  this.cmd("SetLayer", nullLeaf.graphicID, 1);
+  this.cmd("SetLayer", nullLeaf.graphicID, showNullLeaves ? 0 : 1);
   nullLeaf.blackLevel = 1;
   this.fixNodeColor(nullLeaf);
 };
@@ -921,6 +1123,7 @@ RedBlack.prototype.fixRightNull = function (tree) {
   var treeNodeID = this.nextIndex++;
   let labelID = this.nextIndex++;
   var nullLeaf;
+  let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
   this.cmd("SetMessage", "Coloring 'Null Leaf' double black");
 
   this.cmd("CreateCircle", treeNodeID, "NULL\nLEAF", tree.x, tree.y);
@@ -933,7 +1136,10 @@ RedBlack.prototype.fixRightNull = function (tree) {
     tree.x - 20,
     tree.y - 20,
   );
-  nullLeaf = new RedBlackNode("NULL\nLEAF", treeNodeID, tree.x, tree.x);
+  // Keep null leaves hidden when checkbox is unchecked (no flash during fixup)
+  this.cmd("SetLayer", treeNodeID, showNullLeaves ? 0 : 1);
+  this.cmd("SetLayer", labelID, showNullLeaves ? 0 : 1);
+  nullLeaf = new RedBlackNode("NULL\nLEAF", treeNodeID, labelID, tree.x, tree.y);
   nullLeaf.parent = tree;
   nullLeaf.phantomLeaf = true;
   nullLeaf.blackLevel = 2;
@@ -944,7 +1150,7 @@ RedBlack.prototype.fixRightNull = function (tree) {
 
   this.fixExtraBlackChild(tree, false);
 
-  this.cmd("SetLayer", nullLeaf.graphicID, 1);
+  this.cmd("SetLayer", nullLeaf.graphicID, showNullLeaves ? 0 : 1);
   nullLeaf.blackLevel = 1;
   this.fixNodeColor(nullLeaf);
 };
@@ -1217,6 +1423,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
           tree.right.parent = tree.parent;
         } else {
           this.cmd("Delete", tree.graphicID);
+          this.cmd("Delete", tree.colorLabelID);
           this.treeRoot = tree.right;
           this.treeRoot.parent = null;
           if (this.treeRoot.blackLevel == 0) {
@@ -1253,6 +1460,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
           );
           this.cmd("Step");
           this.cmd("Delete", tree.graphicID);
+          this.cmd("Delete", tree.colorLabelID);
           if (leftchild) {
             tree.parent.left = tree.left;
             if (needFix) {
@@ -1297,7 +1505,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
       else {
         this.cmd(
           "SetMessage",
-          "Node to delete has two childern.  \nFind largest node in left subtree.",
+          "Node to delete has two childern.  \nFind smallest node in right subtree.",
         );
 
         this.highlightID = this.nextIndex;
@@ -1310,17 +1518,17 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
           tree.y,
         );
         var tmp = tree;
-        tmp = tree.left;
+        tmp = tree.right;
         this.cmd("Move", this.highlightID, tmp.x, tmp.y);
         this.cmd("Step");
-        while (tmp.right != null && !tmp.right.phantomLeaf) {
-          tmp = tmp.right;
+        while (tmp.left != null && !tmp.left.phantomLeaf) {
+          tmp = tmp.left;
           this.cmd("Move", this.highlightID, tmp.x, tmp.y);
           this.cmd("Step");
         }
-        if (tmp.right != null) {
-          this.cmd("Delete", tmp.right.graphicID);
-          tmp.right = null;
+        if (tmp.left != null) {
+          this.cmd("Delete", tmp.left.graphicID);
+          tmp.left = null;
         }
         this.cmd("SetText", tree.graphicID, " ");
         var labelID = this.nextIndex;
@@ -1331,7 +1539,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
         this.cmd("Move", labelID, tree.x, tree.y);
         this.cmd(
           "SetMessage",
-          "Copy largest value of left subtree into node to delete.",
+          "Copy smallest value of right subtree over value being removed.",
         );
 
         this.cmd("Step");
@@ -1343,13 +1551,14 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
 
         needFix = tmp.blackLevel > 0;
 
-        if (tmp.left == null) {
+        if (tmp.right == null) {
           this.cmd("Delete", tmp.graphicID);
+          this.cmd("Delete", tmp.colorLabelID);
           if (tmp.parent != tree) {
-            tmp.parent.right = null;
+            tmp.parent.left = null;
             this.resizeTree();
             if (needFix) {
-              this.fixRightNull(tmp.parent);
+              this.fixLeftNull(tmp.parent);
             } else {
               this.cmd(
                 "SetMessage",
@@ -1358,10 +1567,10 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
               this.cmd("Step");
             }
           } else {
-            tree.left = null;
+            tree.right = null;
             this.resizeTree();
             if (needFix) {
-              this.fixLeftNull(tmp.parent);
+              this.fixRightNull(tmp.parent);
             } else {
               this.cmd(
                 "SetMessage",
@@ -1375,28 +1584,37 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
           this.cmd(
             "Connect",
             tmp.parent.graphicID,
-            tmp.left.graphicID,
+            tmp.right.graphicID,
             LINK_COLOR,
           );
           this.cmd("Step");
           this.cmd("Delete", tmp.graphicID);
+          this.cmd("Delete", tmp.colorLabelID);
 
           if (tmp.parent != tree) {
-            tmp.parent.right = tmp.left;
-            tmp.left.parent = tmp.parent;
+            tmp.parent.left = tmp.right;
+            tmp.right.parent = tmp.parent;
             this.resizeTree();
 
             if (needFix) {
               this.cmd("SetMessage", "Coloring child of deleted node black");
               this.cmd("Step");
-              tmp.left.blackLevel++;
-              if (tmp.left.phantomLeaf) {
-                this.cmd("SetLayer", tmp.left.graphicID, 0);
+              tmp.right.blackLevel++;
+              if (tmp.right.phantomLeaf) {
+                let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
+                this.cmd("SetLayer", tmp.right.graphicID, showNullLeaves ? 0 : 1);
+                if (tmp.right.colorLabelID != null) {
+                  this.cmd("SetLayer", tmp.right.colorLabelID, showNullLeaves ? 0 : 1);
+                }
               }
-              this.fixNodeColor(tmp.left);
-              this.fixExtraBlack(tmp.left);
-              if (tmp.left.phantomLeaf) {
-                this.cmd("SetLayer", tmp.left.graphicID, 1);
+              this.fixNodeColor(tmp.right);
+              this.fixExtraBlack(tmp.right);
+              if (tmp.right.phantomLeaf) {
+                let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
+                this.cmd("SetLayer", tmp.right.graphicID, showNullLeaves ? 0 : 1);
+                if (tmp.right.colorLabelID != null) {
+                  this.cmd("SetLayer", tmp.right.colorLabelID, showNullLeaves ? 0 : 1);
+                }
               }
             } else {
               this.cmd(
@@ -1406,21 +1624,29 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
               this.cmd("Step");
             }
           } else {
-            tree.left = tmp.left;
-            tmp.left.parent = tree;
+            tree.right = tmp.right;
+            tmp.right.parent = tree;
             this.resizeTree();
             if (needFix) {
               this.cmd("SetMessage", "Coloring child of deleted node black");
               this.cmd("Step");
-              tmp.left.blackLevel++;
-              if (tmp.left.phantomLeaf) {
-                this.cmd("SetLayer", tmp.left.graphicID, 0);
+              tmp.right.blackLevel++;
+              if (tmp.right.phantomLeaf) {
+                let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
+                this.cmd("SetLayer", tmp.right.graphicID, showNullLeaves ? 0 : 1);
+                if (tmp.right.colorLabelID != null) {
+                  this.cmd("SetLayer", tmp.right.colorLabelID, showNullLeaves ? 0 : 1);
+                }
               }
 
-              this.fixNodeColor(tmp.left);
-              this.fixExtraBlack(tmp.left);
-              if (tmp.left.phantomLeaf) {
-                this.cmd("SetLayer", tmp.left.graphicID, 1);
+              this.fixNodeColor(tmp.right);
+              this.fixExtraBlack(tmp.right);
+              if (tmp.right.phantomLeaf) {
+                let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
+                this.cmd("SetLayer", tmp.right.graphicID, showNullLeaves ? 0 : 1);
+                if (tmp.right.colorLabelID != null) {
+                  this.cmd("SetLayer", tmp.right.colorLabelID, showNullLeaves ? 0 : 1);
+                }
               }
             } else {
               this.cmd(
@@ -1471,6 +1697,17 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
 };
 
 RedBlack.prototype.fixNodeColor = function (tree) {
+  // Keep the R/B label in sync with the node's current blackLevel.
+  // (The fill/stroke colors are often updated via fixNodeColor, but the text
+  // label can otherwise get out of date.)
+  if (tree.colorLabelID != null) {
+    if (tree.phantomLeaf) {
+      this.cmd("SetText", tree.colorLabelID, "");
+    } else {
+      this.cmd("SetText", tree.colorLabelID, tree.blackLevel == 0 ? "R" : "B");
+    }
+  }
+
   if (tree.blackLevel == 0) {
     this.cmd("SetForegroundColor", tree.graphicID, FOREGROUND_RED);
     this.cmd("SetBackgroundColor", tree.graphicID, BACKGROUND_RED);
@@ -1498,7 +1735,7 @@ RedBlack.prototype.resizeTree = function () {
     }
     this.setNewPositions(this.treeRoot, startingPoint, startingY, 0);
     this.animateNewPositions(this.treeRoot);
-    this.updateGroupings();
+    this.updateGroupingsInternal();
     this.cmd("Step");
   }
 };
@@ -1509,7 +1746,8 @@ RedBlack.prototype.setNewPositions = function (
   yPosition,
   side,
 ) {
-  if (tree != null) {
+  let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
+  if (tree != null && (showNullLeaves || !tree.phantomLeaf)) {
     tree.y = yPosition;
     if (side == -1) {
       xPosition = xPosition - tree.rightWidth;
@@ -1522,22 +1760,17 @@ RedBlack.prototype.setNewPositions = function (
     }
     tree.x = xPosition;
     tree.heightLabelY = tree.y - 20;
-    console.log(tree.data)
-    console.log(tree.blackLevel)
-    if(tree.left)console.log(tree.left.blackLevel, tree.left.data)
-    if(tree.right) console.log(tree.right.blackLevel, tree.right.data)
-    let leftHeight = yPosition + heightDelta;
-    if( tree.right && tree.right.blackLevel === 0)
-      leftHeight += heightDelta;
-    let rightHeight = yPosition + heightDelta;
-    if( tree.left && tree.left.blackLevel === 0)
-      rightHeight += heightDelta;
-    this.setNewPositions(tree.left, xPosition, leftHeight, -1);
-    this.setNewPositions(tree.right, xPosition, rightHeight, 1);
+    // Children should always be placed exactly one level below the parent.
+    // (Previously we sometimes pushed a subtree down an extra level when the
+    // sibling was red, which caused red children to appear two levels lower.)
+    const childY = yPosition + heightDelta;
+    this.setNewPositions(tree.left, xPosition, childY, -1);
+    this.setNewPositions(tree.right, xPosition, childY, 1);
   }
 };
 RedBlack.prototype.animateNewPositions = function (tree) {
-  if (tree != null) {
+  let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
+  if (tree != null && (showNullLeaves || !tree.phantomLeaf)) {
     this.cmd("Move", tree.graphicID, tree.x, tree.y);
     this.cmd("Move", tree.colorLabelID, tree.heightLabelX, tree.heightLabelY);
     this.animateNewPositions(tree.left);
@@ -1546,7 +1779,8 @@ RedBlack.prototype.animateNewPositions = function (tree) {
 };
 
 RedBlack.prototype.resizeWidths = function (tree) {
-  if (tree == null) {
+  let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
+  if (tree == null || (!showNullLeaves && tree.phantomLeaf)) {
     return 0;
   }
   tree.leftWidth = Math.max(this.resizeWidths(tree.left), widthDelta / 2);

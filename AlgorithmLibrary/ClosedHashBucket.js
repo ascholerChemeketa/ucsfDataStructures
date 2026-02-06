@@ -24,13 +24,55 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
-import { initCanvas } from "../AnimationLibrary/AnimationMain.js";
+import {
+  initAnimationManager,
+  initCanvas,
+} from "../AnimationLibrary/AnimationMain.js";
 
 import { Hash } from "./Hash.js";
 
 export function ClosedHashBucket(canvas) {
-  let am = initCanvas(canvas);
-  this.init(am, canvas.width, canvas.height);
+  // New-style usage: `new ClosedHashBucket({ ...opts })` (preferred)
+  // Legacy usage: `new ClosedHashBucket(canvas)`
+  let am;
+  let w;
+  let h;
+
+  if (canvas && typeof canvas.getContext === "function") {
+    const legacyCanvas = canvas;
+    am = initCanvas(legacyCanvas, null, "Closed Hashing (Buckets)", false, {
+      viewWidth: legacyCanvas.width,
+      viewHeight: legacyCanvas.height,
+    });
+    w = legacyCanvas.width;
+    h = legacyCanvas.height;
+  } else {
+    const opts = canvas || {};
+    const viewWidth =
+      Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
+        ? opts.viewWidth
+        : Number.isFinite(opts.width) && opts.width > 0
+          ? opts.width
+          : 1000;
+    const viewHeight =
+      Number.isFinite(opts.viewHeight) && opts.viewHeight > 0
+        ? opts.viewHeight
+        : Number.isFinite(opts.height) && opts.height > 0
+          ? opts.height
+          : 500;
+
+    am = initAnimationManager({
+      title: opts.title || "Closed Hashing (Buckets)",
+      height: opts.height || viewHeight,
+      viewWidth,
+      viewHeight,
+      ...opts,
+    });
+    w = viewWidth;
+    h = viewHeight;
+  }
+
+  this.init(am, w, h);
 }
 
 var ARRAY_ELEM_WIDTH = 90;
@@ -92,6 +134,7 @@ ClosedHashBucket.prototype.insertElement = function (elem) {
     candidateIndex++
   ) {
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
+    this.cmd("SetMessage", `Check bucket slot ${candidateIndex} for empty`);
     this.cmd("Step");
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 0);
     if (this.empty[candidateIndex]) {
@@ -106,6 +149,7 @@ ClosedHashBucket.prototype.insertElement = function (elem) {
       candidateIndex++
     ) {
       this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
+      this.cmd("SetMessage", `Check overflow slot ${candidateIndex} for empty`);
       this.cmd("Step");
       this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 0);
 
@@ -125,6 +169,7 @@ ClosedHashBucket.prototype.insertElement = function (elem) {
       this.indexXPos2[foundIndex],
       this.indexYPos2[foundIndex] - ARRAY_ELEM_HEIGHT,
     );
+    this.cmd("SetMessage", `Insert into slot ${foundIndex}`);
     this.cmd("Step");
     this.cmd("Delete", labID);
     this.cmd("SetText", this.hashTableVisual[foundIndex], elem);
@@ -148,6 +193,7 @@ ClosedHashBucket.prototype.getElemIndex = function (elem) {
     candidateIndex++
   ) {
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
+    this.cmd("SetMessage", `Search bucket slot ${candidateIndex} for element ${elem}`);
     this.cmd("Step");
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 0);
     if (
@@ -167,6 +213,7 @@ ClosedHashBucket.prototype.getElemIndex = function (elem) {
     candidateIndex++
   ) {
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
+    this.cmd("SetMessage", `Search overflow slot ${candidateIndex} for element ${elem}`);
     this.cmd("Step");
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 0);
 
@@ -349,6 +396,5 @@ ClosedHashBucket.prototype.enableUI = function (event) {
 var currentAlg;
 
 function init() {
-  var animManag = initCanvas(canvas);
-  currentAlg = new ClosedHashBucket(animManag, canvas.width, canvas.height);
+  currentAlg = new ClosedHashBucket(canvas);
 }
