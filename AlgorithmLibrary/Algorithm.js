@@ -226,11 +226,10 @@ Algorithm.prototype.isAllDigits = function (str) {
 };
 
 Algorithm.prototype.normalizeNumber = function (input, maxLen) {
-  if (!this.isAllDigits(input) || input == "") {
-    return input;
-  } else {
-    return input; //("OOO0000" + input).substr(-maxLen, maxLen);
+  if(this.isAllDigits(input)) {
+    return Number(input);
   }
+  return input;
 };
 
 Algorithm.prototype.disableUI = function (event) {
