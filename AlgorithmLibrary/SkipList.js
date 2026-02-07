@@ -155,12 +155,21 @@ SkipList.prototype.doInsert = function (v) {
 SkipList.prototype.doFindValue = function (v) {
   this.implementAction(this.findElement.bind(this), v);
 };
+// Alias for consistency with other algorithms
+SkipList.prototype.doFind = function (v) {
+  this.implementAction(this.findElement.bind(this), v);
+};
 SkipList.prototype.doRemove = function (v) {
   this.implementAction(this.removeElement.bind(this), v);
 };
-SkipList.prototype.doInsertRandom = function () {
-  const v = Math.floor(Math.random() * 100);
-  this.implementAction(this.insertElement.bind(this), v);
+SkipList.prototype.doInsertRandom = function (count = 10, maxValue = 999) {
+  for (let i = 0; i < count; i++) {
+    const v = Math.floor(1 + Math.random() * maxValue);
+    this.implementAction(this.insertElement.bind(this), v);
+    this.animationManager.skipForward();
+  }
+  this.animationManager.clearHistory();
+  this.animationManager.animatedObjects.draw();
 };
 SkipList.prototype.doClear = function () {
   this.implementAction(this.clearAll.bind(this), 0);
@@ -505,6 +514,35 @@ SkipList.prototype.insertElement = function (value) {
   this.cmd("Step");
   this.cmd("SetMessage", "");
   return this.commands;
+};
+
+// Disable/enable algorithm-specific UI during animations
+SkipList.prototype.disableUI = function () {
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.findButton,
+    this.deleteButton,
+    this.clearButton,
+    this.insertRandomButton,
+  ];
+  for (const el of ctrls) {
+    if (el) el.disabled = true;
+  }
+};
+
+SkipList.prototype.enableUI = function () {
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.findButton,
+    this.deleteButton,
+    this.clearButton,
+    this.insertRandomButton,
+  ];
+  for (const el of ctrls) {
+    if (el) el.disabled = false;
+  }
 };
 
 SkipList.prototype.findElement = function (value) {

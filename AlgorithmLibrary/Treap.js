@@ -40,7 +40,7 @@ Treap.FOREGROUND_COLOR = "var(--svgColor)";
 Treap.LINK_COLOR = Treap.FOREGROUND_COLOR;
 Treap.HIGHLIGHT_CIRCLE_COLOR = Treap.FOREGROUND_COLOR;
 Treap.PRIORITY_LABEL_COLOR = Treap.FOREGROUND_COLOR;
-Treap.STARTING_Y = 20;
+Treap.STARTING_Y = 40;
 Treap.WIDTH_DELTA = 30;
 Treap.HEIGHT_DELTA = 50;
 // Priority label styling & placement
@@ -62,7 +62,7 @@ Treap.prototype.init = function (am, w, h) {
   var fn = sc.init;
   fn.call(this, am, w, h);
 
-  this.startingX = 200;
+  this.startingX = 150;
   this.nextIndex = 0;
   this.commands = [];
   this.rootIndex = 0;
@@ -80,6 +80,7 @@ Treap.prototype.init = function (am, w, h) {
   this.doInsert = (val) => this.implementAction(this.insertElement.bind(this), val);
   this.doRemove = (val) => this.implementAction(this.deleteElement.bind(this), val);
   this.doFind = (val) => this.implementAction(this.findElement.bind(this), val);
+  this.doClear = () => this.implementAction(this.clearData.bind(this), "");
   this.doInsertRandom = (count = 10, maxValue = 999) => {
     for (let i = 0; i < count; i++) {
       const insertedValue = Math.floor(1 + Math.random() * maxValue);
@@ -541,4 +542,33 @@ Treap.prototype.resizeWidths = function (tree) {
   tree.leftWidth = Math.max(this.resizeWidths(tree.left), Treap.WIDTH_DELTA / 2);
   tree.rightWidth = Math.max(this.resizeWidths(tree.right), Treap.WIDTH_DELTA / 2);
   return tree.leftWidth + tree.rightWidth;
+};
+
+// Disable/enable algorithm-specific UI during animations
+Treap.prototype.disableUI = function () {
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.deleteButton,
+    this.findButton,
+    this.clearButton,
+    this.insertRandomButton,
+  ];
+  for (const el of ctrls) {
+    if (el) el.disabled = true;
+  }
+};
+
+Treap.prototype.enableUI = function () {
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.deleteButton,
+    this.findButton,
+    this.clearButton,
+    this.insertRandomButton,
+  ];
+  for (const el of ctrls) {
+    if (el) el.disabled = false;
+  }
 };
