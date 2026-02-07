@@ -3406,11 +3406,10 @@ Algorithm.prototype.isAllDigits = function(str) {
   return true;
 };
 Algorithm.prototype.normalizeNumber = function(input, maxLen) {
-  if (!this.isAllDigits(input) || input == "") {
-    return input;
-  } else {
-    return input;
+  if (this.isAllDigits(input)) {
+    return Number(input);
   }
+  return input;
 };
 Algorithm.prototype.disableUI = function(event) {
 };
@@ -21857,7 +21856,7 @@ Treap.FOREGROUND_COLOR = "var(--svgColor)";
 Treap.LINK_COLOR = Treap.FOREGROUND_COLOR;
 Treap.HIGHLIGHT_CIRCLE_COLOR = Treap.FOREGROUND_COLOR;
 Treap.PRIORITY_LABEL_COLOR = Treap.FOREGROUND_COLOR;
-Treap.STARTING_Y = 20;
+Treap.STARTING_Y = 40;
 Treap.WIDTH_DELTA = 30;
 Treap.HEIGHT_DELTA = 50;
 Treap.PRIORITY_FONT_PERCENT = 85;
@@ -21874,7 +21873,7 @@ Treap.prototype.init = function(am, w2, h) {
   var sc = Treap.superclass;
   var fn = sc.init;
   fn.call(this, am, w2, h);
-  this.startingX = 200;
+  this.startingX = 150;
   this.nextIndex = 0;
   this.commands = [];
   this.rootIndex = 0;
@@ -21888,6 +21887,7 @@ Treap.prototype.init = function(am, w2, h) {
   this.doInsert = (val) => this.implementAction(this.insertElement.bind(this), val);
   this.doRemove = (val) => this.implementAction(this.deleteElement.bind(this), val);
   this.doFind = (val) => this.implementAction(this.findElement.bind(this), val);
+  this.doClear = () => this.implementAction(this.clearData.bind(this), "");
   this.doInsertRandom = (count = 10, maxValue = 999) => {
     for (let i = 0; i < count; i++) {
       const insertedValue = Math.floor(1 + Math.random() * maxValue);
@@ -22313,6 +22313,34 @@ Treap.prototype.resizeWidths = function(tree) {
   tree.leftWidth = Math.max(this.resizeWidths(tree.left), Treap.WIDTH_DELTA / 2);
   tree.rightWidth = Math.max(this.resizeWidths(tree.right), Treap.WIDTH_DELTA / 2);
   return tree.leftWidth + tree.rightWidth;
+};
+Treap.prototype.disableUI = function() {
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.deleteButton,
+    this.findButton,
+    this.clearButton,
+    this.insertRandomButton
+  ];
+  for (const el of ctrls) {
+    if (el)
+      el.disabled = true;
+  }
+};
+Treap.prototype.enableUI = function() {
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.deleteButton,
+    this.findButton,
+    this.clearButton,
+    this.insertRandomButton
+  ];
+  for (const el of ctrls) {
+    if (el)
+      el.disabled = false;
+  }
 };
 
 // AlgorithmLibrary/StackArray.js
@@ -23757,12 +23785,20 @@ SkipList.prototype.doInsert = function(v) {
 SkipList.prototype.doFindValue = function(v) {
   this.implementAction(this.findElement.bind(this), v);
 };
+SkipList.prototype.doFind = function(v) {
+  this.implementAction(this.findElement.bind(this), v);
+};
 SkipList.prototype.doRemove = function(v) {
   this.implementAction(this.removeElement.bind(this), v);
 };
-SkipList.prototype.doInsertRandom = function() {
-  const v = Math.floor(Math.random() * 100);
-  this.implementAction(this.insertElement.bind(this), v);
+SkipList.prototype.doInsertRandom = function(count = 10, maxValue = 999) {
+  for (let i = 0; i < count; i++) {
+    const v = Math.floor(1 + Math.random() * maxValue);
+    this.implementAction(this.insertElement.bind(this), v);
+    this.animationManager.skipForward();
+  }
+  this.animationManager.clearHistory();
+  this.animationManager.animatedObjects.draw();
 };
 SkipList.prototype.doClear = function() {
   this.implementAction(this.clearAll.bind(this), 0);
@@ -24039,6 +24075,34 @@ SkipList.prototype.insertElement = function(value) {
   this.cmd("Step");
   this.cmd("SetMessage", "");
   return this.commands;
+};
+SkipList.prototype.disableUI = function() {
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.findButton,
+    this.deleteButton,
+    this.clearButton,
+    this.insertRandomButton
+  ];
+  for (const el of ctrls) {
+    if (el)
+      el.disabled = true;
+  }
+};
+SkipList.prototype.enableUI = function() {
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.findButton,
+    this.deleteButton,
+    this.clearButton,
+    this.insertRandomButton
+  ];
+  for (const el of ctrls) {
+    if (el)
+      el.disabled = false;
+  }
 };
 SkipList.prototype.findElement = function(value) {
   this.commands = [];
