@@ -2603,12 +2603,18 @@ function makeSVG(centered, viewWidth = 800, viewHeight = 400) {
         <path fill="var(--svgColor--highlight)" d="M 0 0 L 10 5 L 0 10 z"></path>
       </marker>
       <style>
-        :root {
-          --svgFillColor: rgba(255,255,255,0);
-          --svgColor: #111111;
-          --svgColor--highlight: #FF5733;
-          font-family: sans-serif;
-        }
+      // :root {
+      //   --svgColor: var(rgb(0,0,0);
+      //   --svgColor--red: rgb(231, 36, 36);
+      //   --svgColor--redback: rgb(255, 233, 233);
+      //   --svgColor--black: rgb(0, 0 ,0);
+      //   --svgColor--blackback: rgb(227, 227, 227);
+      //   --svgColor--highlight: rgb(33, 139, 33);
+      //   --svgColor--althighlight: rgb(52, 133, 198);
+      //   --svgFillColor: white;
+      //   --controlBackground: #f0f8ff;
+      //   font-family: sans-serif;
+      // }
       </style>
     </defs>
     <g id="allElements">
@@ -2678,6 +2684,18 @@ function ObjectManager(canvas2, centered = false) {
     vb[1] = vb[1] + centerFactorY;
     vb[2] = nextVbW;
     vb[3] = nextVbH;
+    this.svg.setAttribute("viewBox", vb.join(" "));
+  };
+  this.shiftView = function(deltaX = 0, deltaY = 0) {
+    const dx = Number(deltaX);
+    const dy = Number(deltaY);
+    if (!Number.isFinite(dx) || !Number.isFinite(dy))
+      return;
+    const vb = this.svg.getAttribute("viewBox").split(" ").map(parseFloat);
+    if (vb.length < 4 || vb.some((v) => !Number.isFinite(v)))
+      return;
+    vb[0] += dx;
+    vb[1] += dy;
     this.svg.setAttribute("viewBox", vb.join(" "));
   };
   this.cssStyle = window.getComputedStyle(canvas2);
@@ -2863,8 +2881,18 @@ function ObjectManager(canvas2, centered = false) {
       if (svgElement && svgElement.parentNode) {
         svgElement.parentNode.removeChild(svgElement);
       }
+      let secondaryTextElement = null;
+      if (this.Nodes[objectID] && this.Nodes[objectID].svgText && this.Nodes[objectID].svgText !== svgElement) {
+        secondaryTextElement = this.Nodes[objectID].svgText;
+        if (secondaryTextElement.parentNode) {
+          secondaryTextElement.parentNode.removeChild(secondaryTextElement);
+        }
+      }
       if (svgElement) {
         this.svg.getElementById(`layer_${layer}`).appendChild(svgElement);
+        if (secondaryTextElement) {
+          svgElement.after(secondaryTextElement);
+        }
       }
       this.Nodes[objectID].draw(this.ctx);
       if (this.Edges.has(objectID)) {
@@ -3397,6 +3425,11 @@ Algorithm.prototype.implementAction = function(funct, val) {
   var retVal = funct(val);
   this.animationManager.StartNewAnimation(retVal);
 };
+Algorithm.prototype.shift = function(deltaX, deltaY) {
+  if (this.animationManager && this.animationManager.shift) {
+    this.animationManager.shift(deltaX, deltaY);
+  }
+};
 Algorithm.prototype.isAllDigits = function(str) {
   for (var i = str.length - 1; i >= 0; i--) {
     if (str.charAt(i) < "0" || str.charAt(i) > "9") {
@@ -3531,6 +3564,25 @@ var ltiResizeListenerInstalled = false;
 var zoomHoverTrackingInstalled = false;
 var pendingZoomFocusClient = null;
 var lastHoverClient = null;
+var BASE_ZOOM_COOKIE_NAME = "VisualizationZoom";
+var zoomCookieName = BASE_ZOOM_COOKIE_NAME;
+function sanitizeCookieToken(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  const cleaned = raw.replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
+  return cleaned || "default";
+}
+function deriveZoomCookieName(title, opts = null) {
+  const explicitScope = opts && typeof opts.zoomCookieScope === "string" ? opts.zoomCookieScope : null;
+  if (explicitScope && explicitScope.trim() !== "") {
+    return `${BASE_ZOOM_COOKIE_NAME}_${sanitizeCookieToken(explicitScope)}`;
+  }
+  const path = typeof window !== "undefined" && window.location && window.location.pathname || "";
+  const lastSegment = path.split("/").filter(Boolean).pop() || "index";
+  const pageToken = lastSegment.replace(/\.[^.]+$/, "");
+  const fallbackTitle = title && String(title).trim() !== "" ? String(title) : "animation";
+  const scope = pageToken || fallbackTitle;
+  return `${BASE_ZOOM_COOKIE_NAME}_${sanitizeCookieToken(scope)}`;
+}
 function installZoomHoverTracking(targetEl) {
   if (zoomHoverTrackingInstalled)
     return;
@@ -3544,13 +3596,15 @@ function installLTIResizer() {
   if (ltiResizeListenerInstalled)
     return;
   ltiResizeListenerInstalled = true;
-  window.addEventListener("resize", () => {
+  let requestSizeChangeForLTI = function() {
     if (!window.frameElement)
       return;
-    const height = window.innerWidth > 500 ? "100%" : "600px";
+    const height = window.innerWidth > 600 ? "100%" : "600px";
     const data = { subject: "lti.frameResize", message_id: window.frameElement.id, height };
     window.parent.postMessage(data, "*");
-  });
+  };
+  window.addEventListener("resize", requestSizeChangeForLTI);
+  requestSizeChangeForLTI();
 }
 function getZoomSelect() {
   return document.getElementById("zoomLevel");
@@ -3691,7 +3745,7 @@ function makeDiv(id, classes, parent) {
   parent.appendChild(element);
   return element;
 }
-function addGeneralControls(objectManager2, targetElement, title, opts2 = null) {
+function addGeneralControls(objectManager2, targetElement, title, opts = null) {
   if (targetElement == null) {
     targetElement = document.body;
   }
@@ -3731,7 +3785,7 @@ function addGeneralControls(objectManager2, targetElement, title, opts2 = null) 
     <option value="Medium">Medium</option>
     <option value="Fast">Fast</option>
     <option value="Max">Max</option>`;
-  const optsLabel = opts2 ? normalizeSpeedLabel(opts2.speed) : null;
+  const optsLabel = opts ? normalizeSpeedLabel(opts.speed) : null;
   const initialLabel = optsLabel ?? "Off";
   speedSelect.value = initialLabel;
   speedChange(initialLabel);
@@ -3739,7 +3793,11 @@ function addGeneralControls(objectManager2, targetElement, title, opts2 = null) 
     speedChange(e.target.value);
   });
   addControlTo(speedSelect, controlBar, "Auto Step Speed");
-  var zoom = getCookie("VisualizationZoom");
+  zoomCookieName = deriveZoomCookieName(title, opts);
+  var zoom = getCookie(zoomCookieName);
+  if (zoom == void 0 || zoom === null || zoom === "") {
+    zoom = getCookie(BASE_ZOOM_COOKIE_NAME);
+  }
   {
     let parsed = parseFloat(zoom);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -3768,7 +3826,7 @@ function addGeneralControls(objectManager2, targetElement, title, opts2 = null) 
     <option value="2" ${zoom == 2 ? "selected" : ""}>2x</option>
     <option value="1.3333333333" ${zoom == 1.3333333333 ? "selected" : ""}>3x</option>`;
   zoomSelect.addEventListener("change", (e) => {
-    setCookie("VisualizationZoom", e.target.value);
+    setCookie(zoomCookieName, e.target.value);
     let focus = pendingZoomFocusClient;
     pendingZoomFocusClient = null;
     if (!focus && lastHoverClient && objectManager2 && objectManager2.svg) {
@@ -3825,7 +3883,7 @@ function applyAutoZoomForMinVisibleWidth(minVisibleWorldWidth) {
       zoomSelect.value = String(chosenZoom);
     }
   }
-  setCookie("VisualizationZoom", chosenZoom);
+  setCookie(zoomCookieName, chosenZoom);
   objectManager.setZoom(chosenZoom);
 }
 function installKeyboardStepControls() {
@@ -3933,36 +3991,36 @@ function installPinchZoomControls(targetEl) {
     { passive: true }
   );
 }
-function initAnimationManager(opts2) {
-  let canvas2 = opts2.canvas || document.createElement("canvas");
-  let targetElement = opts2.target || null;
-  let centered = opts2.centered || false;
-  let am = initCanvas2(canvas2, targetElement, opts2.title, centered, opts2);
-  if (opts2.zoom) {
-    am.setZoom(opts2.zoom);
+function initAnimationManager(opts) {
+  let canvas2 = opts.canvas || document.createElement("canvas");
+  let targetElement = opts.target || null;
+  let centered = opts.centered || false;
+  let am = initCanvas2(canvas2, targetElement, opts.title, centered, opts);
+  if (opts.zoom) {
+    am.setZoom(opts.zoom);
   }
-  let desiredHeight = opts2.height || 350;
-  if (opts2.singleMode) {
+  let desiredHeight = opts.height || 350;
+  if (opts.singleMode) {
     am.setSingleMode(true);
-    desiredHeight = opts2.heightSingleMode;
+    desiredHeight = opts.heightSingleMode;
   }
   if (innerWidth < 450) {
-    if (opts2.singleMode)
-      desiredHeight = opts2.heightMobileSingle || opts2.heightMobile || 400;
+    if (opts.singleMode)
+      desiredHeight = opts.heightMobileSingle || opts.heightMobile || 400;
     else
-      desiredHeight = opts2.heightMobile || 400;
+      desiredHeight = opts.heightMobile || 400;
   }
   am.requestHeight(desiredHeight);
   return am;
 }
-function initCanvas2(canvas2, targetElement = null, title = "", centered = false, opts2 = null) {
+function initCanvas2(canvas2, targetElement = null, title = "", centered = false, opts = null) {
   let link = document.createElement("link");
   link.rel = "stylesheet";
   let curURL = import.meta.url;
   link.href = curURL.slice(0, curURL.lastIndexOf("/")) + "/entry.css";
   document.head.appendChild(link);
-  const desiredViewWidth = opts2 && Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : opts2 && Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 800;
-  const desiredViewHeight = opts2 && Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : opts2 && Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 400;
+  const desiredViewWidth = opts && Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : opts && Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 800;
+  const desiredViewHeight = opts && Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : opts && Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 400;
   if (!Number.isFinite(canvas2.width) || canvas2.width <= 0) {
     canvas2.width = desiredViewWidth;
   }
@@ -3973,7 +4031,7 @@ function initCanvas2(canvas2, targetElement = null, title = "", centered = false
   canvas2.style.height = canvas2.height + "px";
   objectManager = new ObjectManager(canvas2, centered);
   animationManager = new AnimationManager(objectManager, canvas2);
-  addGeneralControls(objectManager, targetElement, title, opts2);
+  addGeneralControls(objectManager, targetElement, title, opts);
   var controlBar = document.getElementById("algoControlSection");
   controlBar.after(objectManager.svg);
   requestAnimationFrame(() => applyAutoZoomForMinVisibleWidth(800));
@@ -4046,14 +4104,17 @@ function AnimationManager(objectManager2, canvas2) {
   };
   this.setZoom = function(newZoom) {
     let zoomSelect = document.getElementById("zoomLevel");
-    let opts2 = zoomSelect.options;
-    for (let o of opts2) {
+    let opts = zoomSelect.options;
+    for (let o of opts) {
       if (o.innerText == newZoom) {
         o.selected = true;
         objectManager2.setZoom(o.value);
         break;
       }
     }
+  };
+  this.shift = function(deltaX = 0, deltaY = 0) {
+    this.animatedObjects.shiftView(deltaX, deltaY);
   };
   this.parseBool = function(str) {
     var uppercase = str.toUpperCase();
@@ -4287,12 +4348,15 @@ function AnimationManager(objectManager2, canvas2) {
         undoBlock.push(new UndoSetBackgroundColor(id, oldColor));
       } else if (nextCommand[0].toUpperCase() == "SETHIGHLIGHT") {
         var newHighlight = this.parseBool(nextCommand[2]);
+        var oldHighlight = this.animatedObjects.getHighlight(
+          parseInt(nextCommand[1])
+        );
         this.animatedObjects.setHighlight(
           parseInt(nextCommand[1]),
           newHighlight
         );
         undoBlock.push(
-          new UndoHighlight(parseInt(nextCommand[1]), !newHighlight)
+          new UndoHighlight(parseInt(nextCommand[1]), oldHighlight)
         );
       } else if (nextCommand[0].toUpperCase() == "DISCONNECT") {
         var undoConnect = this.animatedObjects.disconnect(
@@ -4903,6 +4967,22 @@ function AnimationManager(objectManager2, canvas2) {
     this.scrubSlider.max = String(this.totalBlocks);
     this.scrubSlider.value = String(Math.max(0, Math.min(this.currentBlockIndex, this.totalBlocks)));
   };
+  this.finishCurrentBlockInstantly = function() {
+    if (!this.currentBlock || this.currentBlock.length === 0)
+      return;
+    for (var i = 0; i < this.currentBlock.length; i++) {
+      var objectID = this.currentBlock[i].objectID;
+      this.animatedObjects.setNodePosition(
+        objectID,
+        this.currentBlock[i].toX,
+        this.currentBlock[i].toY
+      );
+    }
+    this.currFrame = this.animationBlockLength;
+    this.currentBlock = [];
+    this.animatedObjects.update();
+    this.animatedObjects.draw();
+  };
   this.scrubToBlock = function(targetBlockIndex) {
     if (!Number.isFinite(targetBlockIndex))
       return;
@@ -4911,16 +4991,32 @@ function AnimationManager(objectManager2, canvas2) {
       return;
     clearTimeout(timer);
     this.animationPaused = true;
+    if (this.currentlyAnimating) {
+      this.finishCurrentBlockInstantly();
+    }
+    this.currentlyAnimating = false;
+    this.doingUndo = false;
     if (targetBlockIndex === this.currentBlockIndex) {
+      this.awaitingStep = targetBlockIndex < this.totalBlocks;
       this.updateScrubUI();
+      this.fireEvent(this.awaitingStep ? "AnimationWaiting" : "AnimationEnded", "NoData");
       return;
     }
     if (targetBlockIndex < this.currentBlockIndex) {
       while (this.currentBlockIndex > targetBlockIndex && this.undoAnimationStepIndices && this.undoAnimationStepIndices.length > 0) {
         this.undoLastBlock();
+        for (var i = 0; this.currentBlock != null && i < this.currentBlock.length; i++) {
+          var objectID = this.currentBlock[i].objectID;
+          this.animatedObjects.setNodePosition(
+            objectID,
+            this.currentBlock[i].toX,
+            this.currentBlock[i].toY
+          );
+        }
         const undoBlock = this.undoStack.pop();
         if (undoBlock) {
           this.finishUndoBlock(undoBlock);
+          this.currentBlock = [];
         } else {
           break;
         }
@@ -4928,31 +5024,21 @@ function AnimationManager(objectManager2, canvas2) {
       this.updateScrubUI();
       this.animatedObjects.update();
       this.animatedObjects.draw();
+      this.currentlyAnimating = false;
+      this.doingUndo = false;
+      this.awaitingStep = targetBlockIndex < this.totalBlocks;
+      this.fireEvent(this.awaitingStep ? "AnimationWaiting" : "AnimationEnded", "NoData");
       return;
     }
     while (this.currentBlockIndex < targetBlockIndex && this.currentAnimation < this.AnimationSteps.length) {
       this.startNextBlock();
-      this.currFrame = this.animationBlockLength;
-      for (var i = 0; i < (this.currentBlock ? this.currentBlock.length : 0); i++) {
-        var objectID = this.currentBlock[i].objectID;
-        this.animatedObjects.setNodePosition(
-          objectID,
-          this.currentBlock[i].toX,
-          this.currentBlock[i].toY
-        );
-      }
-      this.currentBlock = [];
-      this.animatedObjects.update();
-      this.animatedObjects.draw();
+      this.finishCurrentBlockInstantly();
     }
     this.updateScrubUI();
-    if (targetBlockIndex === this.totalBlocks) {
-      if (this.awaitingStep) {
-        this.step();
-      } else if (this.currentlyAnimating) {
-        this.skipForward();
-      }
-    }
+    this.currentlyAnimating = false;
+    this.doingUndo = false;
+    this.awaitingStep = targetBlockIndex < this.totalBlocks;
+    this.fireEvent(this.awaitingStep ? "AnimationWaiting" : "AnimationEnded", "NoData");
   };
 }
 AnimationManager.prototype = new EventListener();
@@ -4971,19 +5057,19 @@ function SingleAnimation(id, fromX, fromY, toX, toY) {
 }
 
 // AlgorithmLibrary/AVL.js
-function AVL(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "AVL Tree";
-  opts2.centered = true;
-  opts2.heightSingleMode = 250;
-  opts2.height = 350;
-  opts2.heightMobile = 450;
-  opts2.heightMobileSingle = 350;
-  let am = initAnimationManager(opts2);
+function AVL(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "AVL Tree";
+  opts.centered = true;
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
   this.addControls();
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -6214,12 +6300,754 @@ AVLNode.prototype.isLeftChild = function() {
   return this.parent.left == this;
 };
 
+// node_modules/random/dist/index.js
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+var RNG = class {
+};
+var FunctionRNG = class _FunctionRNG extends RNG {
+  constructor(rngFn) {
+    var _a;
+    super();
+    __publicField(this, "_name");
+    __publicField(this, "_rngFn");
+    this._name = (_a = rngFn.name) != null ? _a : "function";
+    this._rngFn = rngFn;
+  }
+  get name() {
+    return this._name;
+  }
+  next() {
+    return this._rngFn();
+  }
+  clone() {
+    return new _FunctionRNG(this._rngFn);
+  }
+};
+function createRNG(seedOrRNG) {
+  switch (typeof seedOrRNG) {
+    case "object":
+      if (seedOrRNG instanceof RNG) {
+        return seedOrRNG;
+      }
+      break;
+    case "function":
+      return new FunctionRNG(seedOrRNG);
+    default:
+      return new ARC4RNG(seedOrRNG);
+  }
+  throw new Error(`invalid RNG seed or instance "${seedOrRNG}"`);
+}
+function mixKey(seed, key) {
+  var _a;
+  const seedStr = `${seed}`;
+  let smear = 0;
+  let j = 0;
+  while (j < seedStr.length) {
+    key[255 & j] = 255 & (smear ^= ((_a = key[255 & j]) != null ? _a : 0) * 19) + seedStr.charCodeAt(j++);
+  }
+  if (!key.length) {
+    return [0];
+  }
+  return key;
+}
+function shuffleInPlace(gen, array) {
+  for (let i = array.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(gen.next() * (i + 1));
+    const tmp = array[i];
+    array[i] = array[j];
+    array[j] = tmp;
+  }
+}
+function sparseFisherYates(gen, array, k) {
+  var _a, _b;
+  const H = /* @__PURE__ */ new Map();
+  const lastIndex = array.length - 1;
+  const result = Array.from({ length: k });
+  for (let i = 0; i < k; i++) {
+    const remaining = lastIndex - i + 1;
+    const r = Math.floor(gen.next() * remaining);
+    result[i] = array[(_a = H.get(r)) != null ? _a : r];
+    H.set(r, (_b = H.get(lastIndex - i)) != null ? _b : lastIndex - i);
+  }
+  return result;
+}
+var _arc4_startdenom = 281474976710656;
+var _arc4_significance = 4503599627370496;
+var _arc4_overflow = 9007199254740992;
+var ARC4RNG = class _ARC4RNG extends RNG {
+  constructor(seed = crypto.randomUUID()) {
+    super();
+    __publicField(this, "_seed");
+    __publicField(this, "i");
+    __publicField(this, "j");
+    __publicField(this, "S");
+    this._seed = seed;
+    const key = mixKey(seed, []);
+    const S = [];
+    const keylen = key.length;
+    this.i = 0;
+    this.j = 0;
+    this.S = S;
+    let i = 0;
+    while (i <= 255) {
+      S[i] = i++;
+    }
+    for (let i2 = 0, j = 0; i2 <= 255; i2++) {
+      const t = S[i2];
+      j = 255 & j + key[i2 % keylen] + t;
+      S[i2] = S[j];
+      S[j] = t;
+    }
+    this.g(256);
+  }
+  get name() {
+    return "arc4";
+  }
+  next() {
+    let n = this.g(6);
+    let d = _arc4_startdenom;
+    let x = 0;
+    while (n < _arc4_significance) {
+      n = (n + x) * 256;
+      d *= 256;
+      x = this.g(1);
+    }
+    while (n >= _arc4_overflow) {
+      n /= 2;
+      d /= 2;
+      x >>>= 1;
+    }
+    return (n + x) / d;
+  }
+  g(count) {
+    const { S } = this;
+    let { i, j } = this;
+    let r = 0;
+    while (count--) {
+      i = 255 & i + 1;
+      const t = S[i];
+      S[j] = t;
+      j = 255 & j + t;
+      S[i] = S[j];
+      r = r * 256 + S[255 & S[i] + t];
+    }
+    this.i = i;
+    this.j = j;
+    return r;
+  }
+  clone() {
+    return new _ARC4RNG(this._seed);
+  }
+};
+var MathRandomRNG = class _MathRandomRNG extends RNG {
+  get name() {
+    return "Math.random";
+  }
+  next() {
+    return Math.random();
+  }
+  clone() {
+    return new _MathRandomRNG();
+  }
+};
+function numberValidator(num) {
+  return new NumberValidator(num);
+}
+var NumberValidator = class {
+  constructor(num) {
+    __publicField(this, "n");
+    __publicField(this, "isInt", () => {
+      if (Number.isInteger(this.n)) {
+        return this;
+      }
+      throw new Error(`Expected number to be an integer, got ${this.n}`);
+    });
+    __publicField(this, "isPositive", () => {
+      if (this.n > 0) {
+        return this;
+      }
+      throw new Error(`Expected number to be positive, got ${this.n}`);
+    });
+    __publicField(this, "lessThan", (v) => {
+      if (this.n < v) {
+        return this;
+      }
+      throw new Error(`Expected number to be less than ${v}, got ${this.n}`);
+    });
+    __publicField(this, "lessThanOrEqual", (v) => {
+      if (this.n <= v) {
+        return this;
+      }
+      throw new Error(
+        `Expected number to be less than or equal to ${v}, got ${this.n}`
+      );
+    });
+    __publicField(this, "greaterThanOrEqual", (v) => {
+      if (this.n >= v) {
+        return this;
+      }
+      throw new Error(
+        `Expected number to be greater than or equal to ${v}, got ${this.n}`
+      );
+    });
+    __publicField(this, "greaterThan", (v) => {
+      if (this.n > v) {
+        return this;
+      }
+      throw new Error(`Expected number to be greater than ${v}, got ${this.n}`);
+    });
+    this.n = num;
+  }
+};
+function bates(random, n = 1) {
+  numberValidator(n).isInt().isPositive();
+  const irwinHall2 = random.irwinHall(n);
+  return () => {
+    return irwinHall2() / n;
+  };
+}
+function bernoulli(random, p = 0.5) {
+  numberValidator(p).greaterThanOrEqual(0).lessThanOrEqual(1);
+  return () => {
+    return Math.min(1, Math.floor(random.next() + p));
+  };
+}
+function binomial(random, n = 1, p = 0.5) {
+  numberValidator(n).isInt().isPositive();
+  numberValidator(p).greaterThanOrEqual(0).lessThan(1);
+  return () => {
+    let i = 0;
+    let x = 0;
+    while (i++ < n) {
+      if (random.next() < p) {
+        x++;
+      }
+    }
+    return x;
+  };
+}
+function exponential(random, lambda = 1) {
+  numberValidator(lambda).isPositive();
+  return () => {
+    return -Math.log(1 - random.next()) / lambda;
+  };
+}
+function geometric(random, p = 0.5) {
+  numberValidator(p).greaterThan(0).lessThan(1);
+  const invLogP = 1 / Math.log(1 - p);
+  return () => {
+    return Math.floor(1 + Math.log(random.next()) * invLogP);
+  };
+}
+function irwinHall(random, n = 1) {
+  numberValidator(n).isInt().greaterThanOrEqual(0);
+  return () => {
+    let sum = 0;
+    for (let i = 0; i < n; ++i) {
+      sum += random.next();
+    }
+    return sum;
+  };
+}
+function logNormal(random, mu = 0, sigma = 1) {
+  const normal2 = random.normal(mu, sigma);
+  return () => {
+    return Math.exp(normal2());
+  };
+}
+function normal(random, mu = 0, sigma = 1) {
+  return () => {
+    let x, y, r;
+    do {
+      x = random.next() * 2 - 1;
+      y = random.next() * 2 - 1;
+      r = x * x + y * y;
+    } while (!r || r > 1);
+    return mu + sigma * y * Math.sqrt(-2 * Math.log(r) / r);
+  };
+}
+function pareto(random, alpha = 1) {
+  numberValidator(alpha).greaterThanOrEqual(0);
+  const invAlpha = 1 / alpha;
+  return () => {
+    return 1 / Math.pow(1 - random.next(), invAlpha);
+  };
+}
+var logFactorialTable = [
+  0,
+  0,
+  0.6931471805599453,
+  1.791759469228055,
+  3.1780538303479458,
+  4.787491742782046,
+  6.579251212010101,
+  8.525161361065415,
+  10.60460290274525,
+  12.801827480081469
+];
+var logFactorial = (k) => {
+  return logFactorialTable[k];
+};
+var logSqrt2PI = 0.9189385332046727;
+function poisson(random, lambda = 1) {
+  numberValidator(lambda).isPositive();
+  if (lambda < 10) {
+    const expMean = Math.exp(-lambda);
+    return () => {
+      let p = expMean;
+      let x = 0;
+      let u = random.next();
+      while (u > p) {
+        u = u - p;
+        p = lambda * p / ++x;
+      }
+      return x;
+    };
+  } else {
+    const smu = Math.sqrt(lambda);
+    const b = 0.931 + 2.53 * smu;
+    const a = -0.059 + 0.02483 * b;
+    const invAlpha = 1.1239 + 1.1328 / (b - 3.4);
+    const vR = 0.9277 - 3.6224 / (b - 2);
+    return () => {
+      var _a;
+      while (true) {
+        let u;
+        let v = random.next();
+        if (v <= 0.86 * vR) {
+          u = v / vR - 0.43;
+          return Math.floor(
+            (2 * a / (0.5 - Math.abs(u)) + b) * u + lambda + 0.445
+          );
+        }
+        if (v >= vR) {
+          u = random.next() - 0.5;
+        } else {
+          u = v / vR - 0.93;
+          u = (u < 0 ? -0.5 : 0.5) - u;
+          v = random.next() * vR;
+        }
+        const us = 0.5 - Math.abs(u);
+        if (us < 0.013 && v > us) {
+          continue;
+        }
+        const k = Math.floor((2 * a / us + b) * u + lambda + 0.445);
+        v = v * invAlpha / (a / (us * us) + b);
+        if (k >= 10) {
+          const t = (k + 0.5) * Math.log(lambda / k) - lambda - logSqrt2PI + k - (1 / 12 - (1 / 360 - 1 / (1260 * k * k)) / (k * k)) / k;
+          if (Math.log(v * smu) <= t) {
+            return k;
+          }
+        } else if (k >= 0) {
+          const f = (_a = logFactorial(k)) != null ? _a : 0;
+          if (Math.log(v) <= k * Math.log(lambda) - lambda - f) {
+            return k;
+          }
+        }
+      }
+    };
+  }
+}
+function uniform(random, min = 0, max = 1) {
+  return () => {
+    return random.next() * (max - min) + min;
+  };
+}
+function uniformBoolean(random) {
+  return () => {
+    return random.next() >= 0.5;
+  };
+}
+function uniformInt(random, min = 0, max = 1) {
+  if (max === void 0) {
+    max = min === void 0 ? 1 : min;
+    min = 0;
+  }
+  numberValidator(min).isInt();
+  numberValidator(max).isInt();
+  return () => {
+    return Math.floor(random.next() * (max - min + 1) + min);
+  };
+}
+function weibull(random, lambda, k) {
+  numberValidator(lambda).greaterThan(0);
+  numberValidator(k).greaterThan(0);
+  return () => {
+    const u = 1 - random.next();
+    return lambda * Math.pow(-Math.log(u), 1 / k);
+  };
+}
+var Random = class _Random {
+  constructor(seedOrRNG = new MathRandomRNG()) {
+    __publicField(this, "_rng");
+    __publicField(this, "_cache", {});
+    this._rng = createRNG(seedOrRNG);
+  }
+  /**
+   * @member {RNG} rng - Underlying pseudo-random number generator.
+   */
+  get rng() {
+    return this._rng;
+  }
+  /**
+   * Creates a new `Random` instance, optionally specifying parameters to
+   * set a new seed.
+   */
+  clone(seedOrRNG = this.rng.clone()) {
+    return new _Random(seedOrRNG);
+  }
+  /**
+   * Sets the underlying pseudorandom number generator.
+   *
+   * @example
+   * ```ts
+   * import random from 'random'
+   *
+   * random.use('example-seed')
+   * // or
+   * random.use(Math.random)
+   * ```
+   */
+  use(seedOrRNG) {
+    this._rng = createRNG(seedOrRNG);
+    this._cache = {};
+  }
+  // --------------------------------------------------------------------------
+  // Uniform utility functions
+  // --------------------------------------------------------------------------
+  /**
+   * Convenience wrapper around `this.rng.next()`
+   *
+   * Returns a floating point number in [0, 1).
+   *
+   * @return {number}
+   */
+  next() {
+    return this._rng.next();
+  }
+  /**
+   * Samples a uniform random floating point number, optionally specifying
+   * lower and upper bounds.
+   *
+   * Convenience wrapper around `random.uniform()`
+   *
+   * @param {number} [min=0] - Lower bound (float, inclusive)
+   * @param {number} [max=1] - Upper bound (float, exclusive)
+   */
+  float(min, max) {
+    return this.uniform(min, max)();
+  }
+  /**
+   * Samples a uniform random integer, optionally specifying lower and upper
+   * bounds.
+   *
+   * Convenience wrapper around `random.uniformInt()`
+   *
+   * @param {number} [min=0] - Lower bound (integer, inclusive)
+   * @param {number} [max=1] - Upper bound (integer, inclusive)
+   */
+  int(min, max) {
+    return this.uniformInt(min, max)();
+  }
+  /**
+   * Samples a uniform random integer, optionally specifying lower and upper
+   * bounds.
+   *
+   * Convenience wrapper around `random.uniformInt()`
+   *
+   * @alias `random.int`
+   *
+   * @param {number} [min=0] - Lower bound (integer, inclusive)
+   * @param {number} [max=1] - Upper bound (integer, inclusive)
+   */
+  integer(min, max) {
+    return this.uniformInt(min, max)();
+  }
+  /**
+   * Samples a uniform random boolean value.
+   *
+   * Convenience wrapper around `random.uniformBoolean()`
+   *
+   * @alias `random.boolean`
+   */
+  bool() {
+    return this.uniformBoolean()();
+  }
+  /**
+   * Samples a uniform random boolean value.
+   *
+   * Convenience wrapper around `random.uniformBoolean()`
+   */
+  boolean() {
+    return this.uniformBoolean()();
+  }
+  /**
+   * Returns an item chosen uniformly at random from the given array.
+   *
+   * Convenience wrapper around `random.uniformInt()`
+   *
+   * @param {Array<T>} [array] - Input array
+   */
+  choice(array) {
+    if (!Array.isArray(array)) {
+      throw new TypeError(
+        `Random.choice expected input to be an array, got ${typeof array}`
+      );
+    }
+    const length = array.length;
+    if (length > 0) {
+      const index = this.uniformInt(0, length - 1)();
+      return array[index];
+    } else {
+      return void 0;
+    }
+  }
+  /**
+   * Returns a random subset of k items from the given array (without replacement).
+   *
+   * @param {Array<T>} [array] - Input array
+   */
+  sample(array, k) {
+    if (!Array.isArray(array)) {
+      throw new TypeError(
+        `Random.sample expected input to be an array, got ${typeof array}`
+      );
+    }
+    if (k < 0 || k > array.length) {
+      throw new Error(
+        `Random.sample: k must be between 0 and array.length (${array.length}), got ${k}`
+      );
+    }
+    return sparseFisherYates(this.rng, array, k);
+  }
+  /**
+   * Generates a thunk which returns samples of size k from the given array.
+   *
+   * This is for convenience only; there is no gain in efficiency.
+   *
+   * @param {Array<T>} [array] - Input array
+   */
+  sampler(array, k) {
+    if (!Array.isArray(array)) {
+      throw new TypeError(
+        `Random.sampler expected input to be an array, got ${typeof array}`
+      );
+    }
+    if (k < 0 || k > array.length) {
+      throw new Error(
+        `Random.sampler: k must be between 0 and array.length (${array.length}), got ${k}`
+      );
+    }
+    const gen = this.rng;
+    return () => {
+      return sparseFisherYates(gen, array, k);
+    };
+  }
+  /**
+   * Returns a shuffled copy of the given array.
+   *
+   * @param {Array<T>} [array] - Input array
+   */
+  shuffle(array) {
+    if (!Array.isArray(array)) {
+      throw new TypeError(
+        `Random.shuffle expected input to be an array, got ${typeof array}`
+      );
+    }
+    const copy = [...array];
+    shuffleInPlace(this.rng, copy);
+    return copy;
+  }
+  /**
+   * Generates a thunk which returns shuffled copies of the given array.
+   *
+   * @param {Array<T>} [array] - Input array
+   */
+  shuffler(array) {
+    if (!Array.isArray(array)) {
+      throw new TypeError(
+        `Random.shuffler expected input to be an array, got ${typeof array}`
+      );
+    }
+    const gen = this.rng;
+    const copy = [...array];
+    return () => {
+      shuffleInPlace(gen, copy);
+      return [...copy];
+    };
+  }
+  // --------------------------------------------------------------------------
+  // Uniform distributions
+  // --------------------------------------------------------------------------
+  /**
+   * Generates a [Continuous uniform distribution](https://en.wikipedia.org/wiki/Uniform_distribution_(continuous)).
+   *
+   * @param {number} [min=0] - Lower bound (float, inclusive)
+   * @param {number} [max=1] - Upper bound (float, exclusive)
+   */
+  uniform(min, max) {
+    return this._memoize("uniform", uniform, min, max);
+  }
+  /**
+   * Generates a [Discrete uniform distribution](https://en.wikipedia.org/wiki/Discrete_uniform_distribution).
+   *
+   * @param {number} [min=0] - Lower bound (integer, inclusive)
+   * @param {number} [max=1] - Upper bound (integer, inclusive)
+   */
+  uniformInt(min, max) {
+    return this._memoize("uniformInt", uniformInt, min, max);
+  }
+  /**
+   * Generates a [Discrete uniform distribution](https://en.wikipedia.org/wiki/Discrete_uniform_distribution),
+   * with two possible outcomes, `true` or `false.
+   *
+   * This method is analogous to flipping a coin.
+   */
+  uniformBoolean() {
+    return this._memoize("uniformBoolean", uniformBoolean);
+  }
+  // --------------------------------------------------------------------------
+  // Normal distributions
+  // --------------------------------------------------------------------------
+  /**
+   * Generates a [Normal distribution](https://en.wikipedia.org/wiki/Normal_distribution).
+   *
+   * @param {number} [mu=0] - Mean
+   * @param {number} [sigma=1] - Standard deviation
+   */
+  normal(mu, sigma) {
+    return normal(this, mu, sigma);
+  }
+  /**
+   * Generates a [Log-normal distribution](https://en.wikipedia.org/wiki/Log-normal_distribution).
+   *
+   * @param {number} [mu=0] - Mean of underlying normal distribution
+   * @param {number} [sigma=1] - Standard deviation of underlying normal distribution
+   */
+  logNormal(mu, sigma) {
+    return logNormal(this, mu, sigma);
+  }
+  // --------------------------------------------------------------------------
+  // Bernoulli distributions
+  // --------------------------------------------------------------------------
+  /**
+   * Generates a [Bernoulli distribution](https://en.wikipedia.org/wiki/Bernoulli_distribution).
+   *
+   * @param {number} [p=0.5] - Success probability of each trial.
+   */
+  bernoulli(p) {
+    return bernoulli(this, p);
+  }
+  /**
+   * Generates a [Binomial distribution](https://en.wikipedia.org/wiki/Binomial_distribution).
+   *
+   * @param {number} [n=1] - Number of trials.
+   * @param {number} [p=0.5] - Success probability of each trial.
+   */
+  binomial(n, p) {
+    return binomial(this, n, p);
+  }
+  /**
+   * Generates a [Geometric distribution](https://en.wikipedia.org/wiki/Geometric_distribution).
+   *
+   * @param {number} [p=0.5] - Success probability of each trial.
+   */
+  geometric(p) {
+    return geometric(this, p);
+  }
+  // --------------------------------------------------------------------------
+  // Poisson distributions
+  // --------------------------------------------------------------------------
+  /**
+   * Generates a [Poisson distribution](https://en.wikipedia.org/wiki/Poisson_distribution).
+   *
+   * @param {number} [lambda=1] - Mean (lambda > 0)
+   */
+  poisson(lambda) {
+    return poisson(this, lambda);
+  }
+  /**
+   * Generates an [Exponential distribution](https://en.wikipedia.org/wiki/Exponential_distribution).
+   *
+   * @param {number} [lambda=1] - Inverse mean (lambda > 0)
+   */
+  exponential(lambda) {
+    return exponential(this, lambda);
+  }
+  // --------------------------------------------------------------------------
+  // Misc distributions
+  // --------------------------------------------------------------------------
+  /**
+   * Generates an [Irwin Hall distribution](https://en.wikipedia.org/wiki/Irwin%E2%80%93Hall_distribution).
+   *
+   * @param {number} [n=1] - Number of uniform samples to sum (n >= 0)
+   */
+  irwinHall(n) {
+    return irwinHall(this, n);
+  }
+  /**
+   * Generates a [Bates distribution](https://en.wikipedia.org/wiki/Bates_distribution).
+   *
+   * @param {number} [n=1] - Number of uniform samples to average (n >= 1)
+   */
+  bates(n) {
+    return bates(this, n);
+  }
+  /**
+   * Generates a [Pareto distribution](https://en.wikipedia.org/wiki/Pareto_distribution).
+   *
+   * @param {number} [alpha=1] - Alpha
+   */
+  pareto(alpha) {
+    return pareto(this, alpha);
+  }
+  /**
+   * Generates a [Weibull distribution](https://en.wikipedia.org/wiki/Weibull_distribution).
+   *
+   * @param {number} [lambda] - Lambda, the scale parameter
+   * @param {number} [k] - k, the shape parameter
+   */
+  weibull(lambda, k) {
+    return weibull(this, lambda, k);
+  }
+  // --------------------------------------------------------------------------
+  // Internal
+  // --------------------------------------------------------------------------
+  /**
+   * Memoizes distributions to ensure they're only created when necessary.
+   *
+   * Returns a thunk which that returns independent, identically distributed
+   * samples from the specified distribution.
+   *
+   * @internal
+   *
+   * @param {string} label - Name of distribution
+   * @param {function} getter - Function which generates a new distribution
+   * @param {...*} args - Distribution-specific arguments
+   */
+  _memoize(label, getter, ...args) {
+    const key = `${args.join(";")}`;
+    let value = this._cache[label];
+    if (value === void 0 || value.key !== key) {
+      value = {
+        key,
+        distribution: getter(this, ...args)
+      };
+      this._cache[label] = value;
+    }
+    return value.distribution;
+  }
+};
+var random_default = new Random();
+
 // AlgorithmLibrary/Graph.js
-function Graph(am, w2, h, dir, dag) {
+function Graph(am, w2, h, dir, dag, opts) {
   if (am == void 0) {
     return;
   }
-  this.init(am, w2, h, dir, dag);
+  this.init(am, w2, h, dir, dag, opts);
 }
 Graph.prototype = new Algorithm();
 Graph.prototype.constructor = Graph;
@@ -6704,15 +7532,48 @@ var VERTEX_INDEX_COLOR = "#0000FF";
 var EDGE_COLOR = "#000000";
 var SMALL_SIZE = 8;
 var LARGE_SIZE = 18;
-Graph.prototype.init = function(am, w2, h, directed, dag) {
-  directed = directed == void 0 ? true : directed;
-  dag = dag == void 0 ? false : dag;
+function parseStartingRepresentation(representation, fallbackLayer = 1) {
+  if (Number.isFinite(representation)) {
+    const n = Math.trunc(representation);
+    if (n >= 1 && n <= 3)
+      return n;
+  }
+  if (typeof representation === "string") {
+    const lower = representation.trim().toLowerCase();
+    if (lower === "1" || lower === "logical")
+      return 1;
+    if (lower === "2" || lower === "adjacencylist" || lower === "adjacency list" || lower === "adjlist" || lower === "list") {
+      return 2;
+    }
+    if (lower === "3" || lower === "adjacencymatrix" || lower === "adjacency matrix" || lower === "matrix") {
+      return 3;
+    }
+  }
+  return fallbackLayer;
+}
+Graph.prototype.init = function(am, w2, h, directed, dag, opts) {
+  if (directed && typeof directed === "object") {
+    opts = directed;
+    directed = void 0;
+    dag = void 0;
+  }
+  opts = opts && typeof opts === "object" ? opts : {};
+  if (opts.randomSeed !== void 0 && opts.randomSeed !== null) {
+    random_default.use(opts.randomSeed);
+  }
+  directed = typeof opts.directed === "boolean" ? opts.directed : directed == void 0 ? true : directed;
+  dag = typeof opts.dag === "boolean" ? opts.dag : dag == void 0 ? false : dag;
+  const requestedLayer = opts.startingGraphRepresentation ?? opts.graphRepresentation ?? opts.startingRepresentation;
+  const initialLayer = parseStartingRepresentation(requestedLayer, 1);
+  const requestedEdgePercentage = opts.edgePercentage ?? opts.edgePercent ?? opts.edgeDensity;
+  const parsedEdgePercentage = Number(requestedEdgePercentage);
+  this.edgePercentage = Number.isFinite(parsedEdgePercentage) && parsedEdgePercentage >= 0 && parsedEdgePercentage <= 1 ? parsedEdgePercentage : null;
+  this.preventBidirectionalEdge = typeof opts.preventBidirectionalEdge === "boolean" ? opts.preventBidirectionalEdge : false;
   Graph.superclass.init.call(this, am, w2, h);
   this.nextIndex = 0;
-  this.currentLayer = 1;
+  this.currentLayer = initialLayer;
   this.isDAG = dag;
   this.directed = directed;
-  this.currentLayer = 1;
   this.addControls();
   this.setup_small();
 };
@@ -6766,7 +7627,9 @@ Graph.prototype.addControls = function(addDirection) {
     this,
     3
   );
-  this.logicalButton.checked = true;
+  this.logicalButton.checked = this.currentLayer === 1;
+  this.adjacencyListButton.checked = this.currentLayer === 2;
+  this.adjacencyMatrixButton.checked = this.currentLayer === 3;
 };
 Graph.prototype.directedGraphCallback = function(newDirected, event) {
   if (newDirected != this.directed) {
@@ -6948,17 +7811,21 @@ Graph.prototype.setup = function() {
     this.adj_matrixID[i] = new Array(this.size);
   }
   var edgePercent;
-  if (this.size == SMALL_SIZE) {
-    if (this.directed) {
-      edgePercent = 0.4;
-    } else {
-      edgePercent = 0.5;
-    }
+  if (this.edgePercentage != null) {
+    edgePercent = this.edgePercentage;
   } else {
-    if (this.directed) {
-      edgePercent = 0.35;
+    if (this.size == SMALL_SIZE) {
+      if (this.directed) {
+        edgePercent = 0.4;
+      } else {
+        edgePercent = 0.5;
+      }
     } else {
-      edgePercent = 0.6;
+      if (this.directed) {
+        edgePercent = 0.35;
+      } else {
+        edgePercent = 0.6;
+      }
     }
   }
   var lowerBound = 0;
@@ -6966,7 +7833,8 @@ Graph.prototype.setup = function() {
     for (i = 0; i < this.size; i++) {
       for (var j = 0; j < this.size; j++) {
         this.adj_matrixID[i][j] = this.nextIndex++;
-        if (this.allowed[i][j] && Math.random() <= edgePercent && (i < j || Math.abs(this.curve[i][j]) < 0.01 || this.adj_matrixID[j][i] == -1) && (!this.isDAG || i < j)) {
+        const reverseEdgeExists = this.adj_matrix[j] != null && this.adj_matrix[j][i] >= 0;
+        if (this.allowed[i][j] && random_default.float() <= edgePercent && (i < j || Math.abs(this.curve[i][j]) < 0.01 || this.adj_matrixID[j][i] == -1) && (!this.preventBidirectionalEdge || !reverseEdgeExists) && (!this.isDAG || i < j)) {
           if (this.showEdgeCosts) {
             this.adj_matrix[i][j] = Math.floor(Math.random() * 9) + 1;
           } else {
@@ -7189,7 +8057,8 @@ var AUX_ARRAY_START_Y = 50;
 var VISITED_START_X = 175;
 var PARENT_START_X = 250;
 var HIGHLIGHT_CIRCLE_COLOR = "#9c0303ff";
-var BFS_TREE_COLOR = "#0000FF";
+var SEARCH_TREE_FINAL_COLOR = "var(--svgColor--althighlight)";
+var EDGE_CHECK_COLOR = "var(--svgColor--althighlight)";
 var BFS_QUEUE_HEAD_COLOR = "#0000FF";
 var QUEUE_START_X = 30;
 var QUEUE_START_Y = 40;
@@ -7198,6 +8067,7 @@ function BFS(canvas2) {
   let am;
   let w2;
   let h;
+  let graphOpts = null;
   if (canvas2 && typeof canvas2.getContext === "function") {
     const legacyCanvas = canvas2;
     am = initCanvas2(legacyCanvas, null, "Breadth-First Search", false, {
@@ -7207,20 +8077,21 @@ function BFS(canvas2) {
     w2 = legacyCanvas.width;
     h = legacyCanvas.height;
   } else {
-    const opts2 = canvas2 || {};
-    const viewWidth = Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 1e3;
-    const viewHeight = Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 500;
+    const opts = canvas2 || {};
+    graphOpts = opts;
+    const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+    const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
     am = initAnimationManager({
-      title: opts2.title || "Breadth-First Search",
-      height: opts2.height || viewHeight,
+      title: opts.title || "Breadth-First Search",
+      height: opts.height || viewHeight,
       viewWidth,
       viewHeight,
-      ...opts2
+      ...opts
     });
     w2 = viewWidth;
     h = viewHeight;
   }
-  this.init(am, w2, h);
+  this.init(am, w2, h, graphOpts);
 }
 BFS.prototype = new Graph();
 BFS.prototype.constructor = BFS;
@@ -7240,9 +8111,9 @@ BFS.prototype.addControls = function() {
   this.startButton.onclick = this.startCallback.bind(this);
   BFS.superclass.addControls.call(this);
 };
-BFS.prototype.init = function(am, w2, h) {
+BFS.prototype.init = function(am, w2, h, graphOpts) {
   this.showEdgeCosts = false;
-  BFS.superclass.init.call(this, am, w2, h);
+  BFS.superclass.init.call(this, am, w2, h, true, false, graphOpts);
 };
 BFS.prototype.setup = function() {
   BFS.superclass.setup.call(this);
@@ -7303,7 +8174,7 @@ BFS.prototype.setup = function() {
   this.cmd(
     "CreateLabel",
     this.nextIndex++,
-    "Visited",
+    "Known",
     VISITED_START_X - AUX_ARRAY_WIDTH,
     AUX_ARRAY_START_Y - AUX_ARRAY_HEIGHT * 1.5,
     0
@@ -7325,12 +8196,51 @@ BFS.prototype.setup = function() {
   this.highlightCircleAM = this.nextIndex++;
 };
 BFS.prototype.startCallback = function(event) {
-  var startvalue;
   if (this.startField.value != "") {
-    startvalue = this.startField.value;
+    const startvalue = this.startField.value;
     this.startField.value = "";
-    if (parseInt(startvalue) < this.size)
-      this.implementAction(this.doBFS.bind(this), startvalue);
+    this.doSearch(startvalue);
+  }
+};
+BFS.prototype.doSearch = function(startVertex) {
+  const parsedStart = parseInt(startVertex);
+  if (!Number.isFinite(parsedStart) || parsedStart < 0 || parsedStart >= this.size) {
+    return false;
+  }
+  this.implementAction(this.doBFS.bind(this), parsedStart);
+  return true;
+};
+BFS.prototype.initEdgeVisualState = function() {
+  this.edgeColorState = new Array(this.size);
+  this.edgeHighlightState = new Array(this.size);
+  for (var i = 0; i < this.size; i++) {
+    this.edgeColorState[i] = new Array(this.size);
+    this.edgeHighlightState[i] = new Array(this.size);
+    for (var j = 0; j < this.size; j++) {
+      this.edgeColorState[i][j] = EDGE_COLOR;
+      this.edgeHighlightState[i][j] = false;
+    }
+  }
+};
+BFS.prototype.recordEdgeVisualState = function(i, j, color, highlighted) {
+  this.edgeColorState[i][j] = color;
+  this.edgeHighlightState[i][j] = highlighted;
+  if (!this.directed) {
+    this.edgeColorState[j][i] = color;
+    this.edgeHighlightState[j][i] = highlighted;
+  }
+};
+BFS.prototype.applyEdgeVisualState = function(i, j, color, highlighted) {
+  this.setEdgeColor(i, j, color);
+  this.highlightEdge(i, j, highlighted ? 1 : 0);
+  this.recordEdgeVisualState(i, j, color, highlighted);
+};
+BFS.prototype.clearAdjacencyRepEdgeHighlight = function(i, j) {
+  if (this.adj_list_edges && this.adj_list_edges[i] && this.adj_list_edges[i][j]) {
+    this.cmd("SetHighlight", this.adj_list_edges[i][j], 0);
+  }
+  if (this.adj_matrixID && this.adj_matrixID[i] && this.adj_matrixID[i][j]) {
+    this.cmd("SetHighlight", this.adj_matrixID[i][j], 0);
   }
 };
 BFS.prototype.doBFS = function(startVetex) {
@@ -7348,25 +8258,32 @@ BFS.prototype.doBFS = function(startVetex) {
     }
   }
   this.rebuildEdges();
+  this.initEdgeVisualState();
   this.messageID = new Array();
   for (i = 0; i < this.size; i++) {
     this.cmd("SetText", this.visitedID[i], "f");
+    this.cmd("SetHighlight", this.visitedID[i], 0);
     this.cmd("SetText", this.parentID[i], "");
     this.visited[i] = false;
     this.parent[i] = -1;
     queueID[i] = this.nextIndex++;
+    this.cmd(
+      "CreateLabel",
+      queueID[i],
+      "",
+      QUEUE_START_X,
+      QUEUE_START_Y + i * QUEUE_SPACING
+    );
+    this.cmd("SetAlpha", queueID[i], 0);
   }
   var vertex = parseInt(startVetex);
   this.visited[vertex] = true;
   this.parent[vertex] = -1;
   this.queue[tail] = vertex;
-  this.cmd(
-    "CreateLabel",
-    queueID[tail],
-    vertex,
-    QUEUE_START_X,
-    QUEUE_START_Y + queueSize * QUEUE_SPACING
-  );
+  this.cmd("SetText", queueID[tail], vertex);
+  this.cmd("SetTextColor", queueID[tail], "#000000");
+  this.cmd("SetAlpha", queueID[tail], 1);
+  this.cmd("Move", queueID[tail], QUEUE_START_X, QUEUE_START_Y);
   queueSize = queueSize + 1;
   tail = (tail + 1) % this.size;
   while (queueSize > 0) {
@@ -7400,35 +8317,24 @@ BFS.prototype.doBFS = function(startVetex) {
     this.cmd("Step");
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[vertex][neighbor] > 0) {
-        this.highlightEdge(vertex, neighbor, 1);
+        const savedEdgeColor = this.edgeColorState[vertex][neighbor];
+        const savedEdgeHighlight = this.edgeHighlightState[vertex][neighbor];
+        this.applyEdgeVisualState(vertex, neighbor, EDGE_CHECK_COLOR, false);
         this.cmd("SetHighlight", this.visitedID[neighbor], 1);
-        this.cmd("SetMessage", `Explore edge ${vertex} -> ${neighbor} (check whether ${neighbor} is unvisited).`);
+        this.cmd("SetMessage", `Explore edge ${vertex} -> ${neighbor} (check whether ${neighbor} is known).`);
         this.cmd("Step");
         if (!this.visited[neighbor]) {
           this.visited[neighbor] = true;
           this.parent[neighbor] = vertex;
           this.cmd("SetText", this.visitedID[neighbor], "T");
           this.cmd("SetText", this.parentID[neighbor], vertex);
-          this.highlightEdge(vertex, neighbor, 0);
-          this.cmd(
-            "Disconnect",
-            this.circleID[vertex],
-            this.circleID[neighbor]
-          );
-          this.cmd(
-            "Connect",
-            this.circleID[vertex],
-            this.circleID[neighbor],
-            BFS_TREE_COLOR,
-            this.curve[vertex][neighbor],
-            1,
-            ""
-          );
           this.queue[tail] = neighbor;
+          this.cmd("SetText", queueID[tail], neighbor);
+          this.cmd("SetTextColor", queueID[tail], "#000000");
+          this.cmd("SetAlpha", queueID[tail], 1);
           this.cmd(
-            "CreateLabel",
+            "Move",
             queueID[tail],
-            neighbor,
             QUEUE_START_X,
             QUEUE_START_Y + queueSize * QUEUE_SPACING
           );
@@ -7438,16 +8344,25 @@ BFS.prototype.doBFS = function(startVetex) {
             "SetMessage",
             `Discovered ${neighbor}; set parent to ${vertex}, add to BFS tree, and enqueue ${neighbor}.`
           );
+          this.applyEdgeVisualState(vertex, neighbor, savedEdgeColor, true);
         } else {
-          this.highlightEdge(vertex, neighbor, 0);
           this.cmd("SetMessage", `Neighbor ${neighbor} was already visited; ignore this edge.`);
+          this.applyEdgeVisualState(
+            vertex,
+            neighbor,
+            savedEdgeColor,
+            savedEdgeHighlight
+          );
         }
         this.cmd("Step");
+        this.clearAdjacencyRepEdgeHighlight(vertex, neighbor);
         this.cmd("SetHighlight", this.visitedID[neighbor], 0);
         this.cmd("Step");
       }
     }
-    this.cmd("Delete", queueID[head]);
+    this.cmd("SetTextColor", queueID[head], "#000000");
+    this.cmd("SetText", queueID[head], "");
+    this.cmd("SetAlpha", queueID[head], 0);
     head = (head + 1) % this.size;
     queueSize = queueSize - 1;
     for (i = 0; i < queueSize; i++) {
@@ -7462,17 +8377,15 @@ BFS.prototype.doBFS = function(startVetex) {
     this.cmd("Delete", this.highlightCircleL);
     this.cmd("Delete", this.highlightCircleAM);
     this.cmd("Delete", this.highlightCircleAL);
-    this.cmd("SetMessage", "BFS complete. Search tree highlighted.");
-    for (i = 0; i < this.size; i++) {
-      if (this.parent[i] >= 0) {
-        this.highlightEdge(this.parent[i], i, 1);
-      }
-    }
-    this.cmd("Step");
     this.cmd("SetMessage", `Done exploring ${vertex}.`);
     this.cmd("Step");
   }
-  this.cmd("SetMessage", `Queue is empty. Done.`);
+  this.cmd("SetMessage", "Queue is empty. BFS complete. Search tree highlighted.");
+  for (i = 0; i < this.size; i++) {
+    if (this.parent[i] >= 0) {
+      this.applyEdgeVisualState(this.parent[i], i, SEARCH_TREE_FINAL_COLOR, true);
+    }
+  }
   this.cmd("Step");
   return this.commands;
 };
@@ -7498,19 +8411,19 @@ BST.STARTING_Y = 40;
 BST.FIRST_PRINT_POS_X = 50;
 BST.PRINT_VERTICAL_GAP = 20;
 BST.PRINT_HORIZONTAL_GAP = 50;
-function BST(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "Binary Search Tree";
-  opts2.centered = true;
-  opts2.heightSingleMode = 250;
-  opts2.height = 350;
-  opts2.heightMobile = 450;
-  opts2.heightMobileSingle = 350;
-  let am = initAnimationManager(opts2);
+function BST(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "Binary Search Tree";
+  opts.centered = true;
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
   this.addControls();
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -8343,19 +9256,19 @@ BSTCopy.WIDTH_DELTA = 50;
 BSTCopy.HEIGHT_DELTA = 50;
 BSTCopy.ROOT_Y = 20;
 BSTCopy.STARTING_Y = 80;
-function BSTCopy(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "BST Copy";
-  opts2.centered = true;
-  opts2.heightSingleMode = 250;
-  opts2.height = 350;
-  opts2.heightMobile = 450;
-  opts2.heightMobileSingle = 350;
-  let am = initAnimationManager(opts2);
+function BSTCopy(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "BST Copy";
+  opts.centered = true;
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  let am = initAnimationManager(opts);
   this.init(am, 1e3, 400);
   this.addControls();
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -8707,19 +9620,19 @@ BSTIterator.STACK_X = 0;
 BSTIterator.STACK_Y = 40;
 BSTIterator.STACK_SPACING = 22;
 BSTIterator.STACK_TOP_COLOR = "var(--svgColor--red)";
-function BSTIterator(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "BST Iterator";
-  opts2.centered = true;
-  opts2.heightSingleMode = 250;
-  opts2.height = 350;
-  opts2.heightMobile = 450;
-  opts2.heightMobileSingle = 350;
-  let am = initAnimationManager(opts2);
+function BSTIterator(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "BST Iterator";
+  opts.centered = true;
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  let am = initAnimationManager(opts);
   this.init(am, 1e3, 400);
   this.addControls();
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -9105,25 +10018,25 @@ var MESSAGE_X = 5;
 var MESSAGE_Y = 10;
 var FOREGROUND_COLOR = Colors.BASE;
 var BACKGROUND_COLOR = Colors.FILL;
-function BTree(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = "BTree";
-  opts2.centered = true;
-  opts2.heightSingleMode = 250;
-  opts2.height = 350;
-  opts2.heightMobile = 450;
-  opts2.heightMobileSingle = 350;
-  if (!opts2.maxDegree)
-    opts2.maxDegree = 3;
-  if (!opts2.preemptiveSplit)
-    opts2.preemptiveSplit = false;
-  this.max_degree = opts2.maxDegree;
+function BTree(opts = {}) {
+  if (!opts.title)
+    opts.title = "BTree";
+  opts.centered = true;
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  if (!opts.maxDegree)
+    opts.maxDegree = 3;
+  if (!opts.preemptiveSplit)
+    opts.preemptiveSplit = false;
+  this.max_degree = opts.maxDegree;
   this.max_keys = this.max_degree - 1;
-  this.preemptiveSplit = opts2.preemptiveSplit && this.max_degree % 2 == 0;
-  let am = initAnimationManager(opts2);
+  this.preemptiveSplit = opts.preemptiveSplit && this.max_degree % 2 == 0;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -10619,15 +11532,15 @@ function Hash(arg1, w2, h) {
     width = w2;
     height = h;
   } else {
-    const opts2 = arg1 || {};
-    const viewWidth = Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 1e3;
-    const viewHeight = Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 500;
+    const opts = arg1 || {};
+    const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+    const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
     am = initAnimationManager({
-      title: opts2.title || "Hashing",
-      height: opts2.height || viewHeight,
+      title: opts.title || "Hashing",
+      height: opts.height || viewHeight,
       viewWidth,
       viewHeight,
-      ...opts2
+      ...opts
     });
     width = viewWidth;
     height = viewHeight;
@@ -10639,11 +11552,11 @@ Hash.prototype.constructor = Hash;
 Hash.superclass = Algorithm.prototype;
 var MAX_HASH_LENGTH = 5;
 var HASH_NUMBER_START_X = 200;
-var HASH_X_DIFF = 7;
+var HASH_X_DIFF = 8;
 var HASH_NUMBER_START_Y = 10;
 var HASH_ADD_START_Y = 30;
 var HASH_INPUT_START_X = 80;
-var HASH_INPUT_X_DIFF = 8;
+var HASH_INPUT_X_DIFF = 10;
 var HASH_INPUT_START_Y = 45;
 var HASH_ADD_LINE_Y = 42;
 var HASH_RESULT_Y = 50;
@@ -10665,49 +11578,33 @@ Hash.prototype.init = function(am, w2, h) {
   }
 };
 Hash.prototype.addControls = function() {
-  this.insertField = addControlToAlgorithmBar("Text", "");
-  this.insertField.size = MAX_HASH_LENGTH;
-  this.insertField.onkeydown = this.returnSubmit(
-    this.insertField,
+  this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+  this.inputField.size = MAX_HASH_LENGTH;
+  this.inputField.onkeydown = this.returnSubmit(
+    this.inputField,
     this.insertCallback.bind(this),
     MAX_HASH_LENGTH,
     true
   );
   this.insertButton = addControlToAlgorithmBar("Button", "Insert");
   this.insertButton.onclick = this.insertCallback.bind(this);
-  this.deleteField = addControlToAlgorithmBar("Text", "");
-  this.deleteField.size = MAX_HASH_LENGTH;
-  this.deleteField.onkeydown = this.returnSubmit(
-    this.insertField,
-    this.deleteCallback.bind(this),
-    MAX_HASH_LENGTH,
-    true
-  );
   this.deleteButton = addControlToAlgorithmBar("Button", "Remove");
   this.deleteButton.onclick = this.deleteCallback.bind(this);
-  this.findField = addControlToAlgorithmBar("Text", "");
-  this.findField.size = MAX_HASH_LENGTH;
-  this.findField.onkeydown = this.returnSubmit(
-    this.insertField,
-    this.findCallback.bind(this),
-    MAX_HASH_LENGTH,
-    true
-  );
   this.findButton = addControlToAlgorithmBar("Button", "Find");
   this.findButton.onclick = this.findCallback.bind(this);
   var radioButtonList = addRadioButtonGroupToAlgorithmBar(
-    ["Hash Integer", "Hash Strings"],
+    ["Integer Mode", "String Mode"],
     "HashType"
+  );
+  this.animateStringHashCheckbox = addCheckboxToAlgorithmBar(
+    "Animate string hashing",
+    "animateStringHashing"
   );
   this.hashIntegerButton = radioButtonList[0];
   this.hashIntegerButton.onclick = this.changeHashTypeCallback.bind(this, true);
   this.hashStringButton = radioButtonList[1];
   this.hashStringButton.onclick = this.changeHashTypeCallback.bind(this, false);
   this.hashIntegerButton.checked = true;
-  this.animateStringHashCheckbox = addCheckboxToAlgorithmBar(
-    "Animate string hashing",
-    "animateStringHashing"
-  );
   this.animateStringHashCheckbox.id = "animateStringHashing";
   this.animateStringHashCheckbox.checked = true;
   this.animateStringHashCheckbox.disabled = true;
@@ -10724,41 +11621,17 @@ Hash.prototype.changeHashType = function(newHashingIntegerValue) {
   this.hashingIntegers = newHashingIntegerValue;
   if (this.hashingIntegers) {
     this.hashIntegerButton.checked = true;
-    this.insertField.onkeydown = this.returnSubmit(
-      this.insertField,
+    this.inputField.onkeydown = this.returnSubmit(
+      this.inputField,
       this.insertCallback.bind(this),
-      MAX_HASH_LENGTH,
-      true
-    );
-    this.deleteField.onkeydown = this.returnSubmit(
-      this.insertField,
-      this.deleteCallback.bind(this),
-      MAX_HASH_LENGTH,
-      true
-    );
-    this.findField.onkeydown = this.returnSubmit(
-      this.insertField,
-      this.findCallback.bind(this),
       MAX_HASH_LENGTH,
       true
     );
   } else {
     this.hashStringButton.checked = true;
-    this.insertField.onkeydown = this.returnSubmit(
-      this.insertField,
+    this.inputField.onkeydown = this.returnSubmit(
+      this.inputField,
       this.insertCallback.bind(this),
-      MAX_HASH_LENGTH,
-      false
-    );
-    this.deleteField.onkeydown = this.returnSubmit(
-      this.insertField,
-      this.deleteCallback.bind(this),
-      MAX_HASH_LENGTH,
-      false
-    );
-    this.findField.onkeydown = this.returnSubmit(
-      this.insertField,
-      this.findCallback.bind(this),
       MAX_HASH_LENGTH,
       false
     );
@@ -10769,7 +11642,7 @@ Hash.prototype.changeHashType = function(newHashingIntegerValue) {
   }
   return this.resetAll();
 };
-Hash.prototype.doHash = function(input) {
+Hash.prototype.doHash = function(input, justHash = false) {
   if (this.hashingIntegers) {
     var labelID1 = this.nextIndex++;
     var labelID2 = this.nextIndex++;
@@ -10790,7 +11663,7 @@ Hash.prototype.doHash = function(input) {
       HASH_LABEL_X + HASH_LABEL_DELTA_X,
       HASH_LABEL_Y
     );
-    this.cmd("SetMessage", "Compute hash index = value mod table size");
+    this.cmd("SetMessage", "Compute hash");
     this.cmd("Step");
     this.cmd(
       "CreateHighlightCircle",
@@ -10937,7 +11810,7 @@ Hash.prototype.doHash = function(input) {
           HASH_ADD_START_Y
         );
       }
-      this.cmd("SetMessage", `Bring next character '${wordToHash[i]}' into position`);
+      this.cmd("SetMessage", `Bring bits for character '${wordToHash[i]}' into position`);
       this.cmd("Step");
       this.cmd(
         "CreateRectangle",
@@ -10963,6 +11836,7 @@ Hash.prototype.doHash = function(input) {
       for (j = 7; j >= 0; j--) {
         hashValue[j + 24] = hashValue[j + 24] ^ nextByte[j];
       }
+      let curHash = "";
       for (j = 0; j < 32; j++) {
         this.cmd(
           "CreateLabel",
@@ -10972,8 +11846,9 @@ Hash.prototype.doHash = function(input) {
           HASH_RESULT_Y,
           0
         );
+        curHash += hashValue[j];
       }
-      this.cmd("SetMessage", "Show updated accumulator bits");
+      this.cmd("SetMessage", "Current hash is now: " + curHash);
       this.cmd("Step");
       for (j = 0; j < 8; j++) {
         this.cmd("Delete", nextByteID[j]);
@@ -10989,7 +11864,7 @@ Hash.prototype.doHash = function(input) {
           HASH_NUMBER_START_Y
         );
       }
-      this.cmd("SetMessage", "Copy result back into accumulator line");
+      this.cmd("SetMessage", "Copy result back into accumulator");
       this.cmd("Step");
       if (i > 0) {
         this.cmd(
@@ -11039,8 +11914,11 @@ Hash.prototype.doHash = function(input) {
       HASH_NUMBER_START_Y,
       0
     );
-    this.cmd("SetMessage", "Convert final bits into an integer value");
+    this.cmd("SetMessage", "Convert final bits into an integer value. Result is " + this.currHash);
     this.cmd("Step");
+    if (justHash) {
+      return 0;
+    }
     for (j = 0; j < 32; j++) {
       this.cmd("Delete", digits[j]);
     }
@@ -11079,29 +11957,28 @@ Hash.prototype.doHash = function(input) {
   }
 };
 Hash.prototype.resetAll = function() {
-  this.insertField.value = "";
-  this.deleteField.value = "";
-  this.findField.value = "";
+  if (this.inputField)
+    this.inputField.value = "";
   return [];
 };
 Hash.prototype.insertCallback = function(event) {
-  var insertedValue = this.insertField.value;
+  var insertedValue = this.inputField.value;
   if (insertedValue != "") {
-    this.insertField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.insertElement.bind(this), insertedValue);
   }
 };
 Hash.prototype.deleteCallback = function(event) {
-  var deletedValue = this.deleteField.value;
+  var deletedValue = this.inputField.value;
   if (deletedValue != "") {
-    this.deleteField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.deleteElement.bind(this), deletedValue);
   }
 };
 Hash.prototype.findCallback = function(event) {
-  var findValue = this.findField.value;
+  var findValue = this.inputField.value;
   if (findValue != "") {
-    this.findField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.findElement.bind(this), findValue);
   }
 };
@@ -11115,20 +11992,28 @@ Hash.prototype.reset = function() {
   this.hashIntegerButton.checked = true;
 };
 Hash.prototype.disableUI = function(event) {
-  this.insertField.disabled = true;
-  this.insertButton.disabled = true;
-  this.deleteField.disabled = true;
-  this.deleteButton.disabled = true;
-  this.findField.disabled = true;
-  this.findButton.disabled = true;
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.deleteButton,
+    this.findButton
+  ];
+  for (const el of ctrls) {
+    if (el)
+      el.disabled = true;
+  }
 };
 Hash.prototype.enableUI = function(event) {
-  this.insertField.disabled = false;
-  this.insertButton.disabled = false;
-  this.deleteField.disabled = false;
-  this.deleteButton.disabled = false;
-  this.findField.disabled = false;
-  this.findButton.disabled = false;
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.deleteButton,
+    this.findButton
+  ];
+  for (const el of ctrls) {
+    if (el)
+      el.disabled = false;
+  }
 };
 
 // AlgorithmLibrary/ClosedHash.js
@@ -11136,7 +12021,7 @@ function ClosedHash(canvas2) {
   let am;
   let w2;
   let h;
-  const opts2 = canvas2 || {};
+  const opts = canvas2 || {};
   if (canvas2 && typeof canvas2.getContext === "function") {
     const legacyCanvas = canvas2;
     am = initCanvas2(legacyCanvas, null, "Closed Hashing", false, {
@@ -11146,21 +12031,37 @@ function ClosedHash(canvas2) {
     w2 = legacyCanvas.width;
     h = legacyCanvas.height;
   } else {
-    const viewWidth = Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 1e3;
-    const viewHeight = Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 500;
+    const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+    const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
     am = initAnimationManager({
-      title: opts2.title || "Closed Hashing",
-      height: opts2.height || viewHeight,
+      title: opts.title || "Closed Hashing",
+      height: opts.height || viewHeight,
       viewWidth,
       viewHeight,
-      ...opts2
+      ...opts
     });
     w2 = viewWidth;
     h = viewHeight;
   }
   this.init(am, w2, h);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts && Array.isArray(opts.initialData)) {
+    const hasString = opts.initialData.some((d) => typeof d === "string");
+    if (hasString) {
+      this.changeHashTypeCallback(false);
+    }
+  }
+  if (opts && typeof opts.probing === "string") {
+    const mode = opts.probing.toLowerCase();
+    if (mode.startsWith("lin")) {
+      this.changeProbeType(this.linearProblingButton);
+    } else if (mode.startsWith("quad")) {
+      this.changeProbeType(this.quadraticProbingButton);
+    } else if (mode.startsWith("dou")) {
+      this.changeProbeType(this.doubleHashingButton);
+    }
+  }
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -11215,6 +12116,18 @@ ClosedHash.prototype.growCallback = function(event) {
     this.implementAction(this.growTable.bind(this), 16);
   }
 };
+ClosedHash.prototype.doInsert = function(value) {
+  return this.implementAction(this.insertElement.bind(this), value);
+};
+ClosedHash.prototype.doRemove = function(value) {
+  return this.implementAction(this.deleteElement.bind(this), value);
+};
+ClosedHash.prototype.doFind = function(value) {
+  return this.implementAction(this.findElement.bind(this), value);
+};
+ClosedHash.prototype.doGrow = function(newSize) {
+  return this.implementAction(this.growTable.bind(this), newSize);
+};
 ClosedHash.prototype.growTable = function(newSize) {
   this.commands = [];
   if (this.hasGrown) {
@@ -11235,6 +12148,11 @@ ClosedHash.prototype.growTable = function(newSize) {
   const stagingYPos = new Array(oldSize);
   const oldRows = Math.max(1, Math.ceil(oldSize / this.elements_per_row));
   const stagingStartY = ARRAY_ELEM_START_Y + oldRows * ARRAY_VERTICAL_SEPARATION + 100;
+  this.cmd(
+    "SetMessage",
+    `Grow table: expand to ${targetSize}`
+  );
+  this.cmd("Step");
   for (let i = 0; i < oldSize; i++) {
     const nextXPos = ARRAY_ELEM_START_X + i % this.elements_per_row * ARRAY_ELEM_WIDTH;
     const nextYPos = stagingStartY + Math.floor(i / this.elements_per_row) * ARRAY_VERTICAL_SEPARATION;
@@ -11257,15 +12175,18 @@ ClosedHash.prototype.growTable = function(newSize) {
     this.cmd("SetForegroundColor", idxID, INDEX_COLOR);
   }
   this.cmd("SetMessage", "Old array becomes staging array");
+  let stagingData = [];
   for (let i = 0; i < oldSize; i++) {
     const hasValue = !this.empty[i] && !this.deleted[i];
     if (this.deleted[i]) {
       this.cmd("SetText", stagingRects[i], "<deleted>");
+      stagingData.push("<deleted>");
     } else if (hasValue) {
       const value = this.hashTableValues[i];
-      elemsToRehash.push(value);
-      stagingSlots.push(i);
       this.cmd("SetText", stagingRects[i], value);
+      stagingData.push(value);
+    } else {
+      stagingData.push("");
     }
   }
   this.cmd("Step");
@@ -11273,6 +12194,8 @@ ClosedHash.prototype.growTable = function(newSize) {
     this.cmd("Delete", oldHashTableVisual[i]);
     this.cmd("Delete", oldHashTableIndices[i]);
   }
+  let oldEmpty = this.empty.slice();
+  let oldDeleted = this.deleted.slice();
   this.table_size = targetSize;
   this.skipDist = new Array(this.table_size);
   this.hashTableVisual = new Array(this.table_size);
@@ -11318,42 +12241,49 @@ ClosedHash.prototype.growTable = function(newSize) {
   }
   this.cmd("SetMessage", `Created new table of size ${targetSize}`);
   this.cmd("Step");
-  for (let k = 0; k < elemsToRehash.length; k++) {
-    const value = elemsToRehash[k];
-    const fromSlot = stagingSlots[k];
+  for (let k = 0; k < oldSize; k++) {
+    const value = stagingData[k];
+    const fromSlot = k;
     const labelID = this.nextIndex++;
     this.cmd("SetHighlight", stagingRects[fromSlot], 1);
-    this.cmd("SetMessage", `Take ${value} from staging slot ${fromSlot}`);
-    this.cmd("Step");
-    this.cmd(
-      "CreateLabel",
-      labelID,
-      value,
-      stagingXPos[fromSlot],
-      stagingYPos[fromSlot] - ARRAY_ELEM_HEIGHT
-    );
-    this.cmd("SetText", stagingRects[fromSlot], "");
-    this.cmd("Step");
-    let index = this.doHash(value);
-    index = this.getEmptyIndex(index, value);
-    if (index !== -1) {
-      this.cmd(
-        "Move",
-        labelID,
-        this.indexXPos[index],
-        this.indexYPos[index] - ARRAY_ELEM_HEIGHT
-      );
-      this.cmd("SetMessage", `Reinsert ${value} at index ${index}`);
-      this.cmd("Step");
-      this.cmd("Delete", labelID);
-      this.cmd("SetText", this.hashTableVisual[index], value);
-      this.hashTableValues[index] = value;
-      this.empty[index] = false;
-      this.deleted[index] = false;
+    let isValid = !oldEmpty[fromSlot] && !oldDeleted[fromSlot];
+    if (isValid) {
+      this.cmd("SetMessage", `Take ${value} from staging slot ${fromSlot}`);
     } else {
-      this.cmd("SetMessage", `Table full while reinserting ${value}`);
+      this.cmd("SetMessage", `Ignoring staging slot ${fromSlot}`);
+    }
+    this.cmd("Step");
+    if (isValid) {
+      this.cmd(
+        "CreateLabel",
+        labelID,
+        value,
+        stagingXPos[fromSlot],
+        stagingYPos[fromSlot] - ARRAY_ELEM_HEIGHT
+      );
+      this.cmd("SetText", stagingRects[fromSlot], "");
       this.cmd("Step");
-      this.cmd("Delete", labelID);
+      let index = this.doHash(value);
+      index = this.getEmptyIndex(index, value);
+      if (index !== -1) {
+        this.cmd(
+          "Move",
+          labelID,
+          this.indexXPos[index],
+          this.indexYPos[index] - ARRAY_ELEM_HEIGHT
+        );
+        this.cmd("SetMessage", `Reinsert ${value} at index ${index}`);
+        this.cmd("Step");
+        this.cmd("Delete", labelID);
+        this.cmd("SetText", this.hashTableVisual[index], value);
+        this.hashTableValues[index] = value;
+        this.empty[index] = false;
+        this.deleted[index] = false;
+      } else {
+        this.cmd("SetMessage", `Table full while reinserting ${value}`);
+        this.cmd("Step");
+        this.cmd("Delete", labelID);
+      }
     }
     this.cmd("SetHighlight", stagingRects[fromSlot], 0);
   }
@@ -11415,10 +12345,10 @@ ClosedHash.prototype.linearProbeCallback = function(event) {
 };
 ClosedHash.prototype.insertElement = function(elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Inserting element: " + String(elem));
+  this.cmd("SetMessage", "Inserting element: " + String(elem));
   var index = this.doHash(elem);
   index = this.getEmptyIndex(index, elem);
-  this.cmd("SetText", this.ExplainLabel, "");
+  this.cmd("SetMessage", "");
   if (index != -1) {
     var labID = this.nextIndex++;
     this.cmd("CreateLabel", labID, elem, 20, 25);
@@ -11460,6 +12390,7 @@ ClosedHash.prototype.resetSkipDist = function(elem, labelID) {
 };
 ClosedHash.prototype.getEmptyIndex = function(index, elem) {
   var foundIndex = -1;
+  var neededDoubleHash = false;
   for (var i = 0; i < this.table_size; i++) {
     var candidateIndex = (index + this.skipDist[i]) % this.table_size;
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
@@ -11481,10 +12412,11 @@ ClosedHash.prototype.getEmptyIndex = function(index, elem) {
     } else {
       if (i == 0 && this.currentHashingTypeButtonState == this.doubleHashingButton) {
         this.resetSkipDist(elem, this.nextIndex++);
+        neededDoubleHash = true;
       }
     }
   }
-  if (this.currentHashingTypeButtonState == this.doubleHashingButton) {
+  if (neededDoubleHash) {
     this.cmd("Delete", --this.nextIndex);
   }
   return foundIndex;
@@ -11514,44 +12446,28 @@ ClosedHash.prototype.getElemIndex = function(index, elem) {
 };
 ClosedHash.prototype.deleteElement = function(elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem);
+  this.cmd("SetMessage", "Deleting element: " + elem);
   var index = this.doHash(elem);
   index = this.getElemIndex(index, elem);
   if (index > 0) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Deleting element: " + elem + "  Adding tombstone."
-    );
+    this.cmd("SetMessage", "Deleting element: " + elem + "  Adding tombstone.");
     this.empty[index] = true;
     this.deleted[index] = true;
     this.cmd("SetText", this.hashTableVisual[index], "<deleted>");
   } else {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Deleting element: " + elem + "  Element not in table"
-    );
+    this.cmd("SetMessage", "Deleting element: " + elem + "  Element not in table");
   }
   return this.commands;
 };
 ClosedHash.prototype.findElement = function(elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem);
+  this.cmd("SetMessage", "Finding Element: " + elem);
   var index = this.doHash(elem);
   var found = this.getElemIndex(index, elem) != -1;
   if (found) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Finding Element: " + elem + "  Found!"
-    );
+    this.cmd("SetMessage", "Finding Element: " + elem + "  Found!");
   } else {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Finding Element: " + elem + "  Not Found!"
-    );
+    this.cmd("SetMessage", "Finding Element: " + elem + "  Not Found!");
   }
   return this.commands;
 };
@@ -11625,269 +12541,6 @@ ClosedHash.prototype.enableUI = function(event) {
   this.linearProblingButton.disabled = false;
   this.quadraticProbingButton.disabled = false;
   this.doubleHashingButton.disabled = false;
-};
-
-// AlgorithmLibrary/ClosedHashBucket.js
-function ClosedHashBucket(canvas2) {
-  let am;
-  let w2;
-  let h;
-  if (canvas2 && typeof canvas2.getContext === "function") {
-    const legacyCanvas = canvas2;
-    am = initCanvas2(legacyCanvas, null, "Closed Hashing (Buckets)", false, {
-      viewWidth: legacyCanvas.width,
-      viewHeight: legacyCanvas.height
-    });
-    w2 = legacyCanvas.width;
-    h = legacyCanvas.height;
-  } else {
-    const opts2 = canvas2 || {};
-    const viewWidth = Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 1e3;
-    const viewHeight = Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 500;
-    am = initAnimationManager({
-      title: opts2.title || "Closed Hashing (Buckets)",
-      height: opts2.height || viewHeight,
-      viewWidth,
-      viewHeight,
-      ...opts2
-    });
-    w2 = viewWidth;
-    h = viewHeight;
-  }
-  this.init(am, w2, h);
-}
-var ARRAY_ELEM_WIDTH2 = 90;
-var ARRAY_ELEM_HEIGHT2 = 30;
-var ARRAY_ELEM_START_X2 = 50;
-var ARRAY_ELEM_START_Y2 = 100;
-var ARRAY_VERTICAL_SEPARATION2 = 100;
-var CLOSED_HASH_TABLE_SIZE2 = 29;
-var BUCKET_SIZE = 3;
-var NUM_BUCKETS = 11;
-var CLOSED_HASH_TABLE_SIZE2 = 40;
-var INDEX_COLOR2 = "#0000FF";
-var INDEX_COLOR2 = "#0000FF";
-ClosedHashBucket.prototype = new Hash();
-ClosedHashBucket.prototype.constructor = ClosedHashBucket;
-ClosedHashBucket.superclass = Hash.prototype;
-ClosedHashBucket.prototype.init = function(am, w2, h) {
-  var sc = ClosedHashBucket.superclass;
-  var fn = sc.init;
-  fn.call(this, am, w2, h);
-  this.elements_per_row = Math.floor(w2 / ARRAY_ELEM_WIDTH2);
-  this.nextIndex = 0;
-  this.setup();
-};
-ClosedHashBucket.prototype.addControls = function() {
-  ClosedHashBucket.superclass.addControls.call(this);
-};
-ClosedHashBucket.prototype.insertElement = function(elem) {
-  this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Inserting element: " + String(elem));
-  var index = this.doHash(elem);
-  var foundIndex = -1;
-  for (var candidateIndex = index * BUCKET_SIZE; candidateIndex < index * BUCKET_SIZE + BUCKET_SIZE; candidateIndex++) {
-    this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
-    this.cmd("SetMessage", `Check bucket slot ${candidateIndex} for empty`);
-    this.cmd("Step");
-    this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 0);
-    if (this.empty[candidateIndex]) {
-      foundIndex = candidateIndex;
-      break;
-    }
-  }
-  if (foundIndex == -1) {
-    for (candidateIndex = BUCKET_SIZE * NUM_BUCKETS; candidateIndex < CLOSED_HASH_TABLE_SIZE2; candidateIndex++) {
-      this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
-      this.cmd("SetMessage", `Check overflow slot ${candidateIndex} for empty`);
-      this.cmd("Step");
-      this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 0);
-      if (this.empty[candidateIndex]) {
-        foundIndex = candidateIndex;
-        break;
-      }
-    }
-  }
-  if (foundIndex != -1) {
-    var labID = this.nextIndex++;
-    this.cmd("CreateLabel", labID, elem, 20, 25);
-    this.cmd(
-      "Move",
-      labID,
-      this.indexXPos2[foundIndex],
-      this.indexYPos2[foundIndex] - ARRAY_ELEM_HEIGHT2
-    );
-    this.cmd("SetMessage", `Insert into slot ${foundIndex}`);
-    this.cmd("Step");
-    this.cmd("Delete", labID);
-    this.cmd("SetText", this.hashTableVisual[foundIndex], elem);
-    this.hashTableValues[foundIndex] = elem;
-    this.empty[foundIndex] = false;
-    this.deleted[foundIndex] = false;
-  }
-  this.cmd("SetText", this.ExplainLabel, "");
-  return this.commands;
-};
-ClosedHashBucket.prototype.getElemIndex = function(elem) {
-  var foundIndex = -1;
-  var initialIndex = this.doHash(elem);
-  for (var candidateIndex = initialIndex * BUCKET_SIZE; candidateIndex < initialIndex * BUCKET_SIZE + BUCKET_SIZE; candidateIndex++) {
-    this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
-    this.cmd("SetMessage", `Search bucket slot ${candidateIndex} for element ${elem}`);
-    this.cmd("Step");
-    this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 0);
-    if (!this.empty[candidateIndex] && this.hashTableValues[candidateIndex] == elem) {
-      return candidateIndex;
-    } else if (this.empty[candidateIndex] && !this.deleted[candidateIndex]) {
-      return -1;
-    }
-  }
-  for (candidateIndex = BUCKET_SIZE * NUM_BUCKETS; candidateIndex < CLOSED_HASH_TABLE_SIZE2; candidateIndex++) {
-    this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
-    this.cmd("SetMessage", `Search overflow slot ${candidateIndex} for element ${elem}`);
-    this.cmd("Step");
-    this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 0);
-    if (!this.empty[candidateIndex] && this.hashTableValues[candidateIndex] == elem) {
-      return candidateIndex;
-    } else if (this.empty[candidateIndex] && !this.deleted[candidateIndex]) {
-      return -1;
-    }
-  }
-  return -1;
-};
-ClosedHashBucket.prototype.deleteElement = function(elem) {
-  this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem);
-  var index = this.getElemIndex(elem);
-  if (index == -1) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Deleting element: " + elem + "  Element not in table"
-    );
-  } else {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Deleting element: " + elem + "  Element this.deleted"
-    );
-    this.empty[index] = true;
-    this.deleted[index] = true;
-    this.cmd("SetText", this.hashTableVisual[index], "<deleted>");
-  }
-  return this.commands;
-};
-ClosedHashBucket.prototype.findElement = function(elem) {
-  this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem);
-  var index = this.getElemIndex(elem);
-  if (index == -1) {
-    this.cmd("SetText", this.ExplainLabel, "Element " + elem + " not found");
-  } else {
-    this.cmd("SetText", this.ExplainLabel, "Element " + elem + " found");
-  }
-  return this.commands;
-};
-ClosedHashBucket.prototype.setup = function() {
-  this.table_size = NUM_BUCKETS;
-  this.hashTableVisual = new Array(CLOSED_HASH_TABLE_SIZE2);
-  this.hashTableIndices = new Array(CLOSED_HASH_TABLE_SIZE2);
-  this.hashTableValues = new Array(CLOSED_HASH_TABLE_SIZE2);
-  this.indexXPos = new Array(NUM_BUCKETS);
-  this.indexYPos = new Array(NUM_BUCKETS);
-  this.indexXPos2 = new Array(CLOSED_HASH_TABLE_SIZE2);
-  this.indexYPos2 = new Array(CLOSED_HASH_TABLE_SIZE2);
-  this.empty = new Array(CLOSED_HASH_TABLE_SIZE2);
-  this.deleted = new Array(CLOSED_HASH_TABLE_SIZE2);
-  this.ExplainLabel = this.nextIndex++;
-  this.commands = [];
-  for (var i = 0; i < CLOSED_HASH_TABLE_SIZE2; i++) {
-    var nextID = this.nextIndex++;
-    this.empty[i] = true;
-    this.deleted[i] = false;
-    var nextXPos = ARRAY_ELEM_START_X2 + i % this.elements_per_row * ARRAY_ELEM_WIDTH2;
-    var nextYPos = ARRAY_ELEM_START_Y2 + Math.floor(i / this.elements_per_row) * ARRAY_VERTICAL_SEPARATION2;
-    this.cmd(
-      "CreateRectangle",
-      nextID,
-      "",
-      ARRAY_ELEM_WIDTH2,
-      ARRAY_ELEM_HEIGHT2,
-      nextXPos,
-      nextYPos
-    );
-    this.hashTableVisual[i] = nextID;
-    nextID = this.nextIndex++;
-    this.hashTableIndices[i] = nextID;
-    this.indexXPos2[i] = nextXPos;
-    this.indexYPos2[i] = nextYPos + ARRAY_ELEM_HEIGHT2;
-    this.cmd("CreateLabel", nextID, i, this.indexXPos2[i], this.indexYPos2[i]);
-    this.cmd("SetForegroundColor", nextID, INDEX_COLOR2);
-  }
-  for (i = 0; i <= NUM_BUCKETS; i++) {
-    nextID = this.nextIndex++;
-    nextXPos = ARRAY_ELEM_START_X2 + i * 3 % this.elements_per_row * ARRAY_ELEM_WIDTH2 - ARRAY_ELEM_WIDTH2 / 2;
-    nextYPos = ARRAY_ELEM_START_Y2 + Math.floor(i * 3 / this.elements_per_row) * ARRAY_VERTICAL_SEPARATION2 + ARRAY_ELEM_HEIGHT2;
-    this.cmd(
-      "CreateRectangle",
-      nextID,
-      "",
-      0,
-      ARRAY_ELEM_HEIGHT2 * 2,
-      nextXPos,
-      nextYPos
-    );
-    nextID = this.nextIndex++;
-    if (i == NUM_BUCKETS) {
-      this.cmd(
-        "CreateLabel",
-        nextID,
-        "Overflow",
-        nextXPos + 3,
-        nextYPos + ARRAY_ELEM_HEIGHT2 / 2,
-        0
-      );
-    } else {
-      this.indexXPos[i] = nextXPos + 5;
-      this.indexYPos[i] = nextYPos + ARRAY_ELEM_HEIGHT2 / 2;
-      this.cmd(
-        "CreateLabel",
-        nextID,
-        i,
-        this.indexXPos[i],
-        this.indexYPos[i],
-        0
-      );
-    }
-  }
-  this.cmd("CreateLabel", this.ExplainLabel, "", 10, 25, 0);
-  this.animationManager.StartNewAnimation(this.commands);
-  this.animationManager.skipForward();
-  this.animationManager.clearHistory();
-  this.resetIndex = this.nextIndex;
-};
-ClosedHashBucket.prototype.resetAll = function() {
-  this.commands = ClosedHashBucket.superclass.resetAll.call(this);
-  for (var i = 0; i < CLOSED_HASH_TABLE_SIZE2; i++) {
-    this.empty[i] = true;
-    this.deleted[i] = false;
-    this.cmd("SetText", this.hashTableVisual[i], "");
-  }
-  return this.commands;
-};
-ClosedHashBucket.prototype.reset = function() {
-  for (var i = 0; i < CLOSED_HASH_TABLE_SIZE2; i++) {
-    this.empty[i] = true;
-    this.deleted[i] = false;
-  }
-  this.nextIndex = this.resetIndex;
-  ClosedHashBucket.superclass.reset.call(this);
-};
-ClosedHashBucket.prototype.disableUI = function(event) {
-  ClosedHashBucket.superclass.disableUI.call(this);
-};
-ClosedHashBucket.prototype.enableUI = function(event) {
-  ClosedHashBucket.superclass.enableUI.call(this);
 };
 
 // AlgorithmLibrary/ConnectedComponent.js
@@ -11981,6 +12634,7 @@ function ConnectedComponent(canvas2) {
   let am;
   let w2;
   let h;
+  let graphOpts = null;
   if (canvas2 && typeof canvas2.getContext === "function") {
     const legacyCanvas = canvas2;
     am = initCanvas2(legacyCanvas, null, "Connected Components", false, {
@@ -11990,20 +12644,21 @@ function ConnectedComponent(canvas2) {
     w2 = legacyCanvas.width;
     h = legacyCanvas.height;
   } else {
-    const opts2 = canvas2 || {};
-    const viewWidth = Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 1e3;
-    const viewHeight = Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 500;
+    const opts = canvas2 || {};
+    graphOpts = opts;
+    const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+    const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
     am = initAnimationManager({
-      title: opts2.title || "Connected Components",
-      height: opts2.height || viewHeight,
+      title: opts.title || "Connected Components",
+      height: opts.height || viewHeight,
       viewWidth,
       viewHeight,
-      ...opts2
+      ...opts
     });
     w2 = viewWidth;
     h = viewHeight;
   }
-  this.init(am, w2, h);
+  this.init(am, w2, h, graphOpts);
 }
 ConnectedComponent.prototype = new Graph();
 ConnectedComponent.prototype.constructor = ConnectedComponent;
@@ -12016,9 +12671,9 @@ ConnectedComponent.prototype.addControls = function() {
   this.startButton.onclick = this.startCallback.bind(this);
   ConnectedComponent.superclass.addControls.call(this, false);
 };
-ConnectedComponent.prototype.init = function(am, w2, h) {
+ConnectedComponent.prototype.init = function(am, w2, h, graphOpts) {
   this.showEdgeCosts = false;
-  ConnectedComponent.superclass.init.call(this, am, w2, h, true, false);
+  ConnectedComponent.superclass.init.call(this, am, w2, h, true, false, graphOpts);
 };
 ConnectedComponent.prototype.setup = function() {
   ConnectedComponent.superclass.setup.call(this);
@@ -12421,19 +13076,381 @@ ConnectedComponent.prototype.undo = function(event) {
   this.enableUI(event);
 };
 
-// AlgorithmLibrary/DFS.js
+// AlgorithmLibrary/DetectCycle.js
 var AUX_ARRAY_WIDTH2 = 25;
 var AUX_ARRAY_HEIGHT2 = 25;
 var AUX_ARRAY_START_Y2 = 50;
 var VISITED_START_X2 = 200;
-var PARENT_START_X2 = 275;
+var ONSTACK_START_X = 285;
+var STACK_START_X = 25;
+var STACK_START_Y = 30;
+var STACK_INDENT = 10;
+var STACK_LINE_HEIGHT = 20;
 var HIGHLIGHT_CIRCLE_COLOR3 = "#000000";
-var DFS_TREE_COLOR2 = "#0000FF";
+var EDGE_CONSIDER_COLOR = "var(--svgColor--althighlight)";
+var TREE_EDGE_COLOR = "#0000FF";
+var CYCLE_EDGE_COLOR = "var(--svgColor--althighlight)";
+function DetectCycle(canvas2) {
+  let am;
+  let w2;
+  let h;
+  let graphOpts = null;
+  if (canvas2 && typeof canvas2.getContext === "function") {
+    const legacyCanvas = canvas2;
+    am = initCanvas2(legacyCanvas, null, "Detect Cycle (Directed Graph)", false, {
+      viewWidth: legacyCanvas.width,
+      viewHeight: legacyCanvas.height
+    });
+    w2 = legacyCanvas.width;
+    h = legacyCanvas.height;
+  } else {
+    const opts = canvas2 || {};
+    graphOpts = opts;
+    const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+    const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
+    am = initAnimationManager({
+      title: opts.title || "Detect Cycle (Directed Graph)",
+      height: opts.height || viewHeight,
+      viewWidth,
+      viewHeight,
+      ...opts
+    });
+    w2 = viewWidth;
+    h = viewHeight;
+  }
+  this.init(am, w2, h, graphOpts);
+}
+DetectCycle.prototype = new Graph();
+DetectCycle.prototype.constructor = DetectCycle;
+DetectCycle.superclass = Graph.prototype;
+DetectCycle.prototype.addControls = function() {
+  this.startButton = addControlToAlgorithmBar("Button", "Run Cycle Detection");
+  this.startButton.onclick = this.startCallback.bind(this);
+  DetectCycle.superclass.addControls.call(this, false);
+};
+DetectCycle.prototype.init = function(am, w2, h, graphOpts) {
+  this.showEdgeCosts = false;
+  const opts = graphOpts && typeof graphOpts === "object" ? { ...graphOpts } : {};
+  const requestedEdgePercentage = opts.edgePercentage ?? opts.edgePercent ?? opts.edgeDensity;
+  const parsedEdgePercentage = Number(requestedEdgePercentage);
+  const hasValidEdgePercentage = Number.isFinite(parsedEdgePercentage) && parsedEdgePercentage >= 0 && parsedEdgePercentage <= 1;
+  if (typeof opts.preventBidirectionalEdge !== "boolean") {
+    opts.preventBidirectionalEdge = true;
+  }
+  DetectCycle.superclass.init.call(this, am, w2, h, true, false, opts);
+};
+DetectCycle.prototype.setup = function() {
+  DetectCycle.superclass.setup.call(this);
+  this.commands = [];
+  this.messageID = [];
+  this.visitedID = new Array(this.size);
+  this.visitedIndexID = new Array(this.size);
+  this.onStackID = new Array(this.size);
+  this.onStackIndexID = new Array(this.size);
+  for (var i = 0; i < this.size; i++) {
+    this.visitedID[i] = this.nextIndex++;
+    this.visitedIndexID[i] = this.nextIndex++;
+    this.onStackID[i] = this.nextIndex++;
+    this.onStackIndexID[i] = this.nextIndex++;
+    this.cmd(
+      "CreateRectangle",
+      this.visitedID[i],
+      "F",
+      AUX_ARRAY_WIDTH2,
+      AUX_ARRAY_HEIGHT2,
+      VISITED_START_X2,
+      AUX_ARRAY_START_Y2 + i * AUX_ARRAY_HEIGHT2
+    );
+    this.cmd(
+      "CreateLabel",
+      this.visitedIndexID[i],
+      i,
+      VISITED_START_X2 - AUX_ARRAY_WIDTH2,
+      AUX_ARRAY_START_Y2 + i * AUX_ARRAY_HEIGHT2
+    );
+    this.cmd("SetForegroundColor", this.visitedIndexID[i], VERTEX_INDEX_COLOR);
+    this.cmd(
+      "CreateRectangle",
+      this.onStackID[i],
+      "F",
+      AUX_ARRAY_WIDTH2,
+      AUX_ARRAY_HEIGHT2,
+      ONSTACK_START_X,
+      AUX_ARRAY_START_Y2 + i * AUX_ARRAY_HEIGHT2
+    );
+    this.cmd(
+      "CreateLabel",
+      this.onStackIndexID[i],
+      i,
+      ONSTACK_START_X - AUX_ARRAY_WIDTH2,
+      AUX_ARRAY_START_Y2 + i * AUX_ARRAY_HEIGHT2
+    );
+    this.cmd("SetForegroundColor", this.onStackIndexID[i], VERTEX_INDEX_COLOR);
+  }
+  this.cmd(
+    "CreateLabel",
+    this.nextIndex++,
+    "Visited",
+    VISITED_START_X2 - AUX_ARRAY_WIDTH2,
+    AUX_ARRAY_START_Y2 - AUX_ARRAY_HEIGHT2 * 1.5,
+    0
+  );
+  this.cmd(
+    "CreateLabel",
+    this.nextIndex++,
+    "On Stack",
+    ONSTACK_START_X - AUX_ARRAY_WIDTH2,
+    AUX_ARRAY_START_Y2 - AUX_ARRAY_HEIGHT2 * 1.5,
+    0
+  );
+  this.cmd(
+    "CreateLabel",
+    this.nextIndex++,
+    "Stack",
+    STACK_START_X,
+    STACK_START_Y - 18,
+    0
+  );
+  this.animationManager.setAllLayers([0, this.currentLayer]);
+  this.animationManager.StartNewAnimation(this.commands);
+  this.animationManager.skipForward();
+  this.animationManager.clearHistory();
+  this.highlightCircleL = this.nextIndex++;
+  this.highlightCircleAL = this.nextIndex++;
+  this.highlightCircleAM = this.nextIndex++;
+};
+DetectCycle.prototype.startCallback = function() {
+  this.doDetectCycle();
+};
+DetectCycle.prototype.doDetectCycle = function() {
+  this.implementAction(this.doDetectCycleAction.bind(this), 0);
+  return true;
+};
+DetectCycle.prototype.doDetectCycleAction = function() {
+  this.commands = [];
+  if (this.messageID != null) {
+    for (var i = 0; i < this.messageID.length; i++) {
+      if (this.objectExists(this.messageID[i])) {
+        this.cmd("Delete", this.messageID[i]);
+      }
+    }
+  }
+  this.rebuildEdges();
+  this.visited = new Array(this.size);
+  this.onStack = new Array(this.size);
+  this.callLabelByVertex = new Array(this.size);
+  this.messageID = [];
+  this.foundCycle = false;
+  this.lastCycleStartRoot = -1;
+  this.lastStartsTried = [];
+  for (i = 0; i < this.size; i++) {
+    this.visited[i] = false;
+    this.onStack[i] = false;
+    this.callLabelByVertex[i] = -1;
+    this.cmd("SetText", this.visitedID[i], "F");
+    this.cmd("SetText", this.onStackID[i], "F");
+    this.cmd("SetHighlight", this.visitedID[i], 0);
+    this.cmd("SetHighlight", this.onStackID[i], 0);
+  }
+  this.cmd(
+    "CreateHighlightCircle",
+    this.highlightCircleL,
+    HIGHLIGHT_CIRCLE_COLOR3,
+    this.x_pos_logical[0],
+    this.y_pos_logical[0]
+  );
+  this.cmd("SetLayer", this.highlightCircleL, 1);
+  this.cmd(
+    "CreateHighlightCircle",
+    this.highlightCircleAL,
+    HIGHLIGHT_CIRCLE_COLOR3,
+    this.adj_list_x_start - this.adj_list_width,
+    this.adj_list_y_start
+  );
+  this.cmd("SetLayer", this.highlightCircleAL, 2);
+  this.cmd(
+    "CreateHighlightCircle",
+    this.highlightCircleAM,
+    HIGHLIGHT_CIRCLE_COLOR3,
+    this.adj_matrix_x_start - this.adj_matrix_width,
+    this.adj_matrix_y_start
+  );
+  this.cmd("SetLayer", this.highlightCircleAM, 3);
+  this.stackVisualDepth = 0;
+  for (var start = 0; start < this.size && !this.foundCycle; start++) {
+    if (!this.visited[start]) {
+      this.lastStartsTried.push(start);
+      if (start === 0) {
+        this.cmd("SetMessage", "Start DFS at 0.");
+      } else {
+        this.cmd("SetMessage", `Start new DFS at ${start}.`);
+      }
+      this.cmd(
+        "Move",
+        this.highlightCircleL,
+        this.x_pos_logical[start],
+        this.y_pos_logical[start]
+      );
+      this.cmd(
+        "Move",
+        this.highlightCircleAL,
+        this.adj_list_x_start - this.adj_list_width,
+        this.adj_list_y_start + start * this.adj_list_height
+      );
+      this.cmd(
+        "Move",
+        this.highlightCircleAM,
+        this.adj_matrix_x_start - this.adj_matrix_width,
+        this.adj_matrix_y_start + start * this.adj_matrix_height
+      );
+      this.cmd("Step");
+      if (this.dfsDetect(start, STACK_START_X)) {
+        this.lastCycleStartRoot = start;
+      }
+    }
+  }
+  this.cmd("Delete", this.highlightCircleL);
+  this.cmd("Delete", this.highlightCircleAL);
+  this.cmd("Delete", this.highlightCircleAM);
+  if (this.foundCycle) {
+    this.cmd("SetMessage", "Cycle detected (found an edge to a node currently on the DFS stack).");
+  } else {
+    this.cmd("SetMessage", "No directed cycle found.");
+  }
+  this.cmd("Step");
+  return this.commands;
+};
+DetectCycle.prototype.objectExists = function(id) {
+  return this.animationManager && this.animationManager.animatedObjects && this.animationManager.animatedObjects.Nodes && this.animationManager.animatedObjects.Nodes[id] != null;
+};
+DetectCycle.prototype.getLastCycleDebugInfo = function() {
+  return {
+    foundCycle: !!this.foundCycle,
+    cycleStartRoot: this.lastCycleStartRoot,
+    startsTried: Array.isArray(this.lastStartsTried) ? this.lastStartsTried.slice() : []
+  };
+};
+DetectCycle.prototype.pushStackVisual = function(vertex, messageX) {
+  var id = this.nextIndex++;
+  this.messageID.push(id);
+  this.callLabelByVertex[vertex] = id;
+  this.cmd(
+    "CreateLabel",
+    id,
+    `DFS(${vertex})`,
+    messageX,
+    STACK_START_Y + this.stackVisualDepth * STACK_LINE_HEIGHT,
+    0,
+    80
+  );
+  this.stackVisualDepth += 1;
+};
+DetectCycle.prototype.popStackVisual = function(vertex) {
+  var id = this.callLabelByVertex[vertex];
+  if (id >= 0) {
+    this.cmd("Delete", id);
+    this.callLabelByVertex[vertex] = -1;
+  }
+  this.stackVisualDepth = Math.max(0, this.stackVisualDepth - 1);
+};
+DetectCycle.prototype.setCurrentCursor = function(vertex) {
+  this.cmd(
+    "Move",
+    this.highlightCircleL,
+    this.x_pos_logical[vertex],
+    this.y_pos_logical[vertex]
+  );
+  this.cmd(
+    "Move",
+    this.highlightCircleAL,
+    this.adj_list_x_start - this.adj_list_width,
+    this.adj_list_y_start + vertex * this.adj_list_height
+  );
+  this.cmd(
+    "Move",
+    this.highlightCircleAM,
+    this.adj_matrix_x_start - this.adj_matrix_width,
+    this.adj_matrix_y_start + vertex * this.adj_matrix_height
+  );
+};
+DetectCycle.prototype.dfsDetect = function(vertex, messageX) {
+  this.pushStackVisual(vertex, messageX);
+  this.visited[vertex] = true;
+  this.onStack[vertex] = true;
+  this.cmd("SetText", this.visitedID[vertex], "T");
+  this.cmd("SetText", this.onStackID[vertex], "T");
+  this.setCurrentCursor(vertex);
+  this.cmd("SetMessage", `Visit ${vertex}; mark as on the stack.`);
+  this.cmd("Step");
+  for (var neighbor = 0; neighbor < this.size; neighbor++) {
+    if (this.adj_matrix[vertex][neighbor] > 0) {
+      this.setEdgeColor(vertex, neighbor, EDGE_CONSIDER_COLOR);
+      this.highlightEdge(vertex, neighbor, 1);
+      if (this.onStack[neighbor]) {
+        this.setEdgeColor(vertex, neighbor, CYCLE_EDGE_COLOR);
+        this.highlightEdge(vertex, neighbor, 1);
+        this.cmd("SetMessage", `Edge ${vertex} -> ${neighbor} reaches a node on the stack. Cycle found.`);
+        this.cmd("Step");
+        this.foundCycle = true;
+        return true;
+      }
+      if (!this.visited[neighbor]) {
+        this.setEdgeColor(vertex, neighbor, TREE_EDGE_COLOR);
+        this.highlightEdge(vertex, neighbor, 1);
+        this.cmd("SetMessage", `Recurse to ${neighbor}.`);
+        this.cmd("Step");
+        if (this.dfsDetect(neighbor, messageX + STACK_INDENT)) {
+          return true;
+        }
+        this.setEdgeColor(vertex, neighbor, "#000000");
+        this.highlightEdge(vertex, neighbor, 0);
+        this.setCurrentCursor(vertex);
+        this.cmd("SetMessage", `Return to ${vertex} from ${neighbor}.`);
+        this.cmd("Step");
+      } else {
+        this.setEdgeColor(vertex, neighbor, "#000000");
+        this.highlightEdge(vertex, neighbor, 0);
+        this.cmd("SetMessage", `${neighbor} already fully processed; continue.`);
+        this.cmd("Step");
+      }
+    }
+  }
+  this.onStack[vertex] = false;
+  this.cmd("SetText", this.onStackID[vertex], "F");
+  this.popStackVisual(vertex);
+  this.cmd("SetMessage", `Done at ${vertex}. Mark as not on the stack.`);
+  this.cmd("Step");
+  return false;
+};
+DetectCycle.prototype.reset = function() {
+};
+DetectCycle.prototype.enableUI = function(event) {
+  this.startButton.disabled = false;
+  DetectCycle.superclass.enableUI.call(this, event);
+};
+DetectCycle.prototype.disableUI = function(event) {
+  this.startButton.disabled = true;
+  DetectCycle.superclass.disableUI.call(this, event);
+};
+
+// AlgorithmLibrary/DFS.js
+var AUX_ARRAY_WIDTH3 = 25;
+var AUX_ARRAY_HEIGHT3 = 25;
+var AUX_ARRAY_START_Y3 = 50;
+var VISITED_START_X3 = 200;
+var PARENT_START_X2 = 275;
+var HIGHLIGHT_CIRCLE_COLOR4 = "#000000";
+var SEARCH_TREE_FINAL_COLOR2 = "var(--svgColor--althighlight)";
+var EDGE_CHECK_COLOR2 = "var(--svgColor--althighlight)";
+var QUEUE_START_X2 = 30;
+var QUEUE_START_Y2 = 50;
+var QUEUE_SPACING2 = 30;
 var DFS_CALLSTACK_FONT_SIZE_PERCENT = 80;
 function DFS(canvas2) {
   let am;
   let w2;
   let h;
+  let graphOpts = null;
   if (canvas2 && typeof canvas2.getContext === "function") {
     const legacyCanvas = canvas2;
     am = initCanvas2(legacyCanvas, null, "Depth-First Search", false, {
@@ -12443,20 +13460,21 @@ function DFS(canvas2) {
     w2 = legacyCanvas.width;
     h = legacyCanvas.height;
   } else {
-    const opts2 = canvas2 || {};
-    const viewWidth = Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 1e3;
-    const viewHeight = Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 500;
+    const opts = canvas2 || {};
+    graphOpts = opts;
+    const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+    const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
     am = initAnimationManager({
-      title: opts2.title || "Depth-First Search",
-      height: opts2.height || viewHeight,
+      title: opts.title || "Depth-First Search",
+      height: opts.height || viewHeight,
       viewWidth,
       viewHeight,
-      ...opts2
+      ...opts
     });
     w2 = viewWidth;
     h = viewHeight;
   }
-  this.init(am, w2, h);
+  this.init(am, w2, h, graphOpts);
 }
 DFS.prototype = new Graph();
 DFS.prototype.constructor = DFS;
@@ -12473,11 +13491,34 @@ DFS.prototype.addControls = function() {
   );
   this.startButton = addControlToAlgorithmBar("Button", "Run DFS");
   this.startButton.onclick = this.startCallback.bind(this);
+  var radioButtonList = addRadioButtonGroupToAlgorithmBar(
+    ["Recursive", "Iterative"],
+    "DFSMode"
+  );
+  this.recursiveModeButton = radioButtonList[0];
+  this.recursiveModeButton.onclick = this.dfsModeChangedCallback.bind(this, false);
+  this.iterativeModeButton = radioButtonList[1];
+  this.iterativeModeButton.onclick = this.dfsModeChangedCallback.bind(this, true);
+  this.recursiveModeButton.checked = !this.useIterative;
+  this.iterativeModeButton.checked = this.useIterative;
   DFS.superclass.addControls.call(this);
 };
-DFS.prototype.init = function(am, w2, h) {
+DFS.prototype.init = function(am, w2, h, graphOpts) {
+  this.useIterative = false;
+  if (graphOpts && typeof graphOpts === "object") {
+    if (typeof graphOpts.iterative === "boolean") {
+      this.useIterative = graphOpts.iterative;
+    } else if (typeof graphOpts.searchMode === "string") {
+      this.useIterative = graphOpts.searchMode.toLowerCase() === "iterative";
+    }
+  }
   this.showEdgeCosts = false;
-  DFS.superclass.init.call(this, am, w2, h);
+  DFS.superclass.init.call(this, am, w2, h, true, false, graphOpts);
+};
+DFS.prototype.dfsModeChangedCallback = function(iterativeMode) {
+  if (this.useIterative !== iterativeMode) {
+    this.useIterative = iterativeMode;
+  }
 };
 DFS.prototype.setup = function() {
   DFS.superclass.setup.call(this);
@@ -12496,34 +13537,34 @@ DFS.prototype.setup = function() {
       "CreateRectangle",
       this.visitedID[i],
       "f",
-      AUX_ARRAY_WIDTH2,
-      AUX_ARRAY_HEIGHT2,
-      VISITED_START_X2,
-      AUX_ARRAY_START_Y2 + i * AUX_ARRAY_HEIGHT2
+      AUX_ARRAY_WIDTH3,
+      AUX_ARRAY_HEIGHT3,
+      VISITED_START_X3,
+      AUX_ARRAY_START_Y3 + i * AUX_ARRAY_HEIGHT3
     );
     this.cmd(
       "CreateLabel",
       this.visitedIndexID[i],
       i,
-      VISITED_START_X2 - AUX_ARRAY_WIDTH2,
-      AUX_ARRAY_START_Y2 + i * AUX_ARRAY_HEIGHT2
+      VISITED_START_X3 - AUX_ARRAY_WIDTH3,
+      AUX_ARRAY_START_Y3 + i * AUX_ARRAY_HEIGHT3
     );
     this.cmd("SetForegroundColor", this.visitedIndexID[i], VERTEX_INDEX_COLOR);
     this.cmd(
       "CreateRectangle",
       this.parentID[i],
       "",
-      AUX_ARRAY_WIDTH2,
-      AUX_ARRAY_HEIGHT2,
+      AUX_ARRAY_WIDTH3,
+      AUX_ARRAY_HEIGHT3,
       PARENT_START_X2,
-      AUX_ARRAY_START_Y2 + i * AUX_ARRAY_HEIGHT2
+      AUX_ARRAY_START_Y3 + i * AUX_ARRAY_HEIGHT3
     );
     this.cmd(
       "CreateLabel",
       this.parentIndexID[i],
       i,
-      PARENT_START_X2 - AUX_ARRAY_WIDTH2,
-      AUX_ARRAY_START_Y2 + i * AUX_ARRAY_HEIGHT2
+      PARENT_START_X2 - AUX_ARRAY_WIDTH3,
+      AUX_ARRAY_START_Y3 + i * AUX_ARRAY_HEIGHT3
     );
     this.cmd("SetForegroundColor", this.parentIndexID[i], VERTEX_INDEX_COLOR);
   }
@@ -12531,16 +13572,16 @@ DFS.prototype.setup = function() {
     "CreateLabel",
     this.nextIndex++,
     "Parent",
-    PARENT_START_X2 - AUX_ARRAY_WIDTH2,
-    AUX_ARRAY_START_Y2 - AUX_ARRAY_HEIGHT2 * 1.5,
+    PARENT_START_X2 - AUX_ARRAY_WIDTH3,
+    AUX_ARRAY_START_Y3 - AUX_ARRAY_HEIGHT3 * 1.5,
     0
   );
   this.cmd(
     "CreateLabel",
     this.nextIndex++,
     "Visited",
-    VISITED_START_X2 - AUX_ARRAY_WIDTH2,
-    AUX_ARRAY_START_Y2 - AUX_ARRAY_HEIGHT2 * 1.5,
+    VISITED_START_X3 - AUX_ARRAY_WIDTH3,
+    AUX_ARRAY_START_Y3 - AUX_ARRAY_HEIGHT3 * 1.5,
     0
   );
   this.animationManager.setAllLayers([0, this.currentLayer]);
@@ -12552,15 +13593,60 @@ DFS.prototype.setup = function() {
   this.highlightCircleAM = this.nextIndex++;
 };
 DFS.prototype.startCallback = function(event) {
-  var startvalue;
   if (this.startField.value != "") {
-    startvalue = this.startField.value;
+    const startvalue = this.startField.value;
     this.startField.value = "";
-    if (parseInt(startvalue) < this.size)
-      this.implementAction(this.doDFS.bind(this), startvalue);
+    this.doSearch(startvalue);
+  }
+};
+DFS.prototype.doSearch = function(startVertex) {
+  const parsedStart = parseInt(startVertex);
+  if (!Number.isFinite(parsedStart) || parsedStart < 0 || parsedStart >= this.size) {
+    return false;
+  }
+  this.implementAction(this.doDFS.bind(this), parsedStart);
+  return true;
+};
+DFS.prototype.initEdgeVisualState = function() {
+  this.edgeColorState = new Array(this.size);
+  this.edgeHighlightState = new Array(this.size);
+  for (var i = 0; i < this.size; i++) {
+    this.edgeColorState[i] = new Array(this.size);
+    this.edgeHighlightState[i] = new Array(this.size);
+    for (var j = 0; j < this.size; j++) {
+      this.edgeColorState[i][j] = EDGE_COLOR;
+      this.edgeHighlightState[i][j] = false;
+    }
+  }
+};
+DFS.prototype.recordEdgeVisualState = function(i, j, color, highlighted) {
+  this.edgeColorState[i][j] = color;
+  this.edgeHighlightState[i][j] = highlighted;
+  if (!this.directed) {
+    this.edgeColorState[j][i] = color;
+    this.edgeHighlightState[j][i] = highlighted;
+  }
+};
+DFS.prototype.applyEdgeVisualState = function(i, j, color, highlighted) {
+  this.setEdgeColor(i, j, color);
+  this.highlightEdge(i, j, highlighted ? 1 : 0);
+  this.recordEdgeVisualState(i, j, color, highlighted);
+};
+DFS.prototype.clearAdjacencyRepEdgeHighlight = function(i, j) {
+  if (this.adj_list_edges && this.adj_list_edges[i] && this.adj_list_edges[i][j]) {
+    this.cmd("SetHighlight", this.adj_list_edges[i][j], 0);
+  }
+  if (this.adj_matrixID && this.adj_matrixID[i] && this.adj_matrixID[i][j]) {
+    this.cmd("SetHighlight", this.adj_matrixID[i][j], 0);
   }
 };
 DFS.prototype.doDFS = function(startVetex) {
+  if (this.useIterative) {
+    return this.doDFSIterative(startVetex);
+  }
+  return this.doDFSRecursive(startVetex);
+};
+DFS.prototype.doDFSRecursive = function(startVetex) {
   this.visited = new Array(this.size);
   this.parent = new Array(this.size);
   this.commands = new Array();
@@ -12570,9 +13656,11 @@ DFS.prototype.doDFS = function(startVetex) {
     }
   }
   this.rebuildEdges();
+  this.initEdgeVisualState();
   this.messageID = new Array();
   for (i = 0; i < this.size; i++) {
     this.cmd("SetText", this.visitedID[i], "f");
+    this.cmd("SetHighlight", this.visitedID[i], 0);
     this.cmd("SetText", this.parentID[i], "");
     this.visited[i] = false;
     this.parent[i] = -1;
@@ -12582,7 +13670,7 @@ DFS.prototype.doDFS = function(startVetex) {
   this.cmd(
     "CreateHighlightCircle",
     this.highlightCircleL,
-    HIGHLIGHT_CIRCLE_COLOR3,
+    HIGHLIGHT_CIRCLE_COLOR4,
     this.x_pos_logical[vertex],
     this.y_pos_logical[vertex]
   );
@@ -12590,7 +13678,7 @@ DFS.prototype.doDFS = function(startVetex) {
   this.cmd(
     "CreateHighlightCircle",
     this.highlightCircleAL,
-    HIGHLIGHT_CIRCLE_COLOR3,
+    HIGHLIGHT_CIRCLE_COLOR4,
     this.adj_list_x_start - this.adj_list_width,
     this.adj_list_y_start + vertex * this.adj_list_height
   );
@@ -12598,7 +13686,7 @@ DFS.prototype.doDFS = function(startVetex) {
   this.cmd(
     "CreateHighlightCircle",
     this.highlightCircleAM,
-    HIGHLIGHT_CIRCLE_COLOR3,
+    HIGHLIGHT_CIRCLE_COLOR4,
     this.adj_matrix_x_start - this.adj_matrix_width,
     this.adj_matrix_y_start + vertex * this.adj_matrix_height
   );
@@ -12614,7 +13702,207 @@ DFS.prototype.doDFS = function(startVetex) {
   );
   for (i = 0; i < this.size; i++) {
     if (this.parent[i] >= 0) {
+      this.setEdgeColor(this.parent[i], i, SEARCH_TREE_FINAL_COLOR2);
       this.highlightEdge(this.parent[i], i, 1);
+    }
+  }
+  this.cmd("Step");
+  return this.commands;
+};
+DFS.prototype.doDFSIterative = function(startVetex) {
+  this.visited = new Array(this.size);
+  this.parent = new Array(this.size);
+  this.commands = new Array();
+  if (this.messageID != null) {
+    for (var i = 0; i < this.messageID.length; i++) {
+      this.cmd("Delete", this.messageID[i]);
+    }
+  }
+  this.rebuildEdges();
+  this.initEdgeVisualState();
+  this.messageID = new Array();
+  var stackTitleID = this.nextIndex++;
+  this.messageID.push(stackTitleID);
+  this.cmd(
+    "CreateLabel",
+    stackTitleID,
+    "Stack",
+    QUEUE_START_X2,
+    QUEUE_START_Y2 - 30,
+    0
+  );
+  var stackCapacity = this.size * this.size;
+  var stackLabelID = new Array(stackCapacity);
+  for (i = 0; i < this.size; i++) {
+    this.cmd("SetText", this.visitedID[i], "f");
+    this.cmd("SetHighlight", this.visitedID[i], 0);
+    this.cmd("SetText", this.parentID[i], "");
+    this.visited[i] = false;
+    this.parent[i] = -1;
+  }
+  for (i = 0; i < stackCapacity; i++) {
+    stackLabelID[i] = this.nextIndex++;
+    this.cmd(
+      "CreateLabel",
+      stackLabelID[i],
+      "",
+      QUEUE_START_X2,
+      QUEUE_START_Y2 + i * QUEUE_SPACING2
+    );
+    this.cmd("SetAlpha", stackLabelID[i], 0);
+  }
+  var vertex = parseInt(startVetex);
+  this.parent[vertex] = -1;
+  var stackVertex = new Array(stackCapacity);
+  var stackSize = 0;
+  stackVertex[stackSize] = vertex;
+  this.cmd("SetText", stackLabelID[stackSize], vertex);
+  this.cmd("SetAlpha", stackLabelID[stackSize], 1);
+  this.cmd(
+    "Move",
+    stackLabelID[stackSize],
+    QUEUE_START_X2,
+    QUEUE_START_Y2 + stackSize * QUEUE_SPACING2
+  );
+  stackSize++;
+  this.cmd(
+    "CreateHighlightCircle",
+    this.highlightCircleL,
+    HIGHLIGHT_CIRCLE_COLOR4,
+    this.x_pos_logical[vertex],
+    this.y_pos_logical[vertex]
+  );
+  this.cmd("SetLayer", this.highlightCircleL, 1);
+  this.cmd(
+    "CreateHighlightCircle",
+    this.highlightCircleAL,
+    HIGHLIGHT_CIRCLE_COLOR4,
+    this.adj_list_x_start - this.adj_list_width,
+    this.adj_list_y_start + vertex * this.adj_list_height
+  );
+  this.cmd("SetLayer", this.highlightCircleAL, 2);
+  this.cmd(
+    "CreateHighlightCircle",
+    this.highlightCircleAM,
+    HIGHLIGHT_CIRCLE_COLOR4,
+    this.adj_matrix_x_start - this.adj_matrix_width,
+    this.adj_matrix_y_start + vertex * this.adj_matrix_height
+  );
+  this.cmd("SetLayer", this.highlightCircleAM, 3);
+  this.cmd("SetMessage", `Initialize stack with ${vertex}.`);
+  this.cmd("Step");
+  while (stackSize > 0) {
+    stackSize--;
+    var currentVertex = stackVertex[stackSize];
+    this.cmd("SetText", stackLabelID[stackSize], "");
+    this.cmd("SetAlpha", stackLabelID[stackSize], 0);
+    this.cmd("SetMessage", `Pop ${currentVertex} from stack.`);
+    this.cmd("Step");
+    if (this.visited[currentVertex]) {
+      this.cmd("SetMessage", `${currentVertex} is already visited; skip.`);
+      this.cmd("Step");
+      continue;
+    }
+    this.visited[currentVertex] = true;
+    this.cmd("SetText", this.visitedID[currentVertex], "T");
+    if (this.parent[currentVertex] >= 0) {
+      this.applyEdgeVisualState(
+        this.parent[currentVertex],
+        currentVertex,
+        EDGE_COLOR,
+        true
+      );
+    }
+    this.cmd(
+      "Move",
+      this.highlightCircleL,
+      this.x_pos_logical[currentVertex],
+      this.y_pos_logical[currentVertex]
+    );
+    this.cmd(
+      "Move",
+      this.highlightCircleAL,
+      this.adj_list_x_start - this.adj_list_width,
+      this.adj_list_y_start + currentVertex * this.adj_list_height
+    );
+    this.cmd(
+      "Move",
+      this.highlightCircleAM,
+      this.adj_matrix_x_start - this.adj_matrix_width,
+      this.adj_matrix_y_start + currentVertex * this.adj_matrix_height
+    );
+    this.cmd("SetMessage", `Visit ${currentVertex}; scan neighbors.`);
+    this.cmd("Step");
+    for (var neighbor = this.size - 1; neighbor >= 0; neighbor--) {
+      if (this.adj_matrix[currentVertex][neighbor] > 0) {
+        const savedEdgeColor = this.edgeColorState[currentVertex][neighbor];
+        const savedEdgeHighlight = this.edgeHighlightState[currentVertex][neighbor];
+        this.applyEdgeVisualState(currentVertex, neighbor, EDGE_CHECK_COLOR2, false);
+        this.cmd("SetHighlight", this.visitedID[neighbor], 1);
+        if (this.visited[neighbor]) {
+          this.cmd(
+            "SetMessage",
+            `Explore edge ${currentVertex} -> ${neighbor}; neighbor already visited (skip).`
+          );
+        } else {
+          this.cmd(
+            "SetMessage",
+            `Explore edge ${currentVertex} -> ${neighbor}; neighbor unvisited (push).`
+          );
+        }
+        this.cmd("Step");
+        if (!this.visited[neighbor]) {
+          this.parent[neighbor] = currentVertex;
+          this.cmd("SetText", this.parentID[neighbor], currentVertex);
+          this.applyEdgeVisualState(
+            currentVertex,
+            neighbor,
+            savedEdgeColor,
+            savedEdgeHighlight
+          );
+          stackVertex[stackSize] = neighbor;
+          this.cmd("SetText", stackLabelID[stackSize], neighbor);
+          this.cmd("SetAlpha", stackLabelID[stackSize], 1);
+          this.cmd(
+            "Move",
+            stackLabelID[stackSize],
+            QUEUE_START_X2,
+            QUEUE_START_Y2 + stackSize * QUEUE_SPACING2
+          );
+          stackSize++;
+          this.cmd(
+            "SetMessage",
+            `Discover ${neighbor}; set parent to ${currentVertex} and push ${neighbor} onto stack (edge locks when ${neighbor} is visited).`
+          );
+          this.cmd("Step");
+        } else {
+          this.applyEdgeVisualState(
+            currentVertex,
+            neighbor,
+            savedEdgeColor,
+            savedEdgeHighlight
+          );
+          this.cmd(
+            "SetMessage",
+            `Neighbor ${neighbor} already visited; skip edge ${currentVertex} -> ${neighbor}.`
+          );
+        }
+        this.cmd("Step");
+        this.clearAdjacencyRepEdgeHighlight(currentVertex, neighbor);
+        this.cmd("SetHighlight", this.visitedID[neighbor], 0);
+        this.cmd("Step");
+      }
+    }
+    this.cmd("SetMessage", `Finished scanning neighbors of ${currentVertex}.`);
+    this.cmd("Step");
+  }
+  this.cmd("Delete", this.highlightCircleL);
+  this.cmd("Delete", this.highlightCircleAL);
+  this.cmd("Delete", this.highlightCircleAM);
+  this.cmd("SetMessage", "DFS complete. Search tree highlighted.");
+  for (i = 0; i < this.size; i++) {
+    if (this.parent[i] >= 0) {
+      this.applyEdgeVisualState(this.parent[i], i, SEARCH_TREE_FINAL_COLOR2, true);
     }
   }
   this.cmd("Step");
@@ -12640,7 +13928,9 @@ DFS.prototype.dfsVisit = function(startVertex, messageX) {
     this.cmd("Step");
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[startVertex][neighbor] > 0) {
-        this.highlightEdge(startVertex, neighbor, 1);
+        const savedEdgeColor = this.edgeColorState[startVertex][neighbor];
+        const savedEdgeHighlight = this.edgeHighlightState[startVertex][neighbor];
+        this.applyEdgeVisualState(startVertex, neighbor, EDGE_CHECK_COLOR2, false);
         this.cmd("SetHighlight", this.visitedID[neighbor], 1);
         if (this.visited[neighbor]) {
           this.cmd(
@@ -12654,23 +13944,8 @@ DFS.prototype.dfsVisit = function(startVertex, messageX) {
           );
         }
         this.cmd("Step");
-        this.highlightEdge(startVertex, neighbor, 0);
-        this.cmd("SetHighlight", this.visitedID[neighbor], 0);
         if (!this.visited[neighbor]) {
-          this.cmd(
-            "Disconnect",
-            this.circleID[startVertex],
-            this.circleID[neighbor]
-          );
-          this.cmd(
-            "Connect",
-            this.circleID[startVertex],
-            this.circleID[neighbor],
-            DFS_TREE_COLOR2,
-            this.curve[startVertex][neighbor],
-            1,
-            ""
-          );
+          this.applyEdgeVisualState(startVertex, neighbor, savedEdgeColor, true);
           this.cmd(
             "Move",
             this.highlightCircleL,
@@ -12720,7 +13995,18 @@ DFS.prototype.dfsVisit = function(startVertex, messageX) {
             `Returned to DFS(${startVertex}) from DFS(${neighbor}); continue scanning neighbors.`
           );
           this.cmd("Step");
+        } else {
+          this.applyEdgeVisualState(
+            startVertex,
+            neighbor,
+            savedEdgeColor,
+            savedEdgeHighlight
+          );
         }
+        this.cmd("Step");
+        this.clearAdjacencyRepEdgeHighlight(startVertex, neighbor);
+        this.cmd("SetHighlight", this.visitedID[neighbor], 0);
+        this.cmd("Step");
         this.cmd(
           "SetMessage",
           `Finished processing edge ${startVertex} -> ${neighbor}.`
@@ -12755,6 +14041,7 @@ function DijkstraPrim(canvas2, runningDijkstra) {
   let am;
   let w2;
   let h;
+  let graphOpts = null;
   if (canvas2 && typeof canvas2.getContext === "function") {
     const legacyCanvas = canvas2;
     const title = runningDijkstra ? "Dijkstra Shortest Path" : "Prim MST";
@@ -12765,22 +14052,23 @@ function DijkstraPrim(canvas2, runningDijkstra) {
     w2 = legacyCanvas.width;
     h = legacyCanvas.height;
   } else {
-    const opts2 = canvas2 || {};
-    const runDijkstra = typeof opts2.runningDijkstra === "boolean" ? opts2.runningDijkstra : true;
-    const viewWidth = Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 1e3;
-    const viewHeight = Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 500;
+    const opts = canvas2 || {};
+    graphOpts = opts;
+    const runDijkstra = typeof opts.runningDijkstra === "boolean" ? opts.runningDijkstra : true;
+    const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+    const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
     am = initAnimationManager({
-      title: opts2.title || (runDijkstra ? "Dijkstra Shortest Path" : "Prim MST"),
-      height: opts2.height || viewHeight,
+      title: opts.title || (runDijkstra ? "Dijkstra Shortest Path" : "Prim MST"),
+      height: opts.height || viewHeight,
       viewWidth,
       viewHeight,
-      ...opts2
+      ...opts
     });
     w2 = viewWidth;
     h = viewHeight;
     runningDijkstra = runDijkstra;
   }
-  this.init(am, runningDijkstra, w2, h);
+  this.init(am, runningDijkstra, w2, h, graphOpts);
 }
 DijkstraPrim.prototype = new Graph();
 DijkstraPrim.prototype.constructor = DijkstraPrim;
@@ -12803,10 +14091,10 @@ DijkstraPrim.prototype.addControls = function() {
   this.startButton.onclick = this.startCallback.bind(this);
   DijkstraPrim.superclass.addControls.call(this, this.runningDijkstra);
 };
-DijkstraPrim.prototype.init = function(am, runningDijkstra, w2, h) {
+DijkstraPrim.prototype.init = function(am, runningDijkstra, w2, h, graphOpts) {
   this.runningDijkstra = runningDijkstra;
   this.showEdgeCosts = true;
-  DijkstraPrim.superclass.init.call(this, am, w2, h, false, false);
+  DijkstraPrim.superclass.init.call(this, am, w2, h, false, false, graphOpts);
 };
 DijkstraPrim.prototype.setup = function() {
   this.message1ID = this.nextIndex++;
@@ -13220,25 +14508,97 @@ function Prim(canvas2) {
   if (canvas2 && typeof canvas2.getContext === "function") {
     return new DijkstraPrim(canvas2, false);
   }
-  const opts2 = canvas2 || {};
+  const opts = canvas2 || {};
   return new DijkstraPrim({
-    ...opts2,
+    ...opts,
     runningDijkstra: false
   });
 }
 
+// AlgorithmLibrary/GraphRepresentation.js
+function GraphRepresentation(canvas2) {
+  let am;
+  let w2;
+  let h;
+  let graphOpts = null;
+  if (canvas2 && typeof canvas2.getContext === "function") {
+    const legacyCanvas = canvas2;
+    am = initCanvas2(legacyCanvas, null, "Graph Representation", false, {
+      viewWidth: legacyCanvas.width,
+      viewHeight: legacyCanvas.height
+    });
+    w2 = legacyCanvas.width;
+    h = legacyCanvas.height;
+  } else {
+    const opts = canvas2 || {};
+    graphOpts = opts;
+    const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+    const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
+    am = initAnimationManager({
+      title: opts.title || "Graph Representation",
+      height: opts.height || viewHeight,
+      viewWidth,
+      viewHeight,
+      ...opts
+    });
+    w2 = viewWidth;
+    h = viewHeight;
+  }
+  this.init(am, w2, h, graphOpts);
+}
+GraphRepresentation.prototype = new Graph();
+GraphRepresentation.prototype.constructor = GraphRepresentation;
+GraphRepresentation.superclass = Graph.prototype;
+GraphRepresentation.prototype.addControls = function() {
+  GraphRepresentation.superclass.addControls.call(this);
+  var radioButtonList = addRadioButtonGroupToAlgorithmBar(
+    ["Unweighted Graph", "Weighted Graph"],
+    "GraphWeightType"
+  );
+  this.unweightedGraphButton = radioButtonList[0];
+  this.unweightedGraphButton.onclick = this.weightedGraphCallback.bind(
+    this,
+    false
+  );
+  this.weightedGraphButton = radioButtonList[1];
+  this.weightedGraphButton.onclick = this.weightedGraphCallback.bind(this, true);
+  this.unweightedGraphButton.checked = !this.showEdgeCosts;
+  this.weightedGraphButton.checked = this.showEdgeCosts;
+};
+GraphRepresentation.prototype.weightedGraphCallback = function(newWeighted) {
+  if (newWeighted != this.showEdgeCosts) {
+    this.showEdgeCosts = newWeighted;
+    this.animationManager.resetAll();
+    this.setup();
+  }
+};
+GraphRepresentation.prototype.init = function(am, w2, h, graphOpts) {
+  if (graphOpts && typeof graphOpts === "object") {
+    if (typeof graphOpts.showEdgeCosts === "boolean") {
+      this.showEdgeCosts = graphOpts.showEdgeCosts;
+    } else if (typeof graphOpts.weighted === "boolean") {
+      this.showEdgeCosts = graphOpts.weighted;
+    } else {
+      this.showEdgeCosts = false;
+    }
+  } else {
+    this.showEdgeCosts = false;
+  }
+  GraphRepresentation.superclass.init.call(this, am, w2, h, true, false, graphOpts);
+};
+
 // AlgorithmLibrary/Heap.js
 function Heap(arg) {
   let am;
-  const opts2 = arg || {};
+  const opts = arg || {};
   am = initAnimationManager({
-    title: opts2.title || "Min Heap",
-    height: opts2.height || 500,
-    ...opts2
+    title: opts.title || "Min Heap",
+    height: opts.height || 500,
+    ...opts
   });
   this.init(am);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -13250,8 +14610,8 @@ Heap.prototype = new Algorithm();
 Heap.prototype.constructor = Heap;
 Heap.superclass = Algorithm.prototype;
 var ARRAY_SIZE = 15;
-var ARRAY_ELEM_WIDTH3 = 30;
-var ARRAY_ELEM_HEIGHT3 = 25;
+var ARRAY_ELEM_WIDTH2 = 30;
+var ARRAY_ELEM_HEIGHT2 = 25;
 var ARRAY_INITIAL_X = 30;
 var HEAP_CAPACITY = ARRAY_SIZE;
 var ARRAY_Y_POS = 50;
@@ -13288,7 +14648,7 @@ Heap.prototype.init = function(am) {
   fn.call(this, am);
   this.addControls();
   this.nextIndex = 0;
-  const heapRootX = ARRAY_INITIAL_X + HEAP_ROOT_UNDER_ARRAY_INDEX * ARRAY_ELEM_WIDTH3;
+  const heapRootX = ARRAY_INITIAL_X + HEAP_ROOT_UNDER_ARRAY_INDEX * ARRAY_ELEM_WIDTH2;
   this.HeapXPositions = buildHeapXPositions(heapRootX);
   this.HeapYPositions = buildHeapYPositions();
   this.commands = [];
@@ -13332,7 +14692,7 @@ Heap.prototype.createArray = function() {
   this.ArrayXPositions = new Array(ARRAY_SIZE);
   this.currentHeapSize = 0;
   for (var i = 0; i < ARRAY_SIZE; i++) {
-    this.ArrayXPositions[i] = ARRAY_INITIAL_X + i * ARRAY_ELEM_WIDTH3;
+    this.ArrayXPositions[i] = ARRAY_INITIAL_X + i * ARRAY_ELEM_WIDTH2;
     this.arrayLabels[i] = this.nextIndex++;
     this.arrayRects[i] = this.nextIndex++;
     this.circleObjs[i] = this.nextIndex++;
@@ -13340,8 +14700,8 @@ Heap.prototype.createArray = function() {
       "CreateRectangle",
       this.arrayRects[i],
       "",
-      ARRAY_ELEM_WIDTH3,
-      ARRAY_ELEM_HEIGHT3,
+      ARRAY_ELEM_WIDTH2,
+      ARRAY_ELEM_HEIGHT2,
       this.ArrayXPositions[i],
       ARRAY_Y_POS
     );
@@ -13365,7 +14725,7 @@ Heap.prototype.createArray = function() {
     "CreateLabel",
     this.descriptLabel1,
     "",
-    ARRAY_INITIAL_X - ARRAY_ELEM_WIDTH3 / 2,
+    ARRAY_INITIAL_X - ARRAY_ELEM_WIDTH2 / 2,
     10,
     0
   );
@@ -13698,15 +15058,15 @@ Heap.prototype.enableUI = function(event) {
 // AlgorithmLibrary/HeapMax.js
 function HeapMax(arg) {
   let am;
-  const opts2 = arg || {};
+  const opts = arg || {};
   am = initAnimationManager({
-    title: opts2.title || "Max Heap",
-    height: opts2.height || 500,
-    ...opts2
+    title: opts.title || "Max Heap",
+    height: opts.height || 500,
+    ...opts
   });
   this.init(am);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -13718,8 +15078,8 @@ HeapMax.prototype = new Algorithm();
 HeapMax.prototype.constructor = HeapMax;
 HeapMax.superclass = Algorithm.prototype;
 var ARRAY_SIZE2 = 15;
-var ARRAY_ELEM_WIDTH4 = 30;
-var ARRAY_ELEM_HEIGHT4 = 25;
+var ARRAY_ELEM_WIDTH3 = 30;
+var ARRAY_ELEM_HEIGHT3 = 25;
 var ARRAY_INITIAL_X2 = 30;
 var HEAP_CAPACITY2 = ARRAY_SIZE2;
 var ARRAY_Y_POS2 = 50;
@@ -13756,7 +15116,7 @@ HeapMax.prototype.init = function(am) {
   fn.call(this, am);
   this.addControls();
   this.nextIndex = 0;
-  const heapRootX = ARRAY_INITIAL_X2 + HEAP_ROOT_UNDER_ARRAY_INDEX2 * ARRAY_ELEM_WIDTH4;
+  const heapRootX = ARRAY_INITIAL_X2 + HEAP_ROOT_UNDER_ARRAY_INDEX2 * ARRAY_ELEM_WIDTH3;
   this.HeapXPositions = buildHeapXPositions2(heapRootX);
   this.HeapYPositions = buildHeapYPositions2();
   this.commands = [];
@@ -13800,7 +15160,7 @@ HeapMax.prototype.createArray = function() {
   this.ArrayXPositions = new Array(ARRAY_SIZE2);
   this.currentHeapSize = 0;
   for (var i = 0; i < ARRAY_SIZE2; i++) {
-    this.ArrayXPositions[i] = ARRAY_INITIAL_X2 + i * ARRAY_ELEM_WIDTH4;
+    this.ArrayXPositions[i] = ARRAY_INITIAL_X2 + i * ARRAY_ELEM_WIDTH3;
     this.arrayLabels[i] = this.nextIndex++;
     this.arrayRects[i] = this.nextIndex++;
     this.circleObjs[i] = this.nextIndex++;
@@ -13808,8 +15168,8 @@ HeapMax.prototype.createArray = function() {
       "CreateRectangle",
       this.arrayRects[i],
       "",
-      ARRAY_ELEM_WIDTH4,
-      ARRAY_ELEM_HEIGHT4,
+      ARRAY_ELEM_WIDTH3,
+      ARRAY_ELEM_HEIGHT3,
       this.ArrayXPositions[i],
       ARRAY_Y_POS2
     );
@@ -13833,7 +15193,7 @@ HeapMax.prototype.createArray = function() {
     "CreateLabel",
     this.descriptLabel1,
     "",
-    ARRAY_INITIAL_X2 - ARRAY_ELEM_WIDTH4 / 2,
+    ARRAY_INITIAL_X2 - ARRAY_ELEM_WIDTH3 / 2,
     10,
     0
   );
@@ -14173,11 +15533,11 @@ function HeapSort(arg) {
   if (arg && typeof arg.getContext === "function") {
     am = initCanvas2(arg);
   } else {
-    const opts2 = arg || {};
+    const opts = arg || {};
     am = initAnimationManager({
-      title: opts2.title || "Heap Sort",
-      height: opts2.height || 500,
-      ...opts2
+      title: opts.title || "Heap Sort",
+      height: opts.height || 500,
+      ...opts
     });
   }
   this.init(am);
@@ -14186,8 +15546,8 @@ HeapSort.prototype = new Algorithm();
 HeapSort.prototype.constructor = HeapSort;
 HeapSort.superclass = Algorithm.prototype;
 var ARRAY_SIZE3 = 15;
-var ARRAY_ELEM_WIDTH5 = 30;
-var ARRAY_ELEM_HEIGHT5 = 25;
+var ARRAY_ELEM_WIDTH4 = 30;
+var ARRAY_ELEM_HEIGHT4 = 25;
 var ARRAY_INITIAL_X3 = 30;
 var ARRAY_Y_POS3 = 50;
 var ARRAY_LABEL_Y_POS3 = 70;
@@ -14226,7 +15586,7 @@ HeapSort.prototype.init = function(am) {
   fn.call(this, am);
   this.addControls();
   this.nextIndex = 0;
-  const heapRootX = ARRAY_INITIAL_X3 + HEAP_ROOT_UNDER_ARRAY_INDEX3 * ARRAY_ELEM_WIDTH5;
+  const heapRootX = ARRAY_INITIAL_X3 + HEAP_ROOT_UNDER_ARRAY_INDEX3 * ARRAY_ELEM_WIDTH4;
   this.HeapXPositions = buildHeapXPositions3(heapRootX);
   this.HeapYPositions = buildHeapYPositions3();
   this.commands = [];
@@ -14264,7 +15624,7 @@ HeapSort.prototype.createArray = function() {
   for (var i = 0; i < ARRAY_SIZE3; i++) {
     this.arrayData[i] = Math.floor(1 + Math.random() * 999);
     this.oldData[i] = this.arrayData[i];
-    this.ArrayXPositions[i] = ARRAY_INITIAL_X3 + i * ARRAY_ELEM_WIDTH5;
+    this.ArrayXPositions[i] = ARRAY_INITIAL_X3 + i * ARRAY_ELEM_WIDTH4;
     this.arrayLabels[i] = this.nextIndex++;
     this.arrayRects[i] = this.nextIndex++;
     this.circleObjs[i] = this.nextIndex++;
@@ -14272,8 +15632,8 @@ HeapSort.prototype.createArray = function() {
       "CreateRectangle",
       this.arrayRects[i],
       this.arrayData[i],
-      ARRAY_ELEM_WIDTH5,
-      ARRAY_ELEM_HEIGHT5,
+      ARRAY_ELEM_WIDTH4,
+      ARRAY_ELEM_HEIGHT4,
       this.ArrayXPositions[i],
       ARRAY_Y_POS3
     );
@@ -14552,6 +15912,7 @@ function Kruskal(canvas2) {
   let am;
   let w2;
   let h;
+  let graphOpts = null;
   if (canvas2 && typeof canvas2.getContext === "function") {
     const legacyCanvas = canvas2;
     am = initCanvas2(legacyCanvas, null, "Kruskal MST", false, {
@@ -14561,20 +15922,21 @@ function Kruskal(canvas2) {
     w2 = legacyCanvas.width;
     h = legacyCanvas.height;
   } else {
-    const opts2 = canvas2 || {};
-    const viewWidth = Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 1e3;
-    const viewHeight = Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 500;
+    const opts = canvas2 || {};
+    graphOpts = opts;
+    const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+    const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
     am = initAnimationManager({
-      title: opts2.title || "Kruskal MST",
-      height: opts2.height || viewHeight,
+      title: opts.title || "Kruskal MST",
+      height: opts.height || viewHeight,
       viewWidth,
       viewHeight,
-      ...opts2
+      ...opts
     });
     w2 = viewWidth;
     h = viewHeight;
   }
-  this.init(am, w2, h);
+  this.init(am, w2, h, graphOpts);
 }
 Kruskal.HIGHLIGHT_CIRCLE_COLOR = "#000000";
 Kruskal.SET_ARRAY_ELEM_WIDTH = 25;
@@ -14603,9 +15965,9 @@ Kruskal.prototype.addControls = function() {
   this.startButton.onclick = this.startCallback.bind(this);
   Kruskal.superclass.addControls.call(this, false);
 };
-Kruskal.prototype.init = function(am, w2, h) {
+Kruskal.prototype.init = function(am, w2, h, graphOpts) {
   this.showEdgeCosts = true;
-  Kruskal.superclass.init.call(this, am, w2, h, false, false);
+  Kruskal.superclass.init.call(this, am, w2, h, false, false, graphOpts);
 };
 Kruskal.prototype.setup = function() {
   Kruskal.superclass.setup.call(this);
@@ -15000,16 +16362,16 @@ var ACTION_LABEL_Y = 25;
 var ACTION_ELEMENT_X = ACTION_LABEL_X;
 var ACTION_ELEMENT_Y = 50;
 var SIZE = 32;
-function LinkedList(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "Singly Linked List";
-  opts2.heightSingleMode = 250;
-  opts2.height = 300;
-  opts2.heightMobile = 450;
-  let am = initAnimationManager(opts2);
+function LinkedList(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "Singly Linked List";
+  opts.heightSingleMode = 250;
+  opts.height = 300;
+  opts.heightMobile = 450;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertBack.bind(this), d);
       am.skipForward();
     }
@@ -15362,16 +16724,16 @@ var ACTION_LABEL_Y2 = 25;
 var ACTION_ELEMENT_X2 = ACTION_LABEL_X2;
 var ACTION_ELEMENT_Y2 = 50;
 var SIZE2 = 32;
-function LinkedListTail(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "SinglyLinkedList";
-  opts2.heightSingleMode = 250;
-  opts2.height = 300;
-  opts2.heightMobile = 450;
-  let am = initAnimationManager(opts2);
+function LinkedListTail(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "SinglyLinkedList";
+  opts.heightSingleMode = 250;
+  opts.height = 300;
+  opts.heightMobile = 450;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertBack.bind(this), d);
       am.skipForward();
     }
@@ -16577,21 +17939,21 @@ var ACTION_LABEL_Y3 = 25;
 var ACTION_ELEMENT_X3 = ACTION_LABEL_X3;
 var ACTION_ELEMENT_Y3 = 50;
 var SIZE3 = 32;
-function LinkedListSimple(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "SimpleLinkedList";
-  opts2.heightSingleMode = 250;
-  opts2.height = 300;
-  opts2.heightMobile = 450;
-  let am = initAnimationManager(opts2);
+function LinkedListSimple(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "SimpleLinkedList";
+  opts.heightSingleMode = 250;
+  opts.height = 300;
+  opts.heightMobile = 450;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
-  if (opts2.initialData) {
-    const n = opts2.initialData.length;
+  if (opts.initialData) {
+    const n = opts.initialData.length;
     if (n > 0) {
       const desiredHeadX = LINKED_LIST_START_X3;
       this._initialFirstNodeX = desiredHeadX + (n - 1) * LINKED_LIST_ELEM_SPACING3;
     }
-    for (let d of opts2.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertFront.bind(this), d);
       am.skipForward();
     }
@@ -17592,16 +18954,16 @@ var SIZE4 = 32;
 var LINK_INDEX_NEXT = 0;
 var LINK_INDEX_PREV = 1;
 var NUM_LINKS_DOUBLY = 2;
-function DoublyLinkedList(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = "Doubly Linked List (Dummy Head/Tail)";
-  opts2.heightSingleMode = 260;
-  opts2.height = 320;
-  opts2.heightMobile = 470;
-  let am = initAnimationManager(opts2);
+function DoublyLinkedList(opts = {}) {
+  if (!opts.title)
+    opts.title = "Doubly Linked List (Dummy Head/Tail)";
+  opts.heightSingleMode = 260;
+  opts.height = 320;
+  opts.heightMobile = 470;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertBack.bind(this), d);
       am.skipForward();
     }
@@ -18492,6 +19854,7 @@ function OpenHash(canvas2) {
   let am;
   let w2;
   let h;
+  const opts = canvas2 || {};
   if (canvas2 && typeof canvas2.getContext === "function") {
     const legacyCanvas = canvas2;
     am = initCanvas2(legacyCanvas, null, "Open Hashing", false, {
@@ -18515,6 +19878,12 @@ function OpenHash(canvas2) {
     h = viewHeight;
   }
   this.init(am, w2, h);
+  if (opts && Array.isArray(opts.initialData)) {
+    const hasString = opts.initialData.some((d) => typeof d === "string");
+    if (hasString) {
+      this.changeHashTypeCallback(false);
+    }
+  }
   if (opts.initialData) {
     for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
@@ -18532,7 +19901,7 @@ var LINKED_ITEM_WIDTH = 50;
 var LINKED_ITEM_Y_DELTA = 50;
 var HASH_TABLE_SIZE = 13;
 var ARRAY_Y_POS4 = 300;
-var INDEX_COLOR3 = "#0000FF";
+var INDEX_COLOR2 = "#0000FF";
 OpenHash.prototype = new Hash();
 OpenHash.prototype.constructor = OpenHash;
 OpenHash.superclass = Hash.prototype;
@@ -18549,7 +19918,7 @@ OpenHash.prototype.addControls = function() {
 };
 OpenHash.prototype.insertElement = function(elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Inserting element: " + String(elem));
+  this.cmd("SetMessage", "Inserting element: " + String(elem));
   var index = this.doHash(elem);
   var node = new LinkedListNode(elem, this.nextIndex++, 100, 75);
   this.cmd(
@@ -18576,7 +19945,7 @@ OpenHash.prototype.insertElement = function(elem) {
   node.next = this.hashTableValues[index];
   this.hashTableValues[index] = node;
   this.repositionList(index);
-  this.cmd("SetText", this.ExplainLabel, "");
+  this.cmd("SetMessage", "");
   return this.commands;
 };
 OpenHash.prototype.repositionList = function(index) {
@@ -18593,14 +19962,10 @@ OpenHash.prototype.repositionList = function(index) {
 };
 OpenHash.prototype.deleteElement = function(elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem);
+  this.cmd("SetMessage", "Deleting element: " + elem);
   var index = this.doHash(elem);
   if (this.hashTableValues[index] == null) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Deleting element: " + elem + "  Element not in table"
-    );
+    this.cmd("SetMessage", "Deleting element: " + elem + "  Element not in table");
     return this.commands;
   }
   this.cmd("SetHighlight", this.hashTableValues[index].graphicID, 1);
@@ -18630,11 +19995,7 @@ OpenHash.prototype.deleteElement = function(elem) {
     this.cmd("SetHighlight", tmp.graphicID, 0);
     if (tmp.data == elem) {
       found = true;
-      this.cmd(
-        "SetText",
-        this.ExplainLabel,
-        "Deleting element: " + elem + "  Element deleted"
-      );
+      this.cmd("SetMessage", "Deleting element: " + elem + "  Element deleted");
       if (tmp.next != null) {
         this.cmd("Connect", tmpPrev.graphicID, tmp.next.graphicID);
       } else {
@@ -18649,17 +20010,13 @@ OpenHash.prototype.deleteElement = function(elem) {
     }
   }
   if (!found) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Deleting element: " + elem + "  Element not in table"
-    );
+    this.cmd("SetMessage", "Deleting element: " + elem + "  Element not in table");
   }
   return this.commands;
 };
 OpenHash.prototype.findElement = function(elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem);
+  this.cmd("SetMessage", "Finding Element: " + elem);
   var index = this.doHash(elem);
   var compareIndex = this.nextIndex++;
   var found = false;
@@ -18678,21 +20035,25 @@ OpenHash.prototype.findElement = function(elem) {
     tmp = tmp.next;
   }
   if (found) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Finding Element: " + elem + "  Found!"
-    );
+    this.cmd("SetMessage", "Finding Element: " + elem + "  Found!");
   } else {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Finding Element: " + elem + "  Not Found!"
-    );
+    this.cmd("SetMessage", "Finding Element: " + elem + "  Not Found!");
   }
   this.cmd("Delete", compareIndex);
   this.nextIndex--;
   return this.commands;
+};
+OpenHash.prototype.doInsert = function(value) {
+  return this.implementAction(this.insertElement.bind(this), value);
+};
+OpenHash.prototype.doRemove = function(value) {
+  return this.implementAction(this.deleteElement.bind(this), value);
+};
+OpenHash.prototype.doFind = function(value) {
+  return this.implementAction(this.findElement.bind(this), value);
+};
+OpenHash.prototype.doGrow = function(newSize) {
+  return [];
 };
 OpenHash.prototype.setup = function() {
   this.hashTableVisual = new Array(HASH_TABLE_SIZE);
@@ -18722,7 +20083,7 @@ OpenHash.prototype.setup = function() {
     this.indexYPos[i] = this.POINTER_ARRAY_ELEM_Y + POINTER_ARRAY_ELEM_HEIGHT;
     this.hashTableValues[i] = null;
     this.cmd("CreateLabel", nextID, i, this.indexXPos[i], this.indexYPos[i]);
-    this.cmd("SetForegroundColor", nextID, INDEX_COLOR3);
+    this.cmd("SetForegroundColor", nextID, INDEX_COLOR2);
   }
   this.cmd("CreateLabel", this.ExplainLabel, "", 10, 25, 0);
   this.animationManager.StartNewAnimation(this.commands);
@@ -18774,8 +20135,8 @@ function LinkedListNode(val, id, initialX, initialY) {
 // AlgorithmLibrary/QueueArray.js
 var ARRAY_START_X = 100;
 var ARRAY_START_Y = 100;
-var ARRAY_ELEM_WIDTH6 = 35;
-var ARRAY_ELEM_HEIGHT6 = 20;
+var ARRAY_ELEM_WIDTH5 = 35;
+var ARRAY_ELEM_HEIGHT5 = 20;
 var ARRAY_ELEMS_PER_LINE = 10;
 var ARRAY_LINE_SPACING = 130;
 var HEAD_LABEL_X = 100;
@@ -18790,20 +20151,20 @@ var QUEUE_LABEL_X = HEAD_LABEL_X + 280;
 var QUEUE_LABEL_Y = 30;
 var QUEUE_ELEMENT_X = HEAD_LABEL_X + 280;
 var QUEUE_ELEMENT_Y = 30;
-var INDEX_COLOR4 = "#0000FF";
+var INDEX_COLOR3 = "#0000FF";
 var SIZE5 = 8;
-function QueueArray(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "Queue (Array)";
-  opts2.heightSingleMode = 250;
-  opts2.height = 300;
-  opts2.heightMobile = 450;
-  if (opts2.size)
-    SIZE5 = opts2.size;
-  let am = initAnimationManager(opts2);
+function QueueArray(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "Queue (Array)";
+  opts.heightSingleMode = 250;
+  opts.height = 300;
+  opts.heightMobile = 450;
+  if (opts.size)
+    SIZE5 = opts.size;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.enqueue.bind(this), d);
       am.skipForward();
     }
@@ -18875,14 +20236,14 @@ QueueArray.prototype.setup = function() {
   this.tail = 0;
   this.leftoverLabelID = this.nextIndex++;
   for (var i = 0; i < SIZE5; i++) {
-    var xpos = i % ARRAY_ELEMS_PER_LINE * ARRAY_ELEM_WIDTH6 + ARRAY_START_X;
+    var xpos = i % ARRAY_ELEMS_PER_LINE * ARRAY_ELEM_WIDTH5 + ARRAY_START_X;
     var ypos = Math.floor(i / ARRAY_ELEMS_PER_LINE) * ARRAY_LINE_SPACING + ARRAY_START_Y;
     this.cmd(
       "CreateRectangle",
       this.arrayID[i],
       "",
-      ARRAY_ELEM_WIDTH6,
-      ARRAY_ELEM_HEIGHT6,
+      ARRAY_ELEM_WIDTH5,
+      ARRAY_ELEM_HEIGHT5,
       xpos,
       ypos
     );
@@ -18891,17 +20252,17 @@ QueueArray.prototype.setup = function() {
       this.arrayLabelID[i],
       i,
       xpos,
-      ypos + ARRAY_ELEM_HEIGHT6
+      ypos + ARRAY_ELEM_HEIGHT5
     );
-    this.cmd("SetForegroundColor", this.arrayLabelID[i], INDEX_COLOR4);
+    this.cmd("SetForegroundColor", this.arrayLabelID[i], INDEX_COLOR3);
   }
   this.cmd("CreateLabel", this.headLabelID, "Start", HEAD_LABEL_X, HEAD_LABEL_Y);
   this.cmd(
     "CreateRectangle",
     this.headID,
     0,
-    ARRAY_ELEM_WIDTH6,
-    ARRAY_ELEM_HEIGHT6,
+    ARRAY_ELEM_WIDTH5,
+    ARRAY_ELEM_HEIGHT5,
     HEAD_POS_X,
     HEAD_POS_Y
   );
@@ -18910,8 +20271,8 @@ QueueArray.prototype.setup = function() {
     "CreateRectangle",
     this.tailID,
     0,
-    ARRAY_ELEM_WIDTH6,
-    ARRAY_ELEM_HEIGHT6,
+    ARRAY_ELEM_WIDTH5,
+    ARRAY_ELEM_HEIGHT5,
     TAIL_POS_X4,
     TAIL_POS_Y
   );
@@ -18969,14 +20330,14 @@ QueueArray.prototype.enqueue = function(elemToEnqueue) {
   this.cmd(
     "CreateHighlightCircle",
     this.highlight1ID,
-    INDEX_COLOR4,
+    INDEX_COLOR3,
     TAIL_POS_X4,
     TAIL_POS_Y
   );
   this.cmd("Step");
-  var xpos = this.tail % ARRAY_ELEMS_PER_LINE * ARRAY_ELEM_WIDTH6 + ARRAY_START_X;
+  var xpos = this.tail % ARRAY_ELEMS_PER_LINE * ARRAY_ELEM_WIDTH5 + ARRAY_START_X;
   var ypos = Math.floor(this.tail / ARRAY_ELEMS_PER_LINE) * ARRAY_LINE_SPACING + ARRAY_START_Y;
-  this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT6);
+  this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT5);
   this.cmd("Step");
   this.cmd("Move", labEnqueueValID, xpos, ypos);
   this.cmd("Step");
@@ -19007,15 +20368,15 @@ QueueArray.prototype.dequeue = function(ignored) {
   this.cmd(
     "CreateHighlightCircle",
     this.highlight1ID,
-    INDEX_COLOR4,
+    INDEX_COLOR3,
     HEAD_POS_X,
     HEAD_POS_Y
   );
   this.cmd("SetMessage", "Start gives location of first value.");
   this.cmd("Step");
-  var xpos = this.head % ARRAY_ELEMS_PER_LINE * ARRAY_ELEM_WIDTH6 + ARRAY_START_X;
+  var xpos = this.head % ARRAY_ELEMS_PER_LINE * ARRAY_ELEM_WIDTH5 + ARRAY_START_X;
   var ypos = Math.floor(this.head / ARRAY_ELEMS_PER_LINE) * ARRAY_LINE_SPACING + ARRAY_START_Y;
-  this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT6);
+  this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT5);
   this.cmd("Step");
   this.cmd("Delete", this.highlight1ID);
   var dequeuedVal = this.arrayData[this.head];
@@ -19072,16 +20433,16 @@ var PUSH_LABEL_Y = 25;
 var PUSH_ELEMENT_X = PUSH_LABEL_X;
 var PUSH_ELEMENT_Y = 50;
 var SIZE6 = 32;
-function QueueLL(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "Queue (Linked List)";
-  opts2.heightSingleMode = 250;
-  opts2.height = 300;
-  opts2.heightMobile = 450;
-  let am = initAnimationManager(opts2);
+function QueueLL(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "Queue (Linked List)";
+  opts.heightSingleMode = 250;
+  opts.height = 300;
+  opts.heightMobile = 450;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.enqueue.bind(this), d);
       am.skipForward();
     }
@@ -19326,19 +20687,19 @@ QueueLL.prototype.clearData = function() {
 };
 
 // AlgorithmLibrary/RedBlack.js
-function RedBlack(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "Red Black Tree";
-  opts2.centered = true;
-  opts2.heightSingleMode = 250;
-  opts2.height = 350;
-  opts2.heightMobile = 450;
-  opts2.heightMobileSingle = 350;
-  let am = initAnimationManager(opts2);
+function RedBlack(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "Red Black Tree";
+  opts.centered = true;
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  let am = initAnimationManager(opts);
   this.init(am, 600, 400);
   this.addControls();
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -20904,19 +22265,19 @@ SPLAYTREE.STARTING_Y = 50;
 SPLAYTREE.FIRST_PRINT_POS_X = 50;
 SPLAYTREE.PRINT_VERTICAL_GAP = 20;
 SPLAYTREE.PRINT_HORIZONTAL_GAP = 50;
-function SPLAYTREE(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "Splay Tree";
-  opts2.centered = true;
-  opts2.heightSingleMode = 250;
-  opts2.height = 350;
-  opts2.heightMobile = 450;
-  opts2.heightMobileSingle = 350;
-  let am = initAnimationManager(opts2);
+function SPLAYTREE(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "Splay Tree";
+  opts.centered = true;
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
   this.addControls();
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -21829,19 +23190,19 @@ SPLAYTREE.prototype.enableUI = function(event) {
 };
 
 // AlgorithmLibrary/Treap.js
-function Treap(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = "Treap";
-  opts2.centered = true;
-  opts2.heightSingleMode = 250;
-  opts2.height = 350;
-  opts2.heightMobile = 450;
-  opts2.heightMobileSingle = 350;
-  let am = initAnimationManager(opts2);
+function Treap(opts = {}) {
+  if (!opts.title)
+    opts.title = "Treap";
+  opts.centered = true;
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
   this.addControls();
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
       am.skipForward();
     }
@@ -22346,8 +23707,8 @@ Treap.prototype.enableUI = function() {
 // AlgorithmLibrary/StackArray.js
 var ARRAY_START_X2 = 100;
 var ARRAY_START_Y2 = 100;
-var ARRAY_ELEM_WIDTH7 = 50;
-var ARRAY_ELEM_HEIGHT7 = 30;
+var ARRAY_ELEM_WIDTH6 = 50;
+var ARRAY_ELEM_HEIGHT6 = 30;
 var ARRAY_ELEMS_PER_LINE2 = 10;
 var ARRAY_LINE_SPACING2 = 130;
 var TOP_LABEL_X5 = 100;
@@ -22358,20 +23719,20 @@ var STACK_LABEL_X = TOP_LABEL_X5 + 180;
 var STACK_LABEL_Y = 30;
 var STACK_ELEMENT_X = STACK_LABEL_X;
 var STACK_ELEMENT_Y = 30;
-var INDEX_COLOR5 = "#0000FF";
+var INDEX_COLOR4 = "#0000FF";
 var SIZE7 = 8;
-function StackArray(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "Stack (Array)";
-  opts2.heightSingleMode = 250;
-  opts2.height = 300;
-  opts2.heightMobile = 450;
-  if (opts2.size)
-    SIZE7 = opts2.size;
-  let am = initAnimationManager(opts2);
+function StackArray(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "Stack (Array)";
+  opts.heightSingleMode = 250;
+  opts.height = 300;
+  opts.heightMobile = 450;
+  if (opts.size)
+    SIZE7 = opts.size;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.push.bind(this), d);
       am.skipForward();
     }
@@ -22448,14 +23809,14 @@ StackArray.prototype.setup = function() {
   this.leftoverLabelID = this.nextIndex++;
   this.commands = new Array();
   for (var i = 0; i < SIZE7; i++) {
-    var xpos = i % ARRAY_ELEMS_PER_LINE2 * ARRAY_ELEM_WIDTH7 + ARRAY_START_X2;
+    var xpos = i % ARRAY_ELEMS_PER_LINE2 * ARRAY_ELEM_WIDTH6 + ARRAY_START_X2;
     var ypos = Math.floor(i / ARRAY_ELEMS_PER_LINE2) * ARRAY_LINE_SPACING2 + ARRAY_START_Y2;
     this.cmd(
       "CreateRectangle",
       this.arrayID[i],
       "",
-      ARRAY_ELEM_WIDTH7,
-      ARRAY_ELEM_HEIGHT7,
+      ARRAY_ELEM_WIDTH6,
+      ARRAY_ELEM_HEIGHT6,
       xpos,
       ypos
     );
@@ -22464,17 +23825,17 @@ StackArray.prototype.setup = function() {
       this.arrayLabelID[i],
       i,
       xpos,
-      ypos + ARRAY_ELEM_HEIGHT7
+      ypos + ARRAY_ELEM_HEIGHT6
     );
-    this.cmd("SetForegroundColor", this.arrayLabelID[i], INDEX_COLOR5);
+    this.cmd("SetForegroundColor", this.arrayLabelID[i], INDEX_COLOR4);
   }
   this.cmd("CreateLabel", this.topLabelID, "Top", TOP_LABEL_X5, TOP_LABEL_Y6);
   this.cmd(
     "CreateRectangle",
     this.topID,
     0,
-    ARRAY_ELEM_WIDTH7,
-    ARRAY_ELEM_HEIGHT7,
+    ARRAY_ELEM_WIDTH6,
+    ARRAY_ELEM_HEIGHT6,
     TOP_POS_X6,
     TOP_POS_Y6
   );
@@ -22528,14 +23889,14 @@ StackArray.prototype.push = function(elemToPush) {
   this.cmd(
     "CreateHighlightCircle",
     this.highlight1ID,
-    INDEX_COLOR5,
+    INDEX_COLOR4,
     TOP_POS_X6,
     TOP_POS_Y6
   );
   this.cmd("Step");
-  var xpos = this.top % ARRAY_ELEMS_PER_LINE2 * ARRAY_ELEM_WIDTH7 + ARRAY_START_X2;
+  var xpos = this.top % ARRAY_ELEMS_PER_LINE2 * ARRAY_ELEM_WIDTH6 + ARRAY_START_X2;
   var ypos = Math.floor(this.top / ARRAY_ELEMS_PER_LINE2) * ARRAY_LINE_SPACING2 + ARRAY_START_Y2;
-  this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT7);
+  this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT6);
   this.cmd("Step");
   this.cmd("Move", labPushValID, xpos, ypos);
   this.cmd("Step");
@@ -22571,15 +23932,15 @@ StackArray.prototype.pop = function(ignored) {
   this.cmd(
     "CreateHighlightCircle",
     this.highlight1ID,
-    INDEX_COLOR5,
+    INDEX_COLOR4,
     TOP_POS_X6,
     TOP_POS_Y6
   );
   this.cmd("SetMessage", "Top gives location of last value.");
   this.cmd("Step");
-  var xpos = this.top % ARRAY_ELEMS_PER_LINE2 * ARRAY_ELEM_WIDTH7 + ARRAY_START_X2;
+  var xpos = this.top % ARRAY_ELEMS_PER_LINE2 * ARRAY_ELEM_WIDTH6 + ARRAY_START_X2;
   var ypos = Math.floor(this.top / ARRAY_ELEMS_PER_LINE2) * ARRAY_LINE_SPACING2 + ARRAY_START_Y2;
-  this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT7);
+  this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT6);
   this.cmd("Step");
   this.cmd("Delete", this.highlight1ID);
   var poppedVal = this.arrayData[this.top];
@@ -22609,15 +23970,15 @@ StackArray.prototype.peek = function(ignored) {
   this.cmd(
     "CreateHighlightCircle",
     this.highlight1ID,
-    INDEX_COLOR5,
+    INDEX_COLOR4,
     TOP_POS_X6,
     TOP_POS_Y6
   );
   this.cmd("SetMessage", "Top-1 gives location of last value.");
   this.cmd("Step");
-  const xpos = peekIndex % ARRAY_ELEMS_PER_LINE2 * ARRAY_ELEM_WIDTH7 + ARRAY_START_X2;
+  const xpos = peekIndex % ARRAY_ELEMS_PER_LINE2 * ARRAY_ELEM_WIDTH6 + ARRAY_START_X2;
   const ypos = Math.floor(peekIndex / ARRAY_ELEMS_PER_LINE2) * ARRAY_LINE_SPACING2 + ARRAY_START_Y2;
-  this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT7);
+  this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT6);
   this.cmd("Step");
   this.cmd("Delete", this.highlight1ID);
   this.cmd("CreateLabel", labPeekValID, peekedVal, xpos, ypos);
@@ -22662,18 +24023,18 @@ var STACK_LABEL_Y2 = 25;
 var STACK_ELEMENT_X2 = STACK_LABEL_X2;
 var STACK_ELEMENT_Y2 = 50;
 var SIZE8 = 32;
-function StackLL(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = opts2.title || "Stack (Linked List)";
-  opts2.heightSingleMode = 250;
-  opts2.height = 300;
-  opts2.heightMobile = 450;
-  if (opts2.size)
-    SIZE8 = opts2.size;
-  let am = initAnimationManager(opts2);
+function StackLL(opts = {}) {
+  if (!opts.title)
+    opts.title = opts.title || "Stack (Linked List)";
+  opts.heightSingleMode = 250;
+  opts.height = 300;
+  opts.heightMobile = 450;
+  if (opts.size)
+    SIZE8 = opts.size;
+  let am = initAnimationManager(opts);
   this.init(am, 800, 400);
-  if (opts2.initialData) {
-    for (let d of opts2.initialData) {
+  if (opts.initialData) {
+    for (let d of opts.initialData) {
       this.implementAction(this.push.bind(this), d);
       am.skipForward();
     }
@@ -22948,26 +24309,26 @@ ExpressionTree.STARTING_Y = 40;
 ExpressionTree.LEVEL_HEIGHT = 70;
 ExpressionTree.NODE_RADIUS = 20;
 ExpressionTree.MARGIN_X = 50;
-function ExpressionTree(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = "Expression Tree";
-  opts2.centered = true;
-  const viewWidth = Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 1e3;
-  const viewHeight = Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 500;
-  if (!Number.isFinite(opts2.height)) {
-    opts2.height = viewHeight;
+function ExpressionTree(opts = {}) {
+  if (!opts.title)
+    opts.title = "Expression Tree";
+  opts.centered = true;
+  const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+  const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
+  if (!Number.isFinite(opts.height)) {
+    opts.height = viewHeight;
   }
-  if (!Number.isFinite(opts2.viewWidth)) {
-    opts2.viewWidth = viewWidth;
+  if (!Number.isFinite(opts.viewWidth)) {
+    opts.viewWidth = viewWidth;
   }
-  if (!Number.isFinite(opts2.viewHeight)) {
-    opts2.viewHeight = viewHeight;
+  if (!Number.isFinite(opts.viewHeight)) {
+    opts.viewHeight = viewHeight;
   }
-  const am = initAnimationManager(opts2);
+  const am = initAnimationManager(opts);
   this.init(am, viewWidth, viewHeight);
   this.addControls();
-  if (opts2.initialData) {
-    const root = this.parseInitialData(opts2.initialData);
+  if (opts.initialData) {
+    const root = this.parseInitialData(opts.initialData);
     this.implementAction(this.buildTree.bind(this), root);
     am.skipForward();
     am.clearHistory();
@@ -23018,10 +24379,10 @@ ExpressionTree.prototype.init = function(am, w2, h) {
     this.implementAction(this.evaluateTree.bind(this), "");
   };
 };
-ExpressionTree.prototype.deleteTreeGraphicsRec = function(node, opts2 = {}) {
+ExpressionTree.prototype.deleteTreeGraphicsRec = function(node, opts = {}) {
   if (!node)
     return;
-  const doStep = opts2.step !== false;
+  const doStep = opts.step !== false;
   const children = Array.isArray(node.children) ? node.children : [];
   let childNum = 1;
   for (const child of children) {
@@ -23034,7 +24395,7 @@ ExpressionTree.prototype.deleteTreeGraphicsRec = function(node, opts2 = {}) {
       this.cmd("Step");
       this.cmd("SetHighlight", node.graphicID, 0);
     }
-    this.deleteTreeGraphicsRec(child, opts2);
+    this.deleteTreeGraphicsRec(child, opts);
     childNum++;
   }
   if (Number.isFinite(node.graphicID)) {
@@ -23693,15 +25054,15 @@ var SPACING_X = 80;
 var HEAD_LABEL = "HEAD";
 var TAIL_LABEL = "TAIL";
 var MAX_LEVELS = 6;
-function SkipList(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = "SkipList";
-  opts2.heightSingleMode = 420;
-  opts2.height = 480;
-  opts2.heightMobile = 620;
-  let am = initAnimationManager(opts2);
+function SkipList(opts = {}) {
+  if (!opts.title)
+    opts.title = "SkipList";
+  opts.heightSingleMode = 420;
+  opts.height = 480;
+  opts.heightMobile = 620;
+  let am = initAnimationManager(opts);
   this.init(am, 900, 500);
-  const seed = Array.isArray(opts2.initialData) ? opts2.initialData.slice() : [];
+  const seed = Array.isArray(opts.initialData) ? opts.initialData.slice() : [];
   for (let v of seed) {
     this.implementAction(this.insertElement.bind(this), v);
     this.animationManager.skipForward();
@@ -24343,6 +25704,7 @@ function TopoSortDFS(canvas2) {
   let am;
   let w2;
   let h;
+  let graphOpts = null;
   if (canvas2 && typeof canvas2.getContext === "function") {
     const legacyCanvas = canvas2;
     am = initCanvas2(legacyCanvas, null, "Topological Sort (DFS)", false, {
@@ -24352,20 +25714,21 @@ function TopoSortDFS(canvas2) {
     w2 = legacyCanvas.width;
     h = legacyCanvas.height;
   } else {
-    const opts2 = canvas2 || {};
-    const viewWidth = Number.isFinite(opts2.viewWidth) && opts2.viewWidth > 0 ? opts2.viewWidth : Number.isFinite(opts2.width) && opts2.width > 0 ? opts2.width : 1e3;
-    const viewHeight = Number.isFinite(opts2.viewHeight) && opts2.viewHeight > 0 ? opts2.viewHeight : Number.isFinite(opts2.height) && opts2.height > 0 ? opts2.height : 500;
+    const opts = canvas2 || {};
+    graphOpts = opts;
+    const viewWidth = Number.isFinite(opts.viewWidth) && opts.viewWidth > 0 ? opts.viewWidth : Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1e3;
+    const viewHeight = Number.isFinite(opts.viewHeight) && opts.viewHeight > 0 ? opts.viewHeight : Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 500;
     am = initAnimationManager({
-      title: opts2.title || "Topological Sort (DFS)",
-      height: opts2.height || viewHeight,
+      title: opts.title || "Topological Sort (DFS)",
+      height: opts.height || viewHeight,
       viewWidth,
       viewHeight,
-      ...opts2
+      ...opts
     });
     w2 = viewWidth;
     h = viewHeight;
   }
-  this.init(am, w2, h);
+  this.init(am, w2, h, graphOpts);
 }
 TopoSortDFS.ORDERING_INITIAL_X = 200;
 TopoSortDFS.ORDERING_INITIAL_Y = 50;
@@ -24464,9 +25827,9 @@ TopoSortDFS.prototype.addControls = function() {
   this.startButton.onclick = this.startCallback.bind(this);
   TopoSortDFS.superclass.addControls.call(this, false);
 };
-TopoSortDFS.prototype.init = function(am, w2, h) {
+TopoSortDFS.prototype.init = function(am, w2, h, graphOpts) {
   this.showEdgeCosts = false;
-  TopoSortDFS.superclass.init.call(this, am, w2, h, true, true);
+  TopoSortDFS.superclass.init.call(this, am, w2, h, true, true, graphOpts);
 };
 TopoSortDFS.prototype.setup = function() {
   TopoSortDFS.superclass.setup.call(this);
@@ -24510,9 +25873,16 @@ TopoSortDFS.prototype.startCallback = function(event) {
   this.runLocked = true;
   if (this.startButton)
     this.startButton.disabled = true;
-  this.implementAction(this.doTopoSort.bind(this), "");
+  this.doTopoSort();
 };
-TopoSortDFS.prototype.doTopoSort = function(ignored) {
+TopoSortDFS.prototype.doTopoSort = function() {
+  this.runLocked = true;
+  if (this.startButton)
+    this.startButton.disabled = true;
+  this.implementAction(this.doTopoSortAction.bind(this), "");
+  return true;
+};
+TopoSortDFS.prototype.doTopoSortAction = function(ignored) {
   this.visited = new Array(this.size);
   this.commands = new Array();
   this.topoOrderArrayL = new Array();
@@ -24836,15 +26206,15 @@ Trie.NEW_NODE_X = 50;
 Trie.FIRST_PRINT_POS_X = 50;
 Trie.PRINT_VERTICAL_GAP = 20;
 Trie.PRINT_HORIZONTAL_GAP = 50;
-function Trie(opts2 = {}) {
-  if (!opts2.title)
-    opts2.title = "Trie (Prefix Tree)";
-  opts2.centered = true;
-  opts2.heightSingleMode = 250;
-  opts2.height = 350;
-  opts2.heightMobile = 450;
-  opts2.heightMobileSingle = 350;
-  let am = initAnimationManager(opts2);
+function Trie(opts = {}) {
+  if (!opts.title)
+    opts.title = "Trie (Prefix Tree)";
+  opts.centered = true;
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  let am = initAnimationManager(opts);
   this.init(am, 1e3, 400);
   this.addControls();
 }
@@ -25352,6 +26722,86 @@ Trie.prototype.enableUI = function() {
       el.disabled = false;
   }
 };
+
+// AlgorithmLibrary/StringHash.js
+function StringHash(opts = {}) {
+  if (!opts.title)
+    opts.title = "String Hash";
+  opts.centered = true;
+  opts.heightSingleMode = 250;
+  opts.height = 350;
+  opts.heightMobile = 450;
+  opts.heightMobileSingle = 350;
+  let am = initAnimationManager(opts);
+  this.init(am, 800, 300);
+  this.hashingIntegers = false;
+  this.animateStringHashing = true;
+  this.table_size = 13;
+  const om = am && am.animatedObjects;
+  const vb = om.svg.getAttribute("viewBox").split(" ").map(parseFloat);
+  const baseW = Number.isFinite(om.svgBaseViewWidth) ? om.svgBaseViewWidth : vb[2];
+  const shiftX = 100;
+  vb[0] = vb[0] + shiftX;
+  om.svg.setAttribute("viewBox", vb.join(" "));
+}
+StringHash.prototype = new Hash();
+StringHash.prototype.constructor = StringHash;
+StringHash.superclass = Hash.prototype;
+StringHash.prototype.init = function(am, w2, h) {
+  StringHash.superclass.init.call(this, am, w2, h);
+  this.nextIndex = 0;
+  this.commands = [];
+  this.hashingIntegers = false;
+  this.animateStringHashing = true;
+  this.table_size = 13;
+  this.doHash = (str) => this.implementAction(this.runHash.bind(this), String(str));
+};
+StringHash.prototype.addControls = function() {
+  addSeparatorToAlgorithmBar();
+  this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "String");
+  this.inputField.setAttribute("placeholder", "String to hash");
+  this.inputField.onkeydown = this.returnSubmit(
+    this.inputField,
+    this.hashCallback.bind(this),
+    64,
+    false
+  );
+  this.hashButton = addControlToAlgorithmBar("Button", "Hash");
+  this.hashButton.onclick = this.hashCallback.bind(this);
+};
+StringHash.prototype.reset = function() {
+  this.nextIndex = 0;
+  this.commands = [];
+};
+StringHash.prototype.hashCallback = function() {
+  const value = String(this.inputField.value);
+  if (value !== "") {
+    this.inputField.value = "";
+    this.implementAction(this.runHash.bind(this), value);
+  }
+};
+StringHash.prototype.runHash = function(str) {
+  this.commands = [];
+  this.cmd("SetMessage", "Hash '" + str + "'");
+  this.cmd("Step");
+  Hash.prototype.doHash.call(this, str, true);
+  this.cmd("SetMessage", "");
+  return this.commands;
+};
+StringHash.prototype.disableUI = function() {
+  const ctrls = [this.inputField, this.hashButton];
+  for (const el of ctrls) {
+    if (el)
+      el.disabled = true;
+  }
+};
+StringHash.prototype.enableUI = function() {
+  const ctrls = [this.inputField, this.hashButton];
+  for (const el of ctrls) {
+    if (el)
+      el.disabled = false;
+  }
+};
 export {
   AVL,
   BFS,
@@ -25360,12 +26810,13 @@ export {
   BSTIterator,
   BTree,
   ClosedHash,
-  ClosedHashBucket,
   ConnectedComponent,
   DFS,
+  DetectCycle,
   DijkstraPrim,
   DoublyLinkedList,
   ExpressionTree,
+  GraphRepresentation,
   Hash,
   Heap,
   HeapMax,
@@ -25384,6 +26835,7 @@ export {
   SPLAYTREE as SplayTree,
   StackArray,
   StackLL,
+  StringHash,
   TopoSortDFS,
   Treap,
   Trie

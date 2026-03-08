@@ -79,7 +79,7 @@ svg {
   container-type: inline-size;
   min-width: 150px;
 }
-@media (min-width: 450px) {
+@media (min-width: 600px) {
   #algoControlSection {
     overflow: auto;
     resize: horizontal;
@@ -144,14 +144,25 @@ svg text {
   }
 }
 :root {
-  --svgColor: rgb(61, 89, 146);
+  --svgColor: rgb(0, 0, 0);
   --svgColor--red: rgb(231, 36, 36);
   --svgColor--redback: rgb(255, 233, 233);
-  --svgColor--black: rgb(0, 0 ,0);
+  --svgColor--black: rgb(0, 0, 0);
   --svgColor--blackback: rgb(227, 227, 227);
-  --svgColor--highlight: rgb(231, 36, 36);
-  --svgColor--althighlight: rgb(111, 0, 130);
+  --svgColor--highlight: rgb(214, 38, 38);
+  --svgColor--althighlight: rgb(52, 133, 198);
   --svgFillColor: white;
+  --controlBackground: #f0f8ff;
+}
+:root.dark-mode {
+  --svgColor: rgb(221, 221, 221);
+  --svgColor--red: rgb(231, 36, 36);
+  --svgColor--redback: rgb(255, 233, 233);
+  --svgColor--black: rgb(0, 0, 0);
+  --svgColor--blackback: rgb(82, 82, 82);
+  --svgColor--highlight: rgb(214, 38, 38);
+  --svgColor--althighlight: rgb(52, 133, 198);
+  --svgFillColor: rgb(82, 82, 82);
   --controlBackground: #f0f8ff;
 }
 /*# sourceMappingURL=entry.css.map */
