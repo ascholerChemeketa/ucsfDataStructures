@@ -138,12 +138,18 @@ function makeSVG(centered, viewWidth = 800, viewHeight = 400) {
         <path fill="var(--svgColor--highlight)" d="M 0 0 L 10 5 L 0 10 z"></path>
       </marker>
       <style>
-        :root {
-          --svgFillColor: rgba(255,255,255,0);
-          --svgColor: #111111;
-          --svgColor--highlight: #FF5733;
-          font-family: sans-serif;
-        }
+      // :root {
+      //   --svgColor: var(rgb(0,0,0);
+      //   --svgColor--red: rgb(231, 36, 36);
+      //   --svgColor--redback: rgb(255, 233, 233);
+      //   --svgColor--black: rgb(0, 0 ,0);
+      //   --svgColor--blackback: rgb(227, 227, 227);
+      //   --svgColor--highlight: rgb(33, 139, 33);
+      //   --svgColor--althighlight: rgb(52, 133, 198);
+      //   --svgFillColor: white;
+      //   --controlBackground: #f0f8ff;
+      //   font-family: sans-serif;
+      // }
       </style>
     </defs>
     <g id="allElements">
@@ -238,6 +244,19 @@ export function ObjectManager(canvas, centered = false) {
     vb[1] = vb[1] + centerFactorY;
     vb[2] = nextVbW;
     vb[3] = nextVbH;
+    this.svg.setAttribute("viewBox", vb.join(" "));
+  };
+
+  this.shiftView = function (deltaX = 0, deltaY = 0) {
+    const dx = Number(deltaX);
+    const dy = Number(deltaY);
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+
+    const vb = this.svg.getAttribute("viewBox").split(" ").map(parseFloat);
+    if (vb.length < 4 || vb.some((v) => !Number.isFinite(v))) return;
+
+    vb[0] += dx;
+    vb[1] += dy;
     this.svg.setAttribute("viewBox", vb.join(" "));
   };
 
@@ -512,8 +531,23 @@ export function ObjectManager(canvas, centered = false) {
         svgElement.parentNode.removeChild(svgElement);
       }
 
+      let secondaryTextElement = null;
+      if (
+        this.Nodes[objectID] &&
+        this.Nodes[objectID].svgText &&
+        this.Nodes[objectID].svgText !== svgElement
+      ) {
+        secondaryTextElement = this.Nodes[objectID].svgText;
+        if (secondaryTextElement.parentNode) {
+          secondaryTextElement.parentNode.removeChild(secondaryTextElement);
+        }
+      }
+
       if (svgElement) {
         this.svg.getElementById(`layer_${layer}`).appendChild(svgElement);
+        if (secondaryTextElement) {
+          svgElement.after(secondaryTextElement);
+        }
       }
 
       // Apply addedToScene visibility immediately after layer change.

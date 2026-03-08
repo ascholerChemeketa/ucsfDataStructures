@@ -97,11 +97,11 @@ Hash.superclass = Algorithm.prototype;
 var MAX_HASH_LENGTH = 5;
 
 var HASH_NUMBER_START_X = 200;
-var HASH_X_DIFF = 7;
+var HASH_X_DIFF = 8;
 var HASH_NUMBER_START_Y = 10;
 var HASH_ADD_START_Y = 30;
 var HASH_INPUT_START_X = 80;
-var HASH_INPUT_X_DIFF = 8;
+var HASH_INPUT_X_DIFF = 10;
 var HASH_INPUT_START_Y = 45;
 var HASH_ADD_LINE_Y = 42;
 var HASH_RESULT_Y = 50;
@@ -129,43 +129,38 @@ Hash.prototype.init = function (am, w, h) {
 };
 
 Hash.prototype.addControls = function () {
-  this.insertField = addControlToAlgorithmBar("Text", "");
-  this.insertField.size = MAX_HASH_LENGTH;
-  this.insertField.onkeydown = this.returnSubmit(
-    this.insertField,
+  // Single shared input used by Insert/Remove/Find
+  
+  this.inputField = addControlToAlgorithmBar("Text", "", "inputField", "Value");
+  this.inputField.size = MAX_HASH_LENGTH;
+  this.inputField.onkeydown = this.returnSubmit(
+    this.inputField,
     this.insertCallback.bind(this),
     MAX_HASH_LENGTH,
     true,
   );
+  
+
   this.insertButton = addControlToAlgorithmBar("Button", "Insert");
   this.insertButton.onclick = this.insertCallback.bind(this);
 
-  this.deleteField = addControlToAlgorithmBar("Text", "");
-  this.deleteField.size = MAX_HASH_LENGTH;
-  this.deleteField.onkeydown = this.returnSubmit(
-    this.insertField,
-    this.deleteCallback.bind(this),
-    MAX_HASH_LENGTH,
-    true,
-  );
   this.deleteButton = addControlToAlgorithmBar("Button", "Remove");
   this.deleteButton.onclick = this.deleteCallback.bind(this);
 
-  this.findField = addControlToAlgorithmBar("Text", "");
-  this.findField.size = MAX_HASH_LENGTH;
-  this.findField.onkeydown = this.returnSubmit(
-    this.insertField,
-    this.findCallback.bind(this),
-    MAX_HASH_LENGTH,
-    true,
-  );
   this.findButton = addControlToAlgorithmBar("Button", "Find");
   this.findButton.onclick = this.findCallback.bind(this);
 
+  
   var radioButtonList = addRadioButtonGroupToAlgorithmBar(
-    ["Hash Integer", "Hash Strings"],
+    ["Integer Mode", "String Mode"],
     "HashType",
   );
+  
+  this.animateStringHashCheckbox = addCheckboxToAlgorithmBar(
+    "Animate string hashing",
+    "animateStringHashing",
+  );
+
   this.hashIntegerButton = radioButtonList[0];
   this.hashIntegerButton.onclick = this.changeHashTypeCallback.bind(this, true);
   //  this.hashIntegerButton.onclick = this.hashIntegerCallback.bind(this);
@@ -175,10 +170,6 @@ Hash.prototype.addControls = function () {
   //	this.hashStringButton.onclick = this.hashStringCallback.bind(this);
   this.hashIntegerButton.checked = true;
 
-  this.animateStringHashCheckbox = addCheckboxToAlgorithmBar(
-    "Animate string hashing",
-    "animateStringHashing",
-  );
   // addCheckboxToAlgorithmBar does not currently assign the element id.
   // Ensure the label's "for" attribute works.
   this.animateStringHashCheckbox.id = "animateStringHashing";
@@ -202,41 +193,17 @@ Hash.prototype.changeHashType = function (newHashingIntegerValue) {
   this.hashingIntegers = newHashingIntegerValue;
   if (this.hashingIntegers) {
     this.hashIntegerButton.checked = true;
-    this.insertField.onkeydown = this.returnSubmit(
-      this.insertField,
+    this.inputField.onkeydown = this.returnSubmit(
+      this.inputField,
       this.insertCallback.bind(this),
-      MAX_HASH_LENGTH,
-      true,
-    );
-    this.deleteField.onkeydown = this.returnSubmit(
-      this.insertField,
-      this.deleteCallback.bind(this),
-      MAX_HASH_LENGTH,
-      true,
-    );
-    this.findField.onkeydown = this.returnSubmit(
-      this.insertField,
-      this.findCallback.bind(this),
       MAX_HASH_LENGTH,
       true,
     );
   } else {
     this.hashStringButton.checked = true;
-    this.insertField.onkeydown = this.returnSubmit(
-      this.insertField,
+    this.inputField.onkeydown = this.returnSubmit(
+      this.inputField,
       this.insertCallback.bind(this),
-      MAX_HASH_LENGTH,
-      false,
-    );
-    this.deleteField.onkeydown = this.returnSubmit(
-      this.insertField,
-      this.deleteCallback.bind(this),
-      MAX_HASH_LENGTH,
-      false,
-    );
-    this.findField.onkeydown = this.returnSubmit(
-      this.insertField,
-      this.findCallback.bind(this),
       MAX_HASH_LENGTH,
       false,
     );
@@ -250,7 +217,7 @@ Hash.prototype.changeHashType = function (newHashingIntegerValue) {
   return this.resetAll();
 };
 
-Hash.prototype.doHash = function (input) {
+Hash.prototype.doHash = function (input, justHash = false) {
   if (this.hashingIntegers) {
     var labelID1 = this.nextIndex++;
     var labelID2 = this.nextIndex++;
@@ -272,7 +239,7 @@ Hash.prototype.doHash = function (input) {
       HASH_LABEL_X + HASH_LABEL_DELTA_X,
       HASH_LABEL_Y,
     );
-    this.cmd("SetMessage", "Compute hash index = value mod table size");
+    this.cmd("SetMessage", "Compute hash");
     this.cmd("Step");
     this.cmd(
       "CreateHighlightCircle",
@@ -434,7 +401,7 @@ Hash.prototype.doHash = function (input) {
           HASH_ADD_START_Y,
         );
       }
-      this.cmd("SetMessage", `Bring next character '${wordToHash[i]}' into position`);
+      this.cmd("SetMessage", `Bring bits for character '${wordToHash[i]}' into position`);
       this.cmd("Step");
       this.cmd(
         "CreateRectangle",
@@ -461,6 +428,7 @@ Hash.prototype.doHash = function (input) {
       for (j = 7; j >= 0; j--) {
         hashValue[j + 24] = hashValue[j + 24] ^ nextByte[j];
       }
+      let curHash = "";
       for (j = 0; j < 32; j++) {
         this.cmd(
           "CreateLabel",
@@ -470,8 +438,9 @@ Hash.prototype.doHash = function (input) {
           HASH_RESULT_Y,
           0,
         );
+        curHash += hashValue[j];
       }
-      this.cmd("SetMessage", "Show updated accumulator bits");
+      this.cmd("SetMessage", "Current hash is now: " + curHash);
       this.cmd("Step");
       for (j = 0; j < 8; j++) {
         this.cmd("Delete", nextByteID[j]);
@@ -487,7 +456,7 @@ Hash.prototype.doHash = function (input) {
           HASH_NUMBER_START_Y,
         );
       }
-      this.cmd("SetMessage", "Copy result back into accumulator line");
+      this.cmd("SetMessage", "Copy result back into accumulator");
       this.cmd("Step");
 
       if (i > 0) {
@@ -541,8 +510,13 @@ Hash.prototype.doHash = function (input) {
       HASH_NUMBER_START_Y,
       0,
     );
-    this.cmd("SetMessage", "Convert final bits into an integer value");
+    this.cmd("SetMessage", "Convert final bits into an integer value. Result is " + this.currHash);
     this.cmd("Step");
+    
+    if(justHash) {
+      return 0;
+    }
+
     for (j = 0; j < 32; j++) {
       this.cmd("Delete", digits[j]);
     }
@@ -585,31 +559,29 @@ Hash.prototype.doHash = function (input) {
 };
 
 Hash.prototype.resetAll = function () {
-  this.insertField.value = "";
-  this.deleteField.value = "";
-  this.findField.value = "";
+  if (this.inputField) this.inputField.value = "";
   return [];
 };
 Hash.prototype.insertCallback = function (event) {
-  var insertedValue = this.insertField.value;
+  var insertedValue = this.inputField.value;
   if (insertedValue != "") {
-    this.insertField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.insertElement.bind(this), insertedValue);
   }
 };
 
 Hash.prototype.deleteCallback = function (event) {
-  var deletedValue = this.deleteField.value;
+  var deletedValue = this.inputField.value;
   if (deletedValue != "") {
-    this.deleteField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.deleteElement.bind(this), deletedValue);
   }
 };
 
 Hash.prototype.findCallback = function (event) {
-  var findValue = this.findField.value;
+  var findValue = this.inputField.value;
   if (findValue != "") {
-    this.findField.value = "";
+    this.inputField.value = "";
     this.implementAction(this.findElement.bind(this), findValue);
   }
 };
@@ -625,21 +597,27 @@ Hash.prototype.reset = function () {
 };
 
 Hash.prototype.disableUI = function (event) {
-  this.insertField.disabled = true;
-  this.insertButton.disabled = true;
-  this.deleteField.disabled = true;
-  this.deleteButton.disabled = true;
-  this.findField.disabled = true;
-  this.findButton.disabled = true;
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.deleteButton,
+    this.findButton,
+  ];
+  for (const el of ctrls) {
+    if (el) el.disabled = true;
+  }
 };
 
 Hash.prototype.enableUI = function (event) {
-  this.insertField.disabled = false;
-  this.insertButton.disabled = false;
-  this.deleteField.disabled = false;
-  this.deleteButton.disabled = false;
-  this.findField.disabled = false;
-  this.findButton.disabled = false;
+  const ctrls = [
+    this.inputField,
+    this.insertButton,
+    this.deleteButton,
+    this.findButton,
+  ];
+  for (const el of ctrls) {
+    if (el) el.disabled = false;
+  }
 };
 
 /* no init, this is only a base class! 

@@ -69,6 +69,7 @@ export function ConnectedComponent(canvas) {
   let am;
   let w;
   let h;
+  let graphOpts = null;
 
   if (canvas && typeof canvas.getContext === "function") {
     const legacyCanvas = canvas;
@@ -80,6 +81,7 @@ export function ConnectedComponent(canvas) {
     h = legacyCanvas.height;
   } else {
     const opts = canvas || {};
+    graphOpts = opts;
     const viewWidth =
       Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
         ? opts.viewWidth
@@ -103,7 +105,7 @@ export function ConnectedComponent(canvas) {
     w = viewWidth;
     h = viewHeight;
   }
-  this.init(am, w, h);
+  this.init(am, w, h, graphOpts);
 }
 
 ConnectedComponent.prototype = new Graph();
@@ -119,9 +121,9 @@ ConnectedComponent.prototype.addControls = function () {
   ConnectedComponent.superclass.addControls.call(this, false);
 };
 
-ConnectedComponent.prototype.init = function (am, w, h) {
+ConnectedComponent.prototype.init = function (am, w, h, graphOpts) {
   this.showEdgeCosts = false;
-  ConnectedComponent.superclass.init.call(this, am, w, h, true, false); // TODO:  add no edge label flag to this?
+  ConnectedComponent.superclass.init.call(this, am, w, h, true, false, graphOpts); // TODO:  add no edge label flag to this?
   // Setup called in base class init function
 };
 

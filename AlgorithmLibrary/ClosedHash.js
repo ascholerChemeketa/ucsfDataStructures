@@ -77,6 +77,24 @@ export function ClosedHash(canvas) {
   }
 
   this.init(am, w, h);
+  // If any initial data is a string, default to String Mode
+  if (opts && Array.isArray(opts.initialData)) {
+    const hasString = opts.initialData.some((d) => typeof d === "string");
+    if (hasString) {
+      this.changeHashTypeCallback(false);
+    }
+  }
+  // Allow opts.probing to set probe type before loading data
+  if (opts && typeof opts.probing === "string") {
+    const mode = opts.probing.toLowerCase();
+    if (mode.startsWith("lin")) {
+      this.changeProbeType(this.linearProblingButton);
+    } else if (mode.startsWith("quad")) {
+      this.changeProbeType(this.quadraticProbingButton);
+    } else if (mode.startsWith("dou")) {
+      this.changeProbeType(this.doubleHashingButton);
+    }
+  }
           
   if(opts.initialData) {
     for (let d of opts.initialData) {
@@ -158,6 +176,20 @@ ClosedHash.prototype.growCallback = function (event) {
   }
 };
 
+// Programmatic bindings
+ClosedHash.prototype.doInsert = function (value) {
+  return this.implementAction(this.insertElement.bind(this), value);
+};
+ClosedHash.prototype.doRemove = function (value) {
+  return this.implementAction(this.deleteElement.bind(this), value);
+};
+ClosedHash.prototype.doFind = function (value) {
+  return this.implementAction(this.findElement.bind(this), value);
+};
+ClosedHash.prototype.doGrow = function (newSize) {
+  return this.implementAction(this.growTable.bind(this), newSize);
+};
+
 ClosedHash.prototype.growTable = function (newSize) {
   this.commands = [];
 
@@ -186,11 +218,11 @@ ClosedHash.prototype.growTable = function (newSize) {
   const stagingStartY =
     ARRAY_ELEM_START_Y + oldRows * ARRAY_VERTICAL_SEPARATION + 100;
 
-  // this.cmd(
-  //   "SetMessage",
-  //   `Grow table: collect elements and expand to ${targetSize}`,
-  // );
-  // this.cmd("Step");
+  this.cmd(
+    "SetMessage",
+    `Grow table: expand to ${targetSize}`,
+  );
+  this.cmd("Step");
 
   // Create the staging array boxes/indices.
   for (let i = 0; i < oldSize; i++) {
@@ -225,6 +257,8 @@ ClosedHash.prototype.growTable = function (newSize) {
 
   // Scan each original slot, showing whether it contains a value. If it does,
   // move it into the corresponding staging slot.
+  
+  let stagingData = [];
   for (let i = 0; i < oldSize; i++) {
     const hasValue = !this.empty[i] && !this.deleted[i];
 
@@ -260,11 +294,13 @@ ClosedHash.prototype.growTable = function (newSize) {
 
     if (this.deleted[i]) {
       this.cmd("SetText", stagingRects[i], "<deleted>");
+      stagingData.push("<deleted>");
     } else if (hasValue) {
       const value = this.hashTableValues[i];
-      elemsToRehash.push(value);
-      stagingSlots.push(i);
       this.cmd("SetText", stagingRects[i], value);
+      stagingData.push(value);
+    } else {
+      stagingData.push("");
     }
   }
   
@@ -276,6 +312,8 @@ ClosedHash.prototype.growTable = function (newSize) {
     this.cmd("Delete", oldHashTableIndices[i]);
   }
 
+  let oldEmpty = this.empty.slice();
+  let oldDeleted = this.deleted.slice();
   // Reset the model + create a fresh table of the new size.
   this.table_size = targetSize;
   this.skipDist = new Array(this.table_size);
@@ -334,49 +372,56 @@ ClosedHash.prototype.growTable = function (newSize) {
   this.cmd("Step");
 
   // Reinsert from the staging list, one-by-one.
-  for (let k = 0; k < elemsToRehash.length; k++) {
-    const value = elemsToRehash[k];
-    const fromSlot = stagingSlots[k];
+  for (let k = 0; k < oldSize; k++) {
+    const value = stagingData[k];
+    const fromSlot = k;
     const labelID = this.nextIndex++;
 
     this.cmd("SetHighlight", stagingRects[fromSlot], 1);
-    this.cmd("SetMessage", `Take ${value} from staging slot ${fromSlot}`);
+    let isValid = !oldEmpty[fromSlot] && !oldDeleted[fromSlot];
+    if(isValid) {
+      this.cmd("SetMessage", `Take ${value} from staging slot ${fromSlot}`);
+    } else {
+      this.cmd("SetMessage", `Ignoring staging slot ${fromSlot}`);
+    }
     this.cmd("Step");
 
-    this.cmd(
-      "CreateLabel",
-      labelID,
-      value,
-      stagingXPos[fromSlot],
-      stagingYPos[fromSlot] - ARRAY_ELEM_HEIGHT,
-    );
-    this.cmd("SetText", stagingRects[fromSlot], "");
-    
-      this.cmd("Step");
-
-    // Hash + probing are animated inside doHash/getEmptyIndex.
-    let index = this.doHash(value);
-    index = this.getEmptyIndex(index, value);
-
-    if (index !== -1) {
+    if(isValid) {
       this.cmd(
-        "Move",
+        "CreateLabel",
         labelID,
-        this.indexXPos[index],
-        this.indexYPos[index] - ARRAY_ELEM_HEIGHT,
+        value,
+        stagingXPos[fromSlot],
+        stagingYPos[fromSlot] - ARRAY_ELEM_HEIGHT,
       );
-      this.cmd("SetMessage", `Reinsert ${value} at index ${index}`);
+      this.cmd("SetText", stagingRects[fromSlot], "");
+      
       this.cmd("Step");
-      this.cmd("Delete", labelID);
-      this.cmd("SetText", this.hashTableVisual[index], value);
-      this.hashTableValues[index] = value;
-      this.empty[index] = false;
-      this.deleted[index] = false;
-    } else {
-      // Shouldn't happen with an empty table, but keep a graceful path.
-      this.cmd("SetMessage", `Table full while reinserting ${value}`);
-      this.cmd("Step");
-      this.cmd("Delete", labelID);
+
+      // Hash + probing are animated inside doHash/getEmptyIndex.
+      let index = this.doHash(value);
+      index = this.getEmptyIndex(index, value);
+
+      if (index !== -1) {
+        this.cmd(
+          "Move",
+          labelID,
+          this.indexXPos[index],
+          this.indexYPos[index] - ARRAY_ELEM_HEIGHT,
+        );
+        this.cmd("SetMessage", `Reinsert ${value} at index ${index}`);
+        this.cmd("Step");
+        this.cmd("Delete", labelID);
+        this.cmd("SetText", this.hashTableVisual[index], value);
+        this.hashTableValues[index] = value;
+        this.empty[index] = false;
+        this.deleted[index] = false;
+      } else {
+        // Shouldn't happen with an empty table, but keep a graceful path.
+        this.cmd("SetMessage", `Table full while reinserting ${value}`);
+        this.cmd("Step");
+        this.cmd("Delete", labelID);
+      }
     }
 
     this.cmd("SetHighlight", stagingRects[fromSlot], 0);
@@ -450,11 +495,13 @@ ClosedHash.prototype.linearProbeCallback = function (event) {
 
 ClosedHash.prototype.insertElement = function (elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Inserting element: " + String(elem));
+  // this.cmd("SetText", this.ExplainLabel, "Inserting element: " + String(elem));
+  this.cmd("SetMessage", "Inserting element: " + String(elem));
   var index = this.doHash(elem);
 
   index = this.getEmptyIndex(index, elem);
-  this.cmd("SetText", this.ExplainLabel, "");
+  // this.cmd("SetText", this.ExplainLabel, "");
+  this.cmd("SetMessage", "");
   if (index != -1) {
     var labID = this.nextIndex++;
     this.cmd("CreateLabel", labID, elem, 20, 25);
@@ -506,6 +553,7 @@ ClosedHash.prototype.resetSkipDist = function (elem, labelID) {
 
 ClosedHash.prototype.getEmptyIndex = function (index, elem) {
   var foundIndex = -1;
+  var neededDoubleHash = false;
   for (var i = 0; i < this.table_size; i++) {
     var candidateIndex = (index + this.skipDist[i]) % this.table_size;
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
@@ -528,10 +576,11 @@ ClosedHash.prototype.getEmptyIndex = function (index, elem) {
       
       if (i == 0 && this.currentHashingTypeButtonState == this.doubleHashingButton) {
         this.resetSkipDist(elem, this.nextIndex++);
+        neededDoubleHash = true;
       }
     }
   }
-  if (this.currentHashingTypeButtonState == this.doubleHashingButton) {
+  if (neededDoubleHash) {
     this.cmd("Delete", --this.nextIndex);
   }
   return foundIndex;
@@ -566,48 +615,38 @@ ClosedHash.prototype.getElemIndex = function (index, elem) {
 
 ClosedHash.prototype.deleteElement = function (elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem);
+  // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem);
+  this.cmd("SetMessage", "Deleting element: " + elem);
   var index = this.doHash(elem);
 
   index = this.getElemIndex(index, elem);
 
   if (index > 0) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Deleting element: " + elem + "  Adding tombstone.",
-    );
+    // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem + "  Adding tombstone.");
+    this.cmd("SetMessage", "Deleting element: " + elem + "  Adding tombstone.");
     this.empty[index] = true;
     this.deleted[index] = true;
     this.cmd("SetText", this.hashTableVisual[index], "<deleted>");
   } else {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Deleting element: " + elem + "  Element not in table",
-    );
+    // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem + "  Element not in table");
+    this.cmd("SetMessage", "Deleting element: " + elem + "  Element not in table");
   }
   return this.commands;
 };
 ClosedHash.prototype.findElement = function (elem) {
   this.commands = new Array();
 
-  this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem);
+  // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem);
+  this.cmd("SetMessage", "Finding Element: " + elem);
   var index = this.doHash(elem);
 
   var found = this.getElemIndex(index, elem) != -1;
   if (found) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Finding Element: " + elem + "  Found!",
-    );
+    // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem + "  Found!");
+    this.cmd("SetMessage", "Finding Element: " + elem + "  Found!");
   } else {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Finding Element: " + elem + "  Not Found!",
-    );
+    // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem + "  Not Found!");
+    this.cmd("SetMessage", "Finding Element: " + elem + "  Not Found!");
   }
   return this.commands;
 };

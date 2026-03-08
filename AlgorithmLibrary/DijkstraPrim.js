@@ -50,6 +50,7 @@ export function DijkstraPrim(canvas, runningDijkstra) {
   let am;
   let w;
   let h;
+  let graphOpts = null;
 
   if (canvas && typeof canvas.getContext === "function") {
     const legacyCanvas = canvas;
@@ -62,6 +63,7 @@ export function DijkstraPrim(canvas, runningDijkstra) {
     h = legacyCanvas.height;
   } else {
     const opts = canvas || {};
+    graphOpts = opts;
     const runDijkstra =
       typeof opts.runningDijkstra === "boolean" ? opts.runningDijkstra : true;
 
@@ -90,7 +92,7 @@ export function DijkstraPrim(canvas, runningDijkstra) {
     runningDijkstra = runDijkstra;
   }
 
-  this.init(am, runningDijkstra, w, h);
+  this.init(am, runningDijkstra, w, h, graphOpts);
 }
 
 DijkstraPrim.prototype = new Graph();
@@ -116,10 +118,10 @@ DijkstraPrim.prototype.addControls = function () {
   DijkstraPrim.superclass.addControls.call(this, this.runningDijkstra);
 };
 
-DijkstraPrim.prototype.init = function (am, runningDijkstra, w, h) {
+DijkstraPrim.prototype.init = function (am, runningDijkstra, w, h, graphOpts) {
   this.runningDijkstra = runningDijkstra;
   this.showEdgeCosts = true;
-  DijkstraPrim.superclass.init.call(this, am, w, h, false, false); // TODO:  add no edge label flag to this?
+  DijkstraPrim.superclass.init.call(this, am, w, h, false, false, graphOpts); // TODO:  add no edge label flag to this?
   // Setup called in base class init function
 };
 

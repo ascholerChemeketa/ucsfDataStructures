@@ -28,7 +28,7 @@ import {
   initAnimationManager,
   initCanvas,
 } from "../AnimationLibrary/AnimationMain.js";
-import { Graph, VERTEX_INDEX_COLOR } from "./Graph.js";
+import { Graph, VERTEX_INDEX_COLOR, EDGE_COLOR } from "./Graph.js";
 
 import {
   addControlToAlgorithmBar,
@@ -44,6 +44,8 @@ var PARENT_START_X = 250;
 
 var HIGHLIGHT_CIRCLE_COLOR = "#9c0303ff";
 var BFS_TREE_COLOR = "#0000FF";
+var SEARCH_TREE_FINAL_COLOR = "var(--svgColor--althighlight)";
+var EDGE_CHECK_COLOR = "var(--svgColor--althighlight)";
 var BFS_QUEUE_HEAD_COLOR = "#0000FF";
 
 var QUEUE_START_X = 30;
@@ -56,6 +58,7 @@ export function BFS(canvas) {
   let am;
   let w;
   let h;
+  let graphOpts = null;
 
   if (canvas && typeof canvas.getContext === "function") {
     const legacyCanvas = canvas;
@@ -67,6 +70,7 @@ export function BFS(canvas) {
     h = legacyCanvas.height;
   } else {
     const opts = canvas || {};
+    graphOpts = opts;
     const viewWidth =
       Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
         ? opts.viewWidth
@@ -91,7 +95,7 @@ export function BFS(canvas) {
     h = viewHeight;
   }
 
-  this.init(am, w, h);
+  this.init(am, w, h, graphOpts);
 }
 
 BFS.prototype = new Graph();
@@ -114,9 +118,9 @@ BFS.prototype.addControls = function () {
   BFS.superclass.addControls.call(this);
 };
 
-BFS.prototype.init = function (am, w, h) {
+BFS.prototype.init = function (am, w, h, graphOpts) {
   this.showEdgeCosts = false;
-  BFS.superclass.init.call(this, am, w, h); // TODO:  add no edge label flag to this?
+  BFS.superclass.init.call(this, am, w, h, true, false, graphOpts); // TODO:  add no edge label flag to this?
   // Setup called in base class constructor
 };
 
@@ -180,7 +184,7 @@ BFS.prototype.setup = function () {
   this.cmd(
     "CreateLabel",
     this.nextIndex++,
-    "Visited",
+    "Known",
     VISITED_START_X - AUX_ARRAY_WIDTH,
     AUX_ARRAY_START_Y - AUX_ARRAY_HEIGHT * 1.5,
     0,
@@ -203,13 +207,61 @@ BFS.prototype.setup = function () {
 };
 
 BFS.prototype.startCallback = function (event) {
-  var startvalue;
-
   if (this.startField.value != "") {
-    startvalue = this.startField.value;
+    const startvalue = this.startField.value;
     this.startField.value = "";
-    if (parseInt(startvalue) < this.size)
-      this.implementAction(this.doBFS.bind(this), startvalue);
+    this.doSearch(startvalue);
+  }
+};
+
+BFS.prototype.doSearch = function (startVertex) {
+  const parsedStart = parseInt(startVertex);
+  if (
+    !Number.isFinite(parsedStart) ||
+    parsedStart < 0 ||
+    parsedStart >= this.size
+  ) {
+    return false;
+  }
+
+  this.implementAction(this.doBFS.bind(this), parsedStart);
+  return true;
+};
+
+BFS.prototype.initEdgeVisualState = function () {
+  this.edgeColorState = new Array(this.size);
+  this.edgeHighlightState = new Array(this.size);
+  for (var i = 0; i < this.size; i++) {
+    this.edgeColorState[i] = new Array(this.size);
+    this.edgeHighlightState[i] = new Array(this.size);
+    for (var j = 0; j < this.size; j++) {
+      this.edgeColorState[i][j] = EDGE_COLOR;
+      this.edgeHighlightState[i][j] = false;
+    }
+  }
+};
+
+BFS.prototype.recordEdgeVisualState = function (i, j, color, highlighted) {
+  this.edgeColorState[i][j] = color;
+  this.edgeHighlightState[i][j] = highlighted;
+  if (!this.directed) {
+    this.edgeColorState[j][i] = color;
+    this.edgeHighlightState[j][i] = highlighted;
+  }
+};
+
+BFS.prototype.applyEdgeVisualState = function (i, j, color, highlighted) {
+  this.setEdgeColor(i, j, color);
+  this.highlightEdge(i, j, highlighted ? 1 : 0);
+  this.recordEdgeVisualState(i, j, color, highlighted);
+};
+
+BFS.prototype.clearAdjacencyRepEdgeHighlight = function (i, j) {
+  if (this.adj_list_edges && this.adj_list_edges[i] && this.adj_list_edges[i][j]) {
+    this.cmd("SetHighlight", this.adj_list_edges[i][j], 0);
+  }
+  if (this.adj_matrixID && this.adj_matrixID[i] && this.adj_matrixID[i][j]) {
+    this.cmd("SetHighlight", this.adj_matrixID[i][j], 0);
   }
 };
 
@@ -230,25 +282,32 @@ BFS.prototype.doBFS = function (startVetex) {
   }
 
   this.rebuildEdges();
+  this.initEdgeVisualState();
   this.messageID = new Array();
   for (i = 0; i < this.size; i++) {
     this.cmd("SetText", this.visitedID[i], "f");
+    this.cmd("SetHighlight", this.visitedID[i], 0);
     this.cmd("SetText", this.parentID[i], "");
     this.visited[i] = false;
     this.parent[i] = -1;
     queueID[i] = this.nextIndex++;
+    this.cmd(
+      "CreateLabel",
+      queueID[i],
+      "",
+      QUEUE_START_X,
+      QUEUE_START_Y + i * QUEUE_SPACING,
+    );
+    this.cmd("SetAlpha", queueID[i], 0);
   }
   var vertex = parseInt(startVetex);
   this.visited[vertex] = true;
   this.parent[vertex] = -1;
   this.queue[tail] = vertex;
-  this.cmd(
-    "CreateLabel",
-    queueID[tail],
-    vertex,
-    QUEUE_START_X,
-    QUEUE_START_Y + queueSize * QUEUE_SPACING,
-  );
+  this.cmd("SetText", queueID[tail], vertex);
+  this.cmd("SetTextColor", queueID[tail], "#000000");
+  this.cmd("SetAlpha", queueID[tail], 1);
+  this.cmd("Move", queueID[tail], QUEUE_START_X, QUEUE_START_Y);
   queueSize = queueSize + 1;
   tail = (tail + 1) % this.size;
 
@@ -286,35 +345,42 @@ BFS.prototype.doBFS = function (startVetex) {
 
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[vertex][neighbor] > 0) {
-        this.highlightEdge(vertex, neighbor, 1);
+        const savedEdgeColor = this.edgeColorState[vertex][neighbor];
+        const savedEdgeHighlight = this.edgeHighlightState[vertex][neighbor];
+
+        // Phase 1: temporarily show the edge being considered.
+        this.applyEdgeVisualState(vertex, neighbor, EDGE_CHECK_COLOR, false);
         this.cmd("SetHighlight", this.visitedID[neighbor], 1);
-        this.cmd("SetMessage", `Explore edge ${vertex} -> ${neighbor} (check whether ${neighbor} is unvisited).`);
+        this.cmd("SetMessage", `Explore edge ${vertex} -> ${neighbor} (check whether ${neighbor} is known).`);
         this.cmd("Step");
+
+        // Phase 2: choose either selected (normal highlight) or restore prior state.
         if (!this.visited[neighbor]) {
           this.visited[neighbor] = true;
           this.parent[neighbor] = vertex;
           this.cmd("SetText", this.visitedID[neighbor], "T");
           this.cmd("SetText", this.parentID[neighbor], vertex);
-          this.highlightEdge(vertex, neighbor, 0);
-          this.cmd(
-            "Disconnect",
-            this.circleID[vertex],
-            this.circleID[neighbor],
-          );
-          this.cmd(
-            "Connect",
-            this.circleID[vertex],
-            this.circleID[neighbor],
-            BFS_TREE_COLOR,
-            this.curve[vertex][neighbor],
-            1,
-            "",
-          );
+          // this.cmd(
+          //   "Disconnect",
+          //   this.circleID[vertex],
+          //   this.circleID[neighbor],
+          // );
+          // this.cmd(
+          //   "Connect",
+          //   this.circleID[vertex],
+          //   this.circleID[neighbor],
+          //   BFS_TREE_COLOR,
+          //   this.curve[vertex][neighbor],
+          //   0,
+          //   "",
+          // );
           this.queue[tail] = neighbor;
+          this.cmd("SetText", queueID[tail], neighbor);
+          this.cmd("SetTextColor", queueID[tail], "#000000");
+          this.cmd("SetAlpha", queueID[tail], 1);
           this.cmd(
-            "CreateLabel",
+            "Move",
             queueID[tail],
-            neighbor,
             QUEUE_START_X,
             QUEUE_START_Y + queueSize * QUEUE_SPACING,
           );
@@ -324,16 +390,29 @@ BFS.prototype.doBFS = function (startVetex) {
             "SetMessage",
             `Discovered ${neighbor}; set parent to ${vertex}, add to BFS tree, and enqueue ${neighbor}.`,
           );
+          // Selected edge: restore normal color, but keep highlighted.
+          this.applyEdgeVisualState(vertex, neighbor, savedEdgeColor, true);
         } else {
-          this.highlightEdge(vertex, neighbor, 0);
           this.cmd("SetMessage", `Neighbor ${neighbor} was already visited; ignore this edge.`);
+          // Not selected edge: restore whatever visual state it had before consideration.
+          this.applyEdgeVisualState(
+            vertex,
+            neighbor,
+            savedEdgeColor,
+            savedEdgeHighlight,
+          );
         }
         this.cmd("Step");
+
+        // Keep adjacency-list/matrix highlights temporary per edge check.
+        this.clearAdjacencyRepEdgeHighlight(vertex, neighbor);
         this.cmd("SetHighlight", this.visitedID[neighbor], 0);
         this.cmd("Step");
       }
     }
-    this.cmd("Delete", queueID[head]);
+    this.cmd("SetTextColor", queueID[head], "#000000");
+    this.cmd("SetText", queueID[head], "");
+    this.cmd("SetAlpha", queueID[head], 0);
     head = (head + 1) % this.size;
     queueSize = queueSize - 1;
     for (i = 0; i < queueSize; i++) {
@@ -350,20 +429,18 @@ BFS.prototype.doBFS = function (startVetex) {
     this.cmd("Delete", this.highlightCircleAM);
     this.cmd("Delete", this.highlightCircleAL);
 
-  this.cmd("SetMessage", "BFS complete. Search tree highlighted.");
+
+    this.cmd("SetMessage", `Done exploring ${vertex}.`);
+    this.cmd("Step");
+  }
+
+  this.cmd("SetMessage", "Queue is empty. BFS complete. Search tree highlighted.");
   for (i = 0; i < this.size; i++) {
     if (this.parent[i] >= 0) {
-      this.highlightEdge(this.parent[i], i, 1);
+      this.applyEdgeVisualState(this.parent[i], i, SEARCH_TREE_FINAL_COLOR, true);
     }
   }
   this.cmd("Step");
-    
-          this.cmd("SetMessage", `Done exploring ${vertex}.`);
-        this.cmd("Step");
-  }
-  
-    this.cmd("SetMessage", `Queue is empty. Done.`);
-    this.cmd("Step");
 
 
   return this.commands;

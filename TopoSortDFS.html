@@ -11,12 +11,13 @@
 <body>
   <script type="module">
     import { TopoSortDFS } from "./dist/entry.js";
-    new TopoSortDFS({
+    let anim = new TopoSortDFS({
       height: 500,
       viewWidth: 1000,
       viewHeight: 500,
       title: "Topological Sort (DFS)",
     });
+    anim.doTopoSort();
   </script>
 </body>
 

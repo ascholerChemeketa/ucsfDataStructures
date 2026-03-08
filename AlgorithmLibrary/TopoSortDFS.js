@@ -33,6 +33,7 @@ export function TopoSortDFS(canvas) {
   let am;
   let w;
   let h;
+  let graphOpts = null;
 
   if (canvas && typeof canvas.getContext === "function") {
     const legacyCanvas = canvas;
@@ -44,6 +45,7 @@ export function TopoSortDFS(canvas) {
     h = legacyCanvas.height;
   } else {
     const opts = canvas || {};
+    graphOpts = opts;
     const viewWidth =
       Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
         ? opts.viewWidth
@@ -67,7 +69,7 @@ export function TopoSortDFS(canvas) {
     w = viewWidth;
     h = viewHeight;
   }
-  this.init(am, w, h);
+  this.init(am, w, h, graphOpts);
 }
 
 TopoSortDFS.ORDERING_INITIAL_X = 200;
@@ -113,9 +115,9 @@ TopoSortDFS.prototype.addControls = function () {
   TopoSortDFS.superclass.addControls.call(this, false);
 };
 
-TopoSortDFS.prototype.init = function (am, w, h) {
+TopoSortDFS.prototype.init = function (am, w, h, graphOpts) {
   this.showEdgeCosts = false;
-  TopoSortDFS.superclass.init.call(this, am, w, h, true, true); // TODO:  add no edge label flag to this?
+  TopoSortDFS.superclass.init.call(this, am, w, h, true, true, graphOpts); // TODO:  add no edge label flag to this?
   // Setup called in base class init function
 };
 
@@ -166,10 +168,18 @@ TopoSortDFS.prototype.startCallback = function (event) {
   // Lock Run until user resets
   this.runLocked = true;
   if (this.startButton) this.startButton.disabled = true;
-  this.implementAction(this.doTopoSort.bind(this), "");
+  this.doTopoSort();
 };
 
-TopoSortDFS.prototype.doTopoSort = function (ignored) {
+TopoSortDFS.prototype.doTopoSort = function () {
+  // Lock Run until user resets
+  this.runLocked = true;
+  if (this.startButton) this.startButton.disabled = true;
+  this.implementAction(this.doTopoSortAction.bind(this), "");
+  return true;
+};
+
+TopoSortDFS.prototype.doTopoSortAction = function (ignored) {
   this.visited = new Array(this.size);
   this.commands = new Array();
   this.topoOrderArrayL = new Array();

@@ -28,7 +28,7 @@ import {
   initAnimationManager,
   initCanvas,
 } from "../AnimationLibrary/AnimationMain.js";
-import { Algorithm, addRadioButtonGroupToAlgorithmBar } from "./Algorithm.js";
+import { Algorithm, addRadioButtonGroupToAlgorithmBar, addControlToAlgorithmBar} from "./Algorithm.js";
 import { Hash } from "./Hash.js";
 
 export function OpenHash(canvas) {
@@ -38,6 +38,7 @@ export function OpenHash(canvas) {
   let w;
   let h;
 
+    const opts = canvas || {};
   if (canvas && typeof canvas.getContext === "function") {
     const legacyCanvas = canvas;
     am = initCanvas(legacyCanvas, null, "Open Hashing", false, {
@@ -73,6 +74,14 @@ export function OpenHash(canvas) {
   }
 
   this.init(am, w, h);
+  // If any initial data is a string, default to String Mode
+  if (opts && Array.isArray(opts.initialData)) {
+    const hasString = opts.initialData.some((d) => typeof d === "string");
+    if (hasString) {
+      // Use the wrapped callback to keep undo/redo semantics consistent
+      this.changeHashTypeCallback(false);
+    }
+  }
   if(opts.initialData) {
     for (let d of opts.initialData) {
       this.implementAction(this.insertElement.bind(this), d);
@@ -122,7 +131,8 @@ OpenHash.prototype.addControls = function () {
 
 OpenHash.prototype.insertElement = function (elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Inserting element: " + String(elem));
+  // this.cmd("SetText", this.ExplainLabel, "Inserting element: " + String(elem));
+  this.cmd("SetMessage", "Inserting element: " + String(elem));
   var index = this.doHash(elem);
   var node = new LinkedListNode(elem, this.nextIndex++, 100, 75);
   this.cmd(
@@ -154,7 +164,8 @@ OpenHash.prototype.insertElement = function (elem) {
 
   this.repositionList(index);
 
-  this.cmd("SetText", this.ExplainLabel, "");
+  // this.cmd("SetText", this.ExplainLabel, "");
+  this.cmd("SetMessage", "");
 
   return this.commands;
 };
@@ -174,14 +185,12 @@ OpenHash.prototype.repositionList = function (index) {
 
 OpenHash.prototype.deleteElement = function (elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem);
+  // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem);
+  this.cmd("SetMessage", "Deleting element: " + elem);
   var index = this.doHash(elem);
   if (this.hashTableValues[index] == null) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Deleting element: " + elem + "  Element not in table",
-    );
+    // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem + "  Element not in table");
+    this.cmd("SetMessage", "Deleting element: " + elem + "  Element not in table");
     return this.commands;
   }
   this.cmd("SetHighlight", this.hashTableValues[index].graphicID, 1);
@@ -211,11 +220,8 @@ OpenHash.prototype.deleteElement = function (elem) {
     this.cmd("SetHighlight", tmp.graphicID, 0);
     if (tmp.data == elem) {
       found = true;
-      this.cmd(
-        "SetText",
-        this.ExplainLabel,
-        "Deleting element: " + elem + "  Element deleted",
-      );
+      // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem + "  Element deleted");
+      this.cmd("SetMessage", "Deleting element: " + elem + "  Element deleted");
       if (tmp.next != null) {
         this.cmd("Connect", tmpPrev.graphicID, tmp.next.graphicID);
       } else {
@@ -230,17 +236,15 @@ OpenHash.prototype.deleteElement = function (elem) {
     }
   }
   if (!found) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Deleting element: " + elem + "  Element not in table",
-    );
+    // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem + "  Element not in table");
+    this.cmd("SetMessage", "Deleting element: " + elem + "  Element not in table");
   }
   return this.commands;
 };
 OpenHash.prototype.findElement = function (elem) {
   this.commands = new Array();
-  this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem);
+  // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem);
+  this.cmd("SetMessage", "Finding Element: " + elem);
 
   var index = this.doHash(elem);
   var compareIndex = this.nextIndex++;
@@ -260,21 +264,30 @@ OpenHash.prototype.findElement = function (elem) {
     tmp = tmp.next;
   }
   if (found) {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Finding Element: " + elem + "  Found!",
-    );
+    // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem + "  Found!");
+    this.cmd("SetMessage", "Finding Element: " + elem + "  Found!");
   } else {
-    this.cmd(
-      "SetText",
-      this.ExplainLabel,
-      "Finding Element: " + elem + "  Not Found!",
-    );
+    // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem + "  Not Found!");
+    this.cmd("SetMessage", "Finding Element: " + elem + "  Not Found!");
   }
   this.cmd("Delete", compareIndex);
   this.nextIndex--;
   return this.commands;
+};
+
+// Programmatic bindings
+OpenHash.prototype.doInsert = function (value) {
+  return this.implementAction(this.insertElement.bind(this), value);
+};
+OpenHash.prototype.doRemove = function (value) {
+  return this.implementAction(this.deleteElement.bind(this), value);
+};
+OpenHash.prototype.doFind = function (value) {
+  return this.implementAction(this.findElement.bind(this), value);
+};
+// Open hashing does not support grow; provide a no-op binding for API parity
+OpenHash.prototype.doGrow = function (newSize) {
+  return [];
 };
 
 OpenHash.prototype.setup = function () {

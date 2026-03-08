@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Detect Cycle (Directed Graph)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+
+  <body>
+    <script type="module">
+      import { DetectCycle } from "./dist/entry.js";
+      let seed = Math.floor(Math.random() * 100000);
+      console.log("DetectCycle random seed:", seed);
+      let anim = new DetectCycle({
+        height: 500,
+        viewWidth: 1000,
+        viewHeight: 500,
+        title: "Detect Cycle (Directed Graph)",
+        directed: true,
+        seed: seed,
+        edgePercentage: 0.35,
+      });
+      window.detectCycleAnim = anim;
+      window.detectCycleDebug = function () {
+        const info = anim.getLastCycleDebugInfo?.() ?? null;
+        console.log("DetectCycle debug:", info);
+        return info;
+      };
+      anim.doDetectCycle();
+      anim.animationManager.skipForward();
+      window.detectCycleDebug();
+    </script>
+  </body>
+</html>

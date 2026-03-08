@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+  <head>
+    <title>String Hash Visualization</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+
+  <body>
+    <script type="module">
+      import { StringHash } from "./dist/entry.js";
+
+      // Always in string hashing mode with a single input + Hash button
+      let anim = new StringHash();
+      anim.doHash("hello");
+    </script>
+  </body>
+</html>

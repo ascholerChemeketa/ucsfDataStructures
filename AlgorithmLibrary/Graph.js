@@ -26,6 +26,8 @@
 
 // TODO:  UNDO (all the way) is BROKEN.  Redo reset ...
 
+import random from 'random';
+
 import { Algorithm } from "../AlgorithmLibrary/Algorithm.js";
 
 import {
@@ -33,11 +35,11 @@ import {
   addRadioButtonGroupToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
 
-export function Graph(am, w, h, dir, dag) {
+export function Graph(am, w, h, dir, dag, opts) {
   if (am == undefined) {
     return;
   }
-  this.init(am, w, h, dir, dag);
+  this.init(am, w, h, dir, dag, opts);
 }
 
 Graph.prototype = new Algorithm();
@@ -530,17 +532,83 @@ export var LARGE_SIZE = 18;
 
 var HIGHLIGHT_COLOR = "#0000FF";
 
-Graph.prototype.init = function (am, w, h, directed, dag) {
-  directed = directed == undefined ? true : directed;
-  dag = dag == undefined ? false : dag;
+function parseStartingRepresentation(representation, fallbackLayer = 1) {
+  if (Number.isFinite(representation)) {
+    const n = Math.trunc(representation);
+    if (n >= 1 && n <= 3) return n;
+  }
+
+  if (typeof representation === "string") {
+    const lower = representation.trim().toLowerCase();
+    if (lower === "1" || lower === "logical") return 1;
+    if (
+      lower === "2" ||
+      lower === "adjacencylist" ||
+      lower === "adjacency list" ||
+      lower === "adjlist" ||
+      lower === "list"
+    ) {
+      return 2;
+    }
+    if (
+      lower === "3" ||
+      lower === "adjacencymatrix" ||
+      lower === "adjacency matrix" ||
+      lower === "matrix"
+    ) {
+      return 3;
+    }
+  }
+
+  return fallbackLayer;
+}
+
+Graph.prototype.init = function (am, w, h, directed, dag, opts) {
+  if (directed && typeof directed === "object") {
+    opts = directed;
+    directed = undefined;
+    dag = undefined;
+  }
+
+  opts = opts && typeof opts === "object" ? opts : {};
+  if (opts.randomSeed !== undefined && opts.randomSeed !== null) {
+    random.use(opts.randomSeed);
+  }
+
+  directed = typeof opts.directed === "boolean"
+    ? opts.directed
+    : directed == undefined
+      ? true
+      : directed;
+  dag = typeof opts.dag === "boolean" ? opts.dag : dag == undefined ? false : dag;
+
+  const requestedLayer =
+    opts.startingGraphRepresentation ??
+    opts.graphRepresentation ??
+    opts.startingRepresentation;
+  const initialLayer = parseStartingRepresentation(requestedLayer, 1);
+
+  const requestedEdgePercentage =
+    opts.edgePercentage ?? opts.edgePercent ?? opts.edgeDensity;
+  const parsedEdgePercentage = Number(requestedEdgePercentage);
+  this.edgePercentage =
+    Number.isFinite(parsedEdgePercentage) &&
+    parsedEdgePercentage >= 0 &&
+    parsedEdgePercentage <= 1
+      ? parsedEdgePercentage
+      : null;
+
+  this.preventBidirectionalEdge =
+    typeof opts.preventBidirectionalEdge === "boolean"
+      ? opts.preventBidirectionalEdge
+      : false;
 
   Graph.superclass.init.call(this, am, w, h);
   this.nextIndex = 0;
 
-  this.currentLayer = 1;
+  this.currentLayer = initialLayer;
   this.isDAG = dag;
   this.directed = directed;
-  this.currentLayer = 1;
   this.addControls();
 
   this.setup_small();
@@ -599,7 +667,9 @@ Graph.prototype.addControls = function (addDirection) {
     this,
     3,
   );
-  this.logicalButton.checked = true;
+  this.logicalButton.checked = this.currentLayer === 1;
+  this.adjacencyListButton.checked = this.currentLayer === 2;
+  this.adjacencyMatrixButton.checked = this.currentLayer === 3;
 };
 
 Graph.prototype.directedGraphCallback = function (newDirected, event) {
@@ -799,32 +869,39 @@ Graph.prototype.setup = function () {
   }
 
   var edgePercent;
-  if (this.size == SMALL_SIZE) {
-    if (this.directed) {
-      edgePercent = 0.4;
-    } else {
-      edgePercent = 0.5;
-    }
+  if (this.edgePercentage != null) {
+    edgePercent = this.edgePercentage;
   } else {
-    if (this.directed) {
-      edgePercent = 0.35;
+    if (this.size == SMALL_SIZE) {
+      if (this.directed) {
+        edgePercent = 0.4;
+      } else {
+        edgePercent = 0.5;
+      }
     } else {
-      edgePercent = 0.6;
+      if (this.directed) {
+        edgePercent = 0.35;
+      } else {
+        edgePercent = 0.6;
+      }
     }
   }
 
+  
   var lowerBound = 0;
-
   if (this.directed) {
     for (i = 0; i < this.size; i++) {
       for (var j = 0; j < this.size; j++) {
         this.adj_matrixID[i][j] = this.nextIndex++;
+        const reverseEdgeExists =
+          this.adj_matrix[j] != null && this.adj_matrix[j][i] >= 0;
         if (
           this.allowed[i][j] &&
-          Math.random() <= edgePercent &&
+          random.float() <= edgePercent &&
           (i < j ||
             Math.abs(this.curve[i][j]) < 0.01 ||
             this.adj_matrixID[j][i] == -1) &&
+          (!this.preventBidirectionalEdge || !reverseEdgeExists) &&
           (!this.isDAG || i < j)
         ) {
           if (this.showEdgeCosts) {

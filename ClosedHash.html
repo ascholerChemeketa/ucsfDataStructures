@@ -9,10 +9,9 @@
     <script type="module">
       import { ClosedHash } from "./dist/entry.js";
       new ClosedHash({
-        height: 500,
-        viewWidth: 1000,
-        viewHeight: 500,
-        initialData: [15, 25, 5, 35, 95, 55],
+        // initialData: [15, 25, 5, 35, 95, 55],
+        initialData: ["hello" , "world", "foo", "bar", "baz"],
+        probing: "linear"
       });
     </script>
   </body>

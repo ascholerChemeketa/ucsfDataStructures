@@ -31,8 +31,9 @@ import {
 import {
   addControlToAlgorithmBar,
   addLabelToAlgorithmBar,
+  addRadioButtonGroupToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
-import { Graph, VERTEX_INDEX_COLOR } from "./Graph.js";
+import { Graph, VERTEX_INDEX_COLOR, EDGE_COLOR } from "./Graph.js";
 
 var AUX_ARRAY_WIDTH = 25;
 var AUX_ARRAY_HEIGHT = 25;
@@ -43,6 +44,8 @@ var PARENT_START_X = 275;
 
 var HIGHLIGHT_CIRCLE_COLOR = "#000000";
 var DFS_TREE_COLOR = "#0000FF";
+var SEARCH_TREE_FINAL_COLOR = "var(--svgColor--althighlight)";
+var EDGE_CHECK_COLOR = "var(--svgColor--althighlight)";
 var BFS_QUEUE_HEAD_COLOR = "#0000FF";
 
 var QUEUE_START_X = 30;
@@ -57,6 +60,7 @@ export function DFS(canvas) {
   let am;
   let w;
   let h;
+  let graphOpts = null;
 
   if (canvas && typeof canvas.getContext === "function") {
     const legacyCanvas = canvas;
@@ -68,6 +72,7 @@ export function DFS(canvas) {
     h = legacyCanvas.height;
   } else {
     const opts = canvas || {};
+    graphOpts = opts;
     const viewWidth =
       Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
         ? opts.viewWidth
@@ -92,7 +97,7 @@ export function DFS(canvas) {
     h = viewHeight;
   }
 
-  this.init(am, w, h);
+  this.init(am, w, h, graphOpts);
 }
 
 DFS.prototype = new Graph();
@@ -111,13 +116,39 @@ DFS.prototype.addControls = function () {
   );
   this.startButton = addControlToAlgorithmBar("Button", "Run DFS");
   this.startButton.onclick = this.startCallback.bind(this);
+
+  var radioButtonList = addRadioButtonGroupToAlgorithmBar(
+    ["Recursive", "Iterative"],
+    "DFSMode",
+  );
+  this.recursiveModeButton = radioButtonList[0];
+  this.recursiveModeButton.onclick = this.dfsModeChangedCallback.bind(this, false);
+  this.iterativeModeButton = radioButtonList[1];
+  this.iterativeModeButton.onclick = this.dfsModeChangedCallback.bind(this, true);
+  this.recursiveModeButton.checked = !this.useIterative;
+  this.iterativeModeButton.checked = this.useIterative;
+
   DFS.superclass.addControls.call(this);
 };
 
-DFS.prototype.init = function (am, w, h) {
+DFS.prototype.init = function (am, w, h, graphOpts) {
+  this.useIterative = false;
+  if (graphOpts && typeof graphOpts === "object") {
+    if (typeof graphOpts.iterative === "boolean") {
+      this.useIterative = graphOpts.iterative;
+    } else if (typeof graphOpts.searchMode === "string") {
+      this.useIterative = graphOpts.searchMode.toLowerCase() === "iterative";
+    }
+  }
   this.showEdgeCosts = false;
-  DFS.superclass.init.call(this, am, w, h); // TODO:  add no edge label flag to this?
+  DFS.superclass.init.call(this, am, w, h, true, false, graphOpts); // TODO:  add no edge label flag to this?
   // Setup called in base class constructor
+};
+
+DFS.prototype.dfsModeChangedCallback = function (iterativeMode) {
+  if (this.useIterative !== iterativeMode) {
+    this.useIterative = iterativeMode;
+  }
 };
 
 DFS.prototype.setup = function () {
@@ -194,17 +225,73 @@ DFS.prototype.setup = function () {
 };
 
 DFS.prototype.startCallback = function (event) {
-  var startvalue;
-
   if (this.startField.value != "") {
-    startvalue = this.startField.value;
+    const startvalue = this.startField.value;
     this.startField.value = "";
-    if (parseInt(startvalue) < this.size)
-      this.implementAction(this.doDFS.bind(this), startvalue);
+    this.doSearch(startvalue);
+  }
+};
+
+DFS.prototype.doSearch = function (startVertex) {
+  const parsedStart = parseInt(startVertex);
+  if (
+    !Number.isFinite(parsedStart) ||
+    parsedStart < 0 ||
+    parsedStart >= this.size
+  ) {
+    return false;
+  }
+
+  this.implementAction(this.doDFS.bind(this), parsedStart);
+  return true;
+};
+
+DFS.prototype.initEdgeVisualState = function () {
+  this.edgeColorState = new Array(this.size);
+  this.edgeHighlightState = new Array(this.size);
+  for (var i = 0; i < this.size; i++) {
+    this.edgeColorState[i] = new Array(this.size);
+    this.edgeHighlightState[i] = new Array(this.size);
+    for (var j = 0; j < this.size; j++) {
+      this.edgeColorState[i][j] = EDGE_COLOR;
+      this.edgeHighlightState[i][j] = false;
+    }
+  }
+};
+
+DFS.prototype.recordEdgeVisualState = function (i, j, color, highlighted) {
+  this.edgeColorState[i][j] = color;
+  this.edgeHighlightState[i][j] = highlighted;
+  if (!this.directed) {
+    this.edgeColorState[j][i] = color;
+    this.edgeHighlightState[j][i] = highlighted;
+  }
+};
+
+DFS.prototype.applyEdgeVisualState = function (i, j, color, highlighted) {
+  this.setEdgeColor(i, j, color);
+  this.highlightEdge(i, j, highlighted ? 1 : 0);
+  this.recordEdgeVisualState(i, j, color, highlighted);
+};
+
+DFS.prototype.clearAdjacencyRepEdgeHighlight = function (i, j) {
+  if (this.adj_list_edges && this.adj_list_edges[i] && this.adj_list_edges[i][j]) {
+    this.cmd("SetHighlight", this.adj_list_edges[i][j], 0);
+  }
+  if (this.adj_matrixID && this.adj_matrixID[i] && this.adj_matrixID[i][j]) {
+    this.cmd("SetHighlight", this.adj_matrixID[i][j], 0);
   }
 };
 
 DFS.prototype.doDFS = function (startVetex) {
+  if (this.useIterative) {
+    return this.doDFSIterative(startVetex);
+  }
+
+  return this.doDFSRecursive(startVetex);
+};
+
+DFS.prototype.doDFSRecursive = function (startVetex) {
   this.visited = new Array(this.size);
   this.parent = new Array(this.size);
   this.commands = new Array();
@@ -214,9 +301,11 @@ DFS.prototype.doDFS = function (startVetex) {
     }
   }
   this.rebuildEdges();
+  this.initEdgeVisualState();
   this.messageID = new Array();
   for (i = 0; i < this.size; i++) {
     this.cmd("SetText", this.visitedID[i], "f");
+    this.cmd("SetHighlight", this.visitedID[i], 0);
     this.cmd("SetText", this.parentID[i], "");
     this.visited[i] = false;
     this.parent[i] = -1;
@@ -261,7 +350,237 @@ DFS.prototype.doDFS = function (startVetex) {
   );
   for (i = 0; i < this.size; i++) {
     if (this.parent[i] >= 0) {
+      this.setEdgeColor(this.parent[i], i, SEARCH_TREE_FINAL_COLOR);
       this.highlightEdge(this.parent[i], i, 1);
+    }
+  }
+  this.cmd("Step");
+  return this.commands;
+};
+
+DFS.prototype.doDFSIterative = function (startVetex) {
+  this.visited = new Array(this.size);
+  this.parent = new Array(this.size);
+  this.commands = new Array();
+
+  if (this.messageID != null) {
+    for (var i = 0; i < this.messageID.length; i++) {
+      this.cmd("Delete", this.messageID[i]);
+    }
+  }
+
+  this.rebuildEdges();
+  this.initEdgeVisualState();
+  this.messageID = new Array();
+
+  var stackTitleID = this.nextIndex++;
+  this.messageID.push(stackTitleID);
+  this.cmd(
+    "CreateLabel",
+    stackTitleID,
+    "Stack",
+    QUEUE_START_X,
+    QUEUE_START_Y - 30,
+    0,
+  );
+
+  var stackCapacity = this.size * this.size;
+  var stackLabelID = new Array(stackCapacity);
+  for (i = 0; i < this.size; i++) {
+    this.cmd("SetText", this.visitedID[i], "f");
+    this.cmd("SetHighlight", this.visitedID[i], 0);
+    this.cmd("SetText", this.parentID[i], "");
+    this.visited[i] = false;
+    this.parent[i] = -1;
+  }
+
+  for (i = 0; i < stackCapacity; i++) {
+    stackLabelID[i] = this.nextIndex++;
+    this.cmd(
+      "CreateLabel",
+      stackLabelID[i],
+      "",
+      QUEUE_START_X,
+      QUEUE_START_Y + i * QUEUE_SPACING,
+    );
+    this.cmd("SetAlpha", stackLabelID[i], 0);
+  }
+
+  var vertex = parseInt(startVetex);
+  this.parent[vertex] = -1;
+  var stackVertex = new Array(stackCapacity);
+  var stackSize = 0;
+
+  // push(start)
+  stackVertex[stackSize] = vertex;
+  this.cmd("SetText", stackLabelID[stackSize], vertex);
+  this.cmd("SetAlpha", stackLabelID[stackSize], 1);
+  this.cmd(
+    "Move",
+    stackLabelID[stackSize],
+    QUEUE_START_X,
+    QUEUE_START_Y + stackSize * QUEUE_SPACING,
+  );
+  stackSize++;
+
+  this.cmd(
+    "CreateHighlightCircle",
+    this.highlightCircleL,
+    HIGHLIGHT_CIRCLE_COLOR,
+    this.x_pos_logical[vertex],
+    this.y_pos_logical[vertex],
+  );
+  this.cmd("SetLayer", this.highlightCircleL, 1);
+  this.cmd(
+    "CreateHighlightCircle",
+    this.highlightCircleAL,
+    HIGHLIGHT_CIRCLE_COLOR,
+    this.adj_list_x_start - this.adj_list_width,
+    this.adj_list_y_start + vertex * this.adj_list_height,
+  );
+  this.cmd("SetLayer", this.highlightCircleAL, 2);
+  this.cmd(
+    "CreateHighlightCircle",
+    this.highlightCircleAM,
+    HIGHLIGHT_CIRCLE_COLOR,
+    this.adj_matrix_x_start - this.adj_matrix_width,
+    this.adj_matrix_y_start + vertex * this.adj_matrix_height,
+  );
+  this.cmd("SetLayer", this.highlightCircleAM, 3);
+
+  this.cmd("SetMessage", `Initialize stack with ${vertex}.`);
+  this.cmd("Step");
+
+  while (stackSize > 0) {
+    // pop()
+    stackSize--;
+    var currentVertex = stackVertex[stackSize];
+    this.cmd("SetText", stackLabelID[stackSize], "");
+    this.cmd("SetAlpha", stackLabelID[stackSize], 0);
+    this.cmd("SetMessage", `Pop ${currentVertex} from stack.`);
+    this.cmd("Step");
+
+    if (this.visited[currentVertex]) {
+      this.cmd("SetMessage", `${currentVertex} is already visited; skip.`);
+      this.cmd("Step");
+      continue;
+    }
+
+    this.visited[currentVertex] = true;
+    this.cmd("SetText", this.visitedID[currentVertex], "T");
+
+    // Lock in tree edge only when the destination vertex is actually visited.
+    if (this.parent[currentVertex] >= 0) {
+      this.applyEdgeVisualState(
+        this.parent[currentVertex],
+        currentVertex,
+        EDGE_COLOR,
+        true,
+      );
+    }
+
+    this.cmd(
+      "Move",
+      this.highlightCircleL,
+      this.x_pos_logical[currentVertex],
+      this.y_pos_logical[currentVertex],
+    );
+    this.cmd(
+      "Move",
+      this.highlightCircleAL,
+      this.adj_list_x_start - this.adj_list_width,
+      this.adj_list_y_start + currentVertex * this.adj_list_height,
+    );
+    this.cmd(
+      "Move",
+      this.highlightCircleAM,
+      this.adj_matrix_x_start - this.adj_matrix_width,
+      this.adj_matrix_y_start + currentVertex * this.adj_matrix_height,
+    );
+    this.cmd("SetMessage", `Visit ${currentVertex}; scan neighbors.`);
+    this.cmd("Step");
+
+    for (var neighbor = this.size - 1; neighbor >= 0; neighbor--) {
+
+      if (this.adj_matrix[currentVertex][neighbor] > 0) {
+        const savedEdgeColor = this.edgeColorState[currentVertex][neighbor];
+        const savedEdgeHighlight = this.edgeHighlightState[currentVertex][neighbor];
+
+        this.applyEdgeVisualState(currentVertex, neighbor, EDGE_CHECK_COLOR, false);
+        this.cmd("SetHighlight", this.visitedID[neighbor], 1);
+        if (this.visited[neighbor]) {
+          this.cmd(
+            "SetMessage",
+            `Explore edge ${currentVertex} -> ${neighbor}; neighbor already visited (skip).`,
+          );
+        } else {
+          this.cmd(
+            "SetMessage",
+            `Explore edge ${currentVertex} -> ${neighbor}; neighbor unvisited (push).`,
+          );
+        }
+        this.cmd("Step");
+
+        if (!this.visited[neighbor]) {
+          // push(neighbor) and set parent at push time
+          this.parent[neighbor] = currentVertex;
+          this.cmd("SetText", this.parentID[neighbor], currentVertex);
+          // Do not lock edge highlight yet; lock when neighbor is actually visited.
+          this.applyEdgeVisualState(
+            currentVertex,
+            neighbor,
+            savedEdgeColor,
+            savedEdgeHighlight,
+          );
+
+          stackVertex[stackSize] = neighbor;
+          this.cmd("SetText", stackLabelID[stackSize], neighbor);
+          this.cmd("SetAlpha", stackLabelID[stackSize], 1);
+          this.cmd(
+            "Move",
+            stackLabelID[stackSize],
+            QUEUE_START_X,
+            QUEUE_START_Y + stackSize * QUEUE_SPACING,
+          );
+          stackSize++;
+
+          this.cmd(
+            "SetMessage",
+            `Discover ${neighbor}; set parent to ${currentVertex} and push ${neighbor} onto stack (edge locks when ${neighbor} is visited).`,
+          );
+          this.cmd("Step");
+        } else {
+          this.applyEdgeVisualState(
+            currentVertex,
+            neighbor,
+            savedEdgeColor,
+            savedEdgeHighlight,
+          );
+          this.cmd(
+            "SetMessage",
+            `Neighbor ${neighbor} already visited; skip edge ${currentVertex} -> ${neighbor}.`,
+          );
+        }
+        this.cmd("Step");
+
+        this.clearAdjacencyRepEdgeHighlight(currentVertex, neighbor);
+        this.cmd("SetHighlight", this.visitedID[neighbor], 0);
+        this.cmd("Step");
+      }
+    }
+
+    this.cmd("SetMessage", `Finished scanning neighbors of ${currentVertex}.`);
+    this.cmd("Step");
+  }
+
+  this.cmd("Delete", this.highlightCircleL);
+  this.cmd("Delete", this.highlightCircleAL);
+  this.cmd("Delete", this.highlightCircleAM);
+
+  this.cmd("SetMessage", "DFS complete. Search tree highlighted.");
+  for (i = 0; i < this.size; i++) {
+    if (this.parent[i] >= 0) {
+      this.applyEdgeVisualState(this.parent[i], i, SEARCH_TREE_FINAL_COLOR, true);
     }
   }
   this.cmd("Step");
@@ -289,7 +608,11 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
     this.cmd("Step");
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[startVertex][neighbor] > 0) {
-        this.highlightEdge(startVertex, neighbor, 1);
+        const savedEdgeColor = this.edgeColorState[startVertex][neighbor];
+        const savedEdgeHighlight = this.edgeHighlightState[startVertex][neighbor];
+
+        // Phase 1: temporarily show considered edge in alt color.
+        this.applyEdgeVisualState(startVertex, neighbor, EDGE_CHECK_COLOR, false);
         this.cmd("SetHighlight", this.visitedID[neighbor], 1);
         if (this.visited[neighbor]) {
           // nextMessage = this.nextIndex;
@@ -313,27 +636,10 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
           );
         }
         this.cmd("Step");
-        this.highlightEdge(startVertex, neighbor, 0);
-        this.cmd("SetHighlight", this.visitedID[neighbor], 0);
-        // if (this.visited[neighbor]) {
-        //   this.cmd("Delete", nextMessage);
-        // }
 
         if (!this.visited[neighbor]) {
-          this.cmd(
-            "Disconnect",
-            this.circleID[startVertex],
-            this.circleID[neighbor],
-          );
-          this.cmd(
-            "Connect",
-            this.circleID[startVertex],
-            this.circleID[neighbor],
-            DFS_TREE_COLOR,
-            this.curve[startVertex][neighbor],
-            1,
-            "",
-          );
+          // Selected edge: restore normal color but keep highlighted.
+          this.applyEdgeVisualState(startVertex, neighbor, savedEdgeColor, true);
           this.cmd(
             "Move",
             this.highlightCircleL,
@@ -396,7 +702,22 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
           );
           this.cmd("Step");
           // this.cmd("Delete", nextMessage);
+        } else {
+          // Not selected edge: restore prior visual state.
+          this.applyEdgeVisualState(
+            startVertex,
+            neighbor,
+            savedEdgeColor,
+            savedEdgeHighlight,
+          );
         }
+        this.cmd("Step");
+
+        // Keep list/matrix edge highlighting temporary per check.
+        this.clearAdjacencyRepEdgeHighlight(startVertex, neighbor);
+        this.cmd("SetHighlight", this.visitedID[neighbor], 0);
+        this.cmd("Step");
+
         this.cmd(
           "SetMessage",
           `Finished processing edge ${startVertex} -> ${neighbor}.`,

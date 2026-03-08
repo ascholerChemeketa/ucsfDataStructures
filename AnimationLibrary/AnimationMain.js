@@ -88,7 +88,34 @@ var zoomHoverTrackingInstalled = false;
 var pendingZoomFocusClient = null;
 var lastHoverClient = null;
 
+const BASE_ZOOM_COOKIE_NAME = "VisualizationZoom";
+var zoomCookieName = BASE_ZOOM_COOKIE_NAME;
+
 var autoplayIntervalId = null;
+
+function sanitizeCookieToken(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  const cleaned = raw.replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
+  return cleaned || "default";
+}
+
+function deriveZoomCookieName(title, opts = null) {
+  const explicitScope = opts && typeof opts.zoomCookieScope === "string"
+    ? opts.zoomCookieScope
+    : null;
+  if (explicitScope && explicitScope.trim() !== "") {
+    return `${BASE_ZOOM_COOKIE_NAME}_${sanitizeCookieToken(explicitScope)}`;
+  }
+
+  const path =
+    (typeof window !== "undefined" && window.location && window.location.pathname) ||
+    "";
+  const lastSegment = path.split("/").filter(Boolean).pop() || "index";
+  const pageToken = lastSegment.replace(/\.[^.]+$/, "");
+  const fallbackTitle = title && String(title).trim() !== "" ? String(title) : "animation";
+  const scope = pageToken || fallbackTitle;
+  return `${BASE_ZOOM_COOKIE_NAME}_${sanitizeCookieToken(scope)}`;
+}
 
 function installZoomHoverTracking(targetEl) {
   if (zoomHoverTrackingInstalled) return;
@@ -104,13 +131,15 @@ function installZoomHoverTracking(targetEl) {
 function installLTIResizer() {
   if (ltiResizeListenerInstalled) return;
   ltiResizeListenerInstalled = true;
-  window.addEventListener('resize', () => {
+  let requestSizeChangeForLTI = function() {
     // console.log('Window resized inside the iframe!');
     if(!window.frameElement) return;
-    const height = window.innerWidth > 500 ? '100%' : '600px';
+    const height = window.innerWidth > 600 ? '100%' : '600px';
     const data = { subject: 'lti.frameResize', message_id: window.frameElement.id, height: height }
     window.parent.postMessage(data, '*')
-  });
+  };
+  window.addEventListener('resize', requestSizeChangeForLTI);
+  requestSizeChangeForLTI();
 }
 
 function getZoomSelect() {
@@ -434,7 +463,13 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
   });
   addControlTo(speedSelect, controlBar, "Auto Step Speed");
 
-  var zoom = getCookie("VisualizationZoom");
+  zoomCookieName = deriveZoomCookieName(title, opts);
+
+  var zoom = getCookie(zoomCookieName);
+  if (zoom == undefined || zoom === null || zoom === "") {
+    // Backward compatibility: if a legacy global cookie exists, keep honoring it.
+    zoom = getCookie(BASE_ZOOM_COOKIE_NAME);
+  }
   {
     let parsed = parseFloat(zoom);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -469,7 +504,7 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
     <option value="1.3333333333" ${zoom == 1.3333333333 ? "selected" : ""}>3x</option>`;
 
   zoomSelect.addEventListener("change", (e) => {
-    setCookie("VisualizationZoom", e.target.value);
+    setCookie(zoomCookieName, e.target.value);
 
     let focus = pendingZoomFocusClient;
     pendingZoomFocusClient = null;
@@ -552,7 +587,7 @@ function applyAutoZoomForMinVisibleWidth(minVisibleWorldWidth) {
     }
   }
 
-  setCookie("VisualizationZoom", chosenZoom);
+  setCookie(zoomCookieName, chosenZoom);
   objectManager.setZoom(chosenZoom);
 }
 
@@ -876,6 +911,10 @@ function AnimationManager(objectManager, canvas) {
     }
   }
 
+  this.shift = function (deltaX = 0, deltaY = 0) {
+    this.animatedObjects.shiftView(deltaX, deltaY);
+  }
+
   this.parseBool = function (str) {
     var uppercase = str.toUpperCase();
     var returnVal = !(
@@ -1121,12 +1160,15 @@ function AnimationManager(objectManager, canvas) {
         undoBlock.push(new Undo.UndoSetBackgroundColor(id, oldColor));
       } else if (nextCommand[0].toUpperCase() == "SETHIGHLIGHT") {
         var newHighlight = this.parseBool(nextCommand[2]);
+        var oldHighlight = this.animatedObjects.getHighlight(
+          parseInt(nextCommand[1]),
+        );
         this.animatedObjects.setHighlight(
           parseInt(nextCommand[1]),
           newHighlight,
         );
         undoBlock.push(
-          new Undo.UndoHighlight(parseInt(nextCommand[1]), !newHighlight),
+          new Undo.UndoHighlight(parseInt(nextCommand[1]), oldHighlight),
         );
       } else if (nextCommand[0].toUpperCase() == "DISCONNECT") {
         var undoConnect = this.animatedObjects.disconnect(
@@ -1831,6 +1873,22 @@ function AnimationManager(objectManager, canvas) {
     this.scrubSlider.value = String(Math.max(0, Math.min(this.currentBlockIndex, this.totalBlocks)));
   };
 
+  this.finishCurrentBlockInstantly = function() {
+    if (!this.currentBlock || this.currentBlock.length === 0) return;
+    for (var i = 0; i < this.currentBlock.length; i++) {
+      var objectID = this.currentBlock[i].objectID;
+      this.animatedObjects.setNodePosition(
+        objectID,
+        this.currentBlock[i].toX,
+        this.currentBlock[i].toY,
+      );
+    }
+    this.currFrame = this.animationBlockLength;
+    this.currentBlock = [];
+    this.animatedObjects.update();
+    this.animatedObjects.draw();
+  };
+
   this.scrubToBlock = function(targetBlockIndex) {
     if (!Number.isFinite(targetBlockIndex)) return;
     targetBlockIndex = Math.max(0, Math.min(targetBlockIndex, this.totalBlocks));
@@ -1842,8 +1900,18 @@ function AnimationManager(objectManager, canvas) {
     clearTimeout(timer);
     this.animationPaused = true;
 
+    // If we are mid-animation, immediately finish in-flight movement so scrub
+    // never starts from an interpolated partial state.
+    if (this.currentlyAnimating) {
+      this.finishCurrentBlockInstantly();
+    }
+    this.currentlyAnimating = false;
+    this.doingUndo = false;
+
     if (targetBlockIndex === this.currentBlockIndex) {
+      this.awaitingStep = targetBlockIndex < this.totalBlocks;
       this.updateScrubUI();
+      this.fireEvent(this.awaitingStep ? "AnimationWaiting" : "AnimationEnded", "NoData");
       return;
     }
 
@@ -1851,9 +1919,20 @@ function AnimationManager(objectManager, canvas) {
     if (targetBlockIndex < this.currentBlockIndex) {
       while (this.currentBlockIndex > targetBlockIndex && this.undoAnimationStepIndices && this.undoAnimationStepIndices.length > 0) {
         this.undoLastBlock();
+        // Apply undo movement instantly (same approach as skipBack) so
+        // objects don't remain at stale positions while scrubbing backward.
+        for (var i = 0; this.currentBlock != null && i < this.currentBlock.length; i++) {
+          var objectID = this.currentBlock[i].objectID;
+          this.animatedObjects.setNodePosition(
+            objectID,
+            this.currentBlock[i].toX,
+            this.currentBlock[i].toY,
+          );
+        }
         const undoBlock = this.undoStack.pop();
         if (undoBlock) {
           this.finishUndoBlock(undoBlock);
+          this.currentBlock = [];
         } else {
           break;
         }
@@ -1861,6 +1940,10 @@ function AnimationManager(objectManager, canvas) {
       this.updateScrubUI();
       this.animatedObjects.update();
       this.animatedObjects.draw();
+      this.currentlyAnimating = false;
+      this.doingUndo = false;
+      this.awaitingStep = targetBlockIndex < this.totalBlocks;
+      this.fireEvent(this.awaitingStep ? "AnimationWaiting" : "AnimationEnded", "NoData");
       return;
     }
 
@@ -1870,34 +1953,14 @@ function AnimationManager(objectManager, canvas) {
       // Start and immediately finalize the next block
       this.startNextBlock();
       // Instantly finish movement for the block
-      this.currFrame = this.animationBlockLength;
-      // Apply end positions for movements in this.currentBlock
-      for (var i = 0; i < (this.currentBlock ? this.currentBlock.length : 0); i++) {
-        var objectID = this.currentBlock[i].objectID;
-        this.animatedObjects.setNodePosition(
-          objectID,
-          this.currentBlock[i].toX,
-          this.currentBlock[i].toY,
-        );
-      }
-      // Clear current block and update visuals
-      this.currentBlock = [];
-      this.animatedObjects.update();
-      this.animatedObjects.draw();
+      this.finishCurrentBlockInstantly();
     }
 
     this.updateScrubUI();
-
-    // If scrubbed to the final block, ensure the animation fully completes.
-    // When paused and awaiting a step, silently advance one step to trigger end state.
-    // If still animating, fast-forward to finish remaining blocks.
-    if (targetBlockIndex === this.totalBlocks) {
-      if (this.awaitingStep) {
-        this.step();
-      } else if (this.currentlyAnimating) {
-        this.skipForward();
-      }
-    }
+    this.currentlyAnimating = false;
+    this.doingUndo = false;
+    this.awaitingStep = targetBlockIndex < this.totalBlocks;
+    this.fireEvent(this.awaitingStep ? "AnimationWaiting" : "AnimationEnded", "NoData");
   };
 }
 

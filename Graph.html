@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Graph Representation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+
+  <body>
+    <script type="module">
+      import { GraphRepresentation } from "./dist/entry.js";
+      let anim = new GraphRepresentation({
+        title: "Graph Representation",
+        startingGraphRepresentation: "adjacency matrix",
+      });
+      anim.shift(300, -20);
+    </script>
+  </body>
+</html>

@@ -41,6 +41,7 @@ export function Kruskal(canvas) {
   let am;
   let w;
   let h;
+  let graphOpts = null;
 
   if (canvas && typeof canvas.getContext === "function") {
     const legacyCanvas = canvas;
@@ -52,6 +53,7 @@ export function Kruskal(canvas) {
     h = legacyCanvas.height;
   } else {
     const opts = canvas || {};
+    graphOpts = opts;
     const viewWidth =
       Number.isFinite(opts.viewWidth) && opts.viewWidth > 0
         ? opts.viewWidth
@@ -76,7 +78,7 @@ export function Kruskal(canvas) {
     h = viewHeight;
   }
 
-  this.init(am, w, h);
+  this.init(am, w, h, graphOpts);
 }
 
 Kruskal.HIGHLIGHT_CIRCLE_COLOR = "#000000";
@@ -116,9 +118,9 @@ Kruskal.prototype.addControls = function () {
   Kruskal.superclass.addControls.call(this, false);
 };
 
-Kruskal.prototype.init = function (am, w, h) {
+Kruskal.prototype.init = function (am, w, h, graphOpts) {
   this.showEdgeCosts = true;
-  Kruskal.superclass.init.call(this, am, w, h, false, false); // TODO:  add no edge label flag to this?
+  Kruskal.superclass.init.call(this, am, w, h, false, false, graphOpts); // TODO:  add no edge label flag to this?
   // Setup called in base class init function
 };
 

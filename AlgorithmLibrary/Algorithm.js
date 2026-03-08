@@ -216,6 +216,12 @@ Algorithm.prototype.implementAction = function (funct, val) {
   this.animationManager.StartNewAnimation(retVal);
 };
 
+Algorithm.prototype.shift = function (deltaX, deltaY) {
+  if (this.animationManager && this.animationManager.shift) {
+    this.animationManager.shift(deltaX, deltaY);
+  }
+};
+
 Algorithm.prototype.isAllDigits = function (str) {
   for (var i = str.length - 1; i >= 0; i--) {
     if (str.charAt(i) < "0" || str.charAt(i) > "9") {

@@ -11,7 +11,8 @@
     "esbuild": "^0.20.1",
     "glob": "^10.3.10",
     "lebab": "^3.2.4",
-    "prettier": "^3.2.5"
+    "prettier": "^3.2.5",
+    "random": "^5.4.1"
   },
   "nodemonConfig": {
     "ignore": [
