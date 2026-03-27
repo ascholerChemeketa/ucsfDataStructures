@@ -369,14 +369,14 @@ LinkedList.prototype.deleteFront = function (ignored) {
   this.cmd("Step");
 
   if (this.top == 1) {
-    this.cmd("SetMessage", "That was the last node; head and tail become null.");
+    this.cmd("SetMessage", "head gets set to head->next which is null.");
     this.cmd("Step");
     this.cmd("SetNull", this.headID, 1);
     this.cmd("SetNull", this.tailID, 1);
     this.cmd("Disconnect", this.headID, this.linkedListElemID[this.top - 1]);
     this.cmd("Disconnect", this.tailID, this.linkedListElemID[this.top - 1]);
   } else {
-    this.cmd("SetMessage", "Advance head to the next node.");
+    this.cmd("SetMessage", "head gets set to head->next.");
     this.cmd("Disconnect", this.headID, this.linkedListElemID[this.top - 1]);
     this.cmd(
       "Connect",

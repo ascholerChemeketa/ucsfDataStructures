@@ -427,7 +427,7 @@ Heap.prototype.removeSmallest = function (dummy) {
     this.cmd("SetText", this.arrayRects[0], "");
     this.cmd("SetText", this.arrayRects[lastIndex], "");
     this.swap(0, lastIndex);
-    this.cmd("SetMessage", "Delete the old last node");
+    this.cmd("SetMessage", "Remove the last value (the old max)");
     this.cmd("Delete", this.circleObjs[lastIndex]);
     this.cmd("SetText", this.arrayRects[lastIndex], "");
     this.arrayData[lastIndex] = "";
