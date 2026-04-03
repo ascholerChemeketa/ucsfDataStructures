@@ -928,7 +928,7 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
         this.cmd("Delete", this.highlightID);
         this.cmd(
           "SetMessage",
-          "Now remove the original node we copied from (in the right subtree).",
+          "Now remove the value we copied. Call remove with that value on the right subtree.",
         );
         this.cmd("Step");
 

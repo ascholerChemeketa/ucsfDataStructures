@@ -139,7 +139,7 @@ function makeSVG(centered, viewWidth = 800, viewHeight = 400) {
       </marker>
       <style>
       // :root {
-      //   --svgColor: var(rgb(0,0,0);
+      //   --svgColor: rgb(0,0,0);
       //   --svgColor--red: rgb(231, 36, 36);
       //   --svgColor--redback: rgb(255, 233, 233);
       //   --svgColor--black: rgb(0, 0 ,0);
