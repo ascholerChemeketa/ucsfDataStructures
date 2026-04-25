@@ -473,7 +473,7 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
   {
     let parsed = parseFloat(zoom);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      parsed = 2;
+      parsed = 4;
     }
 
     // Keep UI + behavior consistent even if an old/unsupported zoom value is stored.
