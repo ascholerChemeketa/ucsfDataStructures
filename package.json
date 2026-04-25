@@ -2,8 +2,9 @@
   "name": "ucsfdatastructures",
   "version": "1.0.0",
   "description": "https://www.cs.usfca.edu/~galles/visualization/source.html",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node ./test/run-tests.js",
     "build": "node ./esbuildconfig.js",
     "watch": "nodemon -e css,js ./esbuildconfig.js"
   },
