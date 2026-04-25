@@ -148,6 +148,25 @@ SkipList.prototype.reset = function () {
   this.ensureLevel(0);
 };
 
+SkipList.prototype.beginSkipListAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "SkipList", operation, ...meta });
+};
+
+SkipList.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "SkipList",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+SkipList.prototype.finishSkipListAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 // Public programmatic bindings
 SkipList.prototype.doInsert = function (v) {
   this.implementAction(this.insertElement.bind(this), v);
@@ -187,7 +206,7 @@ SkipList.prototype.insertRandomCallback = function () {
 };
 
 SkipList.prototype.clearAll = function () {
-  this.commands = [];
+  this.beginSkipListAnimation("clear", "clear skip list", { tags: ["clear"] });
   // Delete all graphics and reset.
   for (let lvl = 0; lvl < this.nodesByLevel.length; lvl++) {
     for (let n of this.nodesByLevel[lvl]) {
@@ -199,7 +218,10 @@ SkipList.prototype.clearAll = function () {
   this.towerByValue = new Map();
   this.knownIDs = new Set();
   this.ensureLevel(0);
-  return this.commands;
+  this.markAnimationStep("skip list cleared", {
+    tags: ["clear", "complete"],
+  });
+  return this.finishSkipListAnimation();
 };
 
 SkipList.prototype.ensureLevel = function (level) {
@@ -328,22 +350,28 @@ SkipList.prototype.relayoutLevel = function (level) {
 };
 
 SkipList.prototype.insertElement = function (value) {
-  this.commands = [];
+  this.beginSkipListAnimation("insert", `insert ${value}`, {
+    tags: ["insert"],
+  });
 
   if (value === "" || value === null || Number.isNaN(Number(value))) {
-    return this.commands;
+    return this.finishSkipListAnimation();
   }
   value = Number(value);
 
   if (this.valueSet.has(value)) {
     this.cmd("SetMessage", "Value already exists: " + value);
-    this.cmd("Step");
+    this.markAnimationStep("value already exists", {
+      tags: ["insert", "duplicate"],
+    });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishSkipListAnimation();
   }
 
   this.cmd("SetMessage", "Insert " + value);
-  this.cmd("Step");
+  this.markAnimationStep(`start insert ${value}`, {
+    tags: ["insert", "start"],
+  });
 
   // 1) Search from the top level to locate predecessors on each level.
   const topLevel = this.nodesByLevel.length - 1;
@@ -419,13 +447,17 @@ SkipList.prototype.insertElement = function (value) {
   }
   // Finished search; remove the search highlight.
   this.cmd("Delete", searchHi);
-  this.cmd("Step");
+  this.markAnimationStep("locate predecessors", {
+    tags: ["insert", "search"],
+  });
 
   // Base insertion index is predecessor+1 on level 0.
   const base = this.nodesByLevel[0];
   const idx0 = (prevIndexByLevel.get(0) || 0) + 1;
   this.cmd("SetMessage", "Base insert between " + (base[idx0 - 1].isSentinel ? "HEAD" : base[idx0 - 1].value) + " and " + (base[idx0].isSentinel ? "TAIL" : base[idx0].value));
-  this.cmd("Step");
+  this.markAnimationStep(`identify base slot ${idx0}`, {
+    tags: ["insert", "slot"],
+  });
 
   // 2) Flip coins to decide height after we know location.
   let height = 0;
@@ -456,7 +488,10 @@ SkipList.prototype.insertElement = function (value) {
     this.knownIDs.add(id);
     nodeIDs.push(id);
   }
-  this.cmd("Step");
+  this.markAnimationStep(`create tower for ${value}`, {
+    tags: ["insert", "tower"],
+    focusNodeId: nodeIDs[0],
+  });
 
 
   // Insert into level 0 at idx0.
@@ -511,9 +546,12 @@ SkipList.prototype.insertElement = function (value) {
   this.towerByValue.set(value, { levelToID: tower });
 
   this.cmd("SetMessage", "Inserted " + value + (height > 0 ? " with height " + (height + 1) : ""));
-  this.cmd("Step");
+  this.markAnimationStep(`insert complete ${value}`, {
+    tags: ["insert", "complete"],
+    focusNodeId: nodeIDs[0],
+  });
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishSkipListAnimation();
 };
 
 // Disable/enable algorithm-specific UI during animations
@@ -546,16 +584,20 @@ SkipList.prototype.enableUI = function () {
 };
 
 SkipList.prototype.findElement = function (value) {
-  this.commands = [];
+  this.beginSkipListAnimation("find", `find ${value}`, {
+    tags: ["search", "find"],
+  });
   if (value === "" || value === null || Number.isNaN(Number(value))) {
-    return this.commands;
+    return this.finishSkipListAnimation();
   }
   value = Number(value);
 
-  if (this.nodesByLevel.length === 0) return this.commands;
+  if (this.nodesByLevel.length === 0) return this.finishSkipListAnimation();
 
   this.cmd("SetMessage", "Find " + value);
-  this.cmd("Step");
+  this.markAnimationStep(`start find ${value}`, {
+    tags: ["search", "start"],
+  });
 
   // Start from the highest level HEAD, move right while next.value < target, then drop.
   const topLevel = this.nodesByLevel.length - 1;
@@ -635,7 +677,11 @@ SkipList.prototype.findElement = function (value) {
         this.cmd("SetHighlight", nextNode.id, 0);
         this.cmd("SetMessage", "");
         this.cmd("Delete", highlightID);
-        return this.commands;
+        this.markAnimationStep(`found ${value}`, {
+          tags: ["search", "found"],
+          focusNodeId: targetID,
+        });
+        return this.finishSkipListAnimation();
       } else {
         // Next is >= target: drop down.
         this.cmd("SetMessage", "Drop down: " + nextValText + " ≥ " + value);
@@ -679,25 +725,31 @@ SkipList.prototype.findElement = function (value) {
   }
 
   this.cmd("SetMessage", "Not found: " + value);
-  this.cmd("Step");
+  this.markAnimationStep(`not found ${value}`, {
+    tags: ["search", "not-found"],
+  });
   this.cmd("SetMessage", "");
   // Clean up the moving highlight circle.
   this.cmd("Delete", highlightID);
-  return this.commands;
+  return this.finishSkipListAnimation();
 };
 
 // Remove a value: top-down search animation, then delete tower nodes and relayout
 SkipList.prototype.removeElement = function (value) {
-  this.commands = [];
+  this.beginSkipListAnimation("remove", `remove ${value}`, {
+    tags: ["delete"],
+  });
   if (value === "" || value === null || Number.isNaN(Number(value))) {
-    return this.commands;
+    return this.finishSkipListAnimation();
   }
   value = Number(value);
 
-  if (this.nodesByLevel.length === 0) return this.commands;
+  if (this.nodesByLevel.length === 0) return this.finishSkipListAnimation();
 
   this.cmd("SetMessage", "Remove " + value);
-  this.cmd("Step");
+  this.markAnimationStep(`start remove ${value}`, {
+    tags: ["delete", "start"],
+  });
 
   const topLevel = this.nodesByLevel.length - 1;
   let lvl = topLevel;
@@ -782,10 +834,12 @@ SkipList.prototype.removeElement = function (value) {
 
   if (!found) {
     this.cmd("SetMessage", "Not found: " + value);
-    this.cmd("Step");
+    this.markAnimationStep(`not found ${value}`, {
+      tags: ["delete", "not-found"],
+    });
     this.cmd("Delete", hi);
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishSkipListAnimation();
   }
 
   // Remove tower nodes from top to base
@@ -826,7 +880,9 @@ SkipList.prototype.removeElement = function (value) {
 
   this.cmd("Delete", hi);
   this.cmd("SetMessage", "Removed " + value);
-  this.cmd("Step");
+  this.markAnimationStep(`remove complete ${value}`, {
+    tags: ["delete", "complete"],
+  });
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishSkipListAnimation();
 };

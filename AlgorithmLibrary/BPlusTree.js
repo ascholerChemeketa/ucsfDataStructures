@@ -95,6 +95,28 @@ BPlusTree.prototype.init = function (am, w, h) {
   this.yPosOfNextLabel = 200;
 };
 
+BPlusTree.prototype.beginBPlusTreeAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "BPlusTree", operation, ...meta });
+};
+
+BPlusTree.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "BPlusTree",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+BPlusTree.prototype.finishBPlusTreeAnimation = function () {
+  return this.finishAnimation();
+};
+
 BPlusTree.prototype.addControls = function () {
   this.controls = [];
 
@@ -252,7 +274,9 @@ BPlusTree.prototype.printCallback = function (event) {
 };
 
 BPlusTree.prototype.printTree = function (unused) {
-  this.commands = new Array();
+  this.beginBPlusTreeAnimation("print", "print tree", {
+    tags: ["print"],
+  });
   this.cmd("SetText", this.messageID, "Printing tree");
   var firstLabel = this.nextIndex;
 
@@ -263,14 +287,23 @@ BPlusTree.prototype.printTree = function (unused) {
     var tmp = this.treeRoot;
 
     this.cmd("SetHighlight", tmp.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep("find leftmost leaf", {
+      focusNodeId: tmp.graphicID,
+      tags: ["print", "seek-leftmost"],
+    });
     while (!tmp.isLeaf) {
       this.cmd("SetEdgeHighlight", tmp.graphicID, tmp.children[0].graphicID, 1);
-      this.cmd("Step");
+      this.markAnimationStep(`descend to child 0 from node ${tmp.graphicID}`, {
+        focusNodeId: tmp.children[0].graphicID,
+        tags: ["print", "descend"],
+      });
       this.cmd("SetHighlight", tmp.graphicID, 0);
       this.cmd("SetHighlight", tmp.children[0].graphicID, 1);
       this.cmd("SetEdgeHighlight", tmp.graphicID, tmp.children[0].graphicID, 0);
-      this.cmd("Step");
+      this.markAnimationStep(`visit child 0 from node ${tmp.graphicID}`, {
+        focusNodeId: tmp.children[0].graphicID,
+        tags: ["print", "visit"],
+      });
       tmp = tmp.children[0];
     }
 
@@ -292,7 +325,10 @@ BPlusTree.prototype.printTree = function (unused) {
           this.xPosOfNextLabel,
           this.yPosOfNextLabel,
         );
-        this.cmd("Step");
+        this.markAnimationStep(`print key ${tmp.keys[i]}`, {
+          focusNodeId: tmp.graphicID,
+          tags: ["print", "output"],
+        });
         this.xPosOfNextLabel += PRINT_HORIZONTAL_GAP;
         if (this.xPosOfNextLabel > PRINT_MAX) {
           this.xPosOfNextLabel = FIRST_PRINT_POS_X;
@@ -301,28 +337,35 @@ BPlusTree.prototype.printTree = function (unused) {
       }
       if (tmp.next != null) {
         this.cmd("SetEdgeHighlight", tmp.graphicID, tmp.next.graphicID, 1);
-        this.cmd("Step");
+        this.markAnimationStep(`advance to next leaf from ${tmp.graphicID}`, {
+          focusNodeId: tmp.next.graphicID,
+          tags: ["print", "next-leaf"],
+        });
         this.cmd("SetEdgeHighlight", tmp.graphicID, tmp.next.graphicID, 0);
       }
       this.cmd("SetHighlight", tmp.graphicID, 0);
       tmp = tmp.next;
     }
-    this.cmd("Step");
+    this.markAnimationStep("clear printed labels", {
+      tags: ["print", "cleanup"],
+    });
     for (var i = firstLabel; i < this.nextIndex; i++) {
       this.cmd("Delete", i);
     }
     this.nextIndex = firstLabel;
   }
   this.cmd("SetText", this.messageID, "");
-  return this.commands;
+  return this.finishBPlusTreeAnimation();
 };
 
 BPlusTree.prototype.clearTree = function (ignored) {
-  this.commands = new Array();
+  this.beginBPlusTreeAnimation("clear", "clear tree", {
+    tags: ["clear"],
+  });
   this.deleteTree(this.treeRoot);
   this.treeRoot = null;
   this.nextIndex = 3;
-  return this.commands;
+  return this.finishBPlusTreeAnimation();
 };
 
 BPlusTree.prototype.deleteTree = function (tree) {
@@ -339,7 +382,9 @@ BPlusTree.prototype.deleteTree = function (tree) {
 };
 
 BPlusTree.prototype.changeDegree = function (degree) {
-  this.commands = new Array();
+  this.beginBPlusTreeAnimation("degree", `change max degree to ${degree}`, {
+    tags: ["config", "degree"],
+  });
   this.deleteTree(this.treeRoot);
   this.treeRoot = null;
   this.nextIndex = 3;
@@ -360,7 +405,7 @@ BPlusTree.prototype.changeDegree = function (degree) {
     this.preemptiveSplit = false;
     this.premptiveSplitBox.checked = false;
   }
-  return this.commands;
+  return this.finishBPlusTreeAnimation();
 };
 
 BPlusTree.prototype.findCallback = function (event) {
@@ -371,18 +416,25 @@ BPlusTree.prototype.findCallback = function (event) {
 };
 
 BPlusTree.prototype.findElement = function (findValue) {
-  this.commands = new Array();
+  this.beginBPlusTreeAnimation("find", `find ${findValue}`, {
+    tags: ["search", "find"],
+  });
 
   this.cmd("SetText", this.messageID, "Finding " + findValue);
   this.findInTree(this.treeRoot, findValue);
 
-  return this.commands;
+  return this.finishBPlusTreeAnimation();
 };
 
 BPlusTree.prototype.findInTree = function (tree, val) {
   if (tree != null) {
+    this.beginBlock(`inspect node ${tree.graphicID}`, {
+      source: "BPlusTree",
+      operation: this.currentAnimationOperation,
+      focusNodeId: tree.graphicID,
+      tags: ["search", "inspect"],
+    });
     this.cmd("SetHighlight", tree.graphicID, 1);
-    this.cmd("Step");
     var i;
     for (i = 0; i < tree.numKeys && tree.keys[i] < val; i++);
     if (i == tree.numKeys) {
@@ -393,7 +445,10 @@ BPlusTree.prototype.findInTree = function (tree, val) {
           tree.children[tree.numKeys].graphicID,
           1,
         );
-        this.cmd("Step");
+        this.markAnimationStep(`descend right from node ${tree.graphicID}`, {
+          focusNodeId: tree.children[tree.numKeys].graphicID,
+          tags: ["search", "descend", "right"],
+        });
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd(
           "SetEdgeHighlight",
@@ -403,6 +458,12 @@ BPlusTree.prototype.findInTree = function (tree, val) {
         );
         this.findInTree(tree.children[tree.numKeys], val);
       } else {
+        this.beginBlock(`value ${val} not found`, {
+          source: "BPlusTree",
+          operation: this.currentAnimationOperation,
+          focusNodeId: tree.graphicID,
+          tags: ["search", "not-found"],
+        });
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd(
           "SetText",
@@ -418,7 +479,10 @@ BPlusTree.prototype.findInTree = function (tree, val) {
           tree.children[i].graphicID,
           1,
         );
-        this.cmd("Step");
+        this.markAnimationStep(`descend child ${i} from node ${tree.graphicID}`, {
+          focusNodeId: tree.children[i].graphicID,
+          tags: ["search", "descend", "left"],
+        });
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd(
           "SetEdgeHighlight",
@@ -428,6 +492,12 @@ BPlusTree.prototype.findInTree = function (tree, val) {
         );
         this.findInTree(tree.children[i], val);
       } else {
+        this.beginBlock(`value ${val} not found`, {
+          source: "BPlusTree",
+          operation: this.currentAnimationOperation,
+          focusNodeId: tree.graphicID,
+          tags: ["search", "not-found"],
+        });
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd(
           "SetText",
@@ -437,13 +507,16 @@ BPlusTree.prototype.findInTree = function (tree, val) {
       }
     } else {
       if (tree.isLeaf) {
+        this.beginBlock(`found ${val}`, {
+          source: "BPlusTree",
+          operation: this.currentAnimationOperation,
+          focusNodeId: tree.graphicID,
+          tags: ["search", "found"],
+        });
         this.cmd("SetTextColor", tree.graphicID, "#FF0000", i);
         this.cmd("SetText", this.messageID, "Element " + val + " found");
-        this.cmd("Step");
         this.cmd("SetTextColor", tree.graphicID, FOREGROUND_COLOR, i);
         this.cmd("SetHighlight", tree.graphicID, 0);
-
-        this.cmd("Step");
       } else {
         this.cmd(
           "SetEdgeHighlight",
@@ -451,7 +524,10 @@ BPlusTree.prototype.findInTree = function (tree, val) {
           tree.children[i + 1].graphicID,
           1,
         );
-        this.cmd("Step");
+        this.markAnimationStep(`descend child ${i + 1} from node ${tree.graphicID}`, {
+          focusNodeId: tree.children[i + 1].graphicID,
+          tags: ["search", "descend", "equal-right"],
+        });
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd(
           "SetEdgeHighlight",
@@ -463,6 +539,11 @@ BPlusTree.prototype.findInTree = function (tree, val) {
       }
     }
   } else {
+    this.beginBlock(`value ${val} not found`, {
+      source: "BPlusTree",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "not-found"],
+    });
     this.cmd(
       "SetText",
       this.messageID,
@@ -472,10 +553,14 @@ BPlusTree.prototype.findInTree = function (tree, val) {
 };
 
 BPlusTree.prototype.insertElement = function (insertedValue) {
-  this.commands = new Array();
+  this.beginBPlusTreeAnimation("insert", `insert ${insertedValue}`, {
+    tags: ["insert"],
+  });
 
   this.cmd("SetText", this.messageID, "Inserting " + insertedValue);
-  this.cmd("Step");
+  this.markAnimationStep(`start insert ${insertedValue}`, {
+    tags: ["insert", "start"],
+  });
 
   if (this.treeRoot == null) {
     this.treeRoot = new BTreeNode(
@@ -496,6 +581,10 @@ BPlusTree.prototype.insertElement = function (insertedValue) {
     );
     this.treeRoot.keys[0] = insertedValue;
     this.cmd("SetText", this.treeRoot.graphicID, insertedValue, 0);
+    this.markAnimationStep(`create root ${insertedValue}`, {
+      focusNodeId: this.treeRoot.graphicID,
+      tags: ["insert", "root"],
+    });
   } else {
     this.insert(this.treeRoot, insertedValue);
     if (!this.treeRoot.isLeaf) {
@@ -505,12 +594,15 @@ BPlusTree.prototype.insertElement = function (insertedValue) {
 
   this.cmd("SetText", this.messageID, "");
 
-  return this.commands;
+  return this.finishBPlusTreeAnimation();
 };
 
 BPlusTree.prototype.insert = function (tree, insertValue) {
   this.cmd("SetHighlight", tree.graphicID, 1);
-  this.cmd("Step");
+  this.markAnimationStep(`inspect node ${tree.graphicID} for insert`, {
+    focusNodeId: tree.graphicID,
+    tags: ["insert", "inspect"],
+  });
   if (tree.isLeaf) {
     this.cmd(
       "SetText",
@@ -554,7 +646,10 @@ BPlusTree.prototype.insert = function (tree, insertValue) {
       tree.children[findIndex].graphicID,
       1,
     );
-    this.cmd("Step");
+    this.markAnimationStep(`descend child ${findIndex} from node ${tree.graphicID}`, {
+      focusNodeId: tree.children[findIndex].graphicID,
+      tags: ["insert", "descend"],
+    });
     this.cmd(
       "SetEdgeHighlight",
       tree.graphicID,
@@ -585,7 +680,10 @@ BPlusTree.prototype.split = function (tree) {
     "Node now contains too many keys.  Splittig ...",
   );
   this.cmd("SetHighlight", tree.graphicID, 1);
-  this.cmd("Step");
+  this.markAnimationStep(`split node ${tree.graphicID}`, {
+    focusNodeId: tree.graphicID,
+    tags: ["insert", "split"],
+  });
   this.cmd("SetHighlight", tree.graphicID, 0);
   var rightNode = new BTreeNode(this.nextIndex++, tree.x + 100, tree.y);
 
@@ -753,7 +851,10 @@ BPlusTree.prototype.split = function (tree) {
       parentIndex + 1,
     );
     this.resizeTree();
-    this.cmd("Step");
+    this.markAnimationStep(`promote split key ${risingNode}`, {
+      focusNodeId: currentParent.graphicID,
+      tags: ["insert", "split", "promote"],
+    });
     this.cmd("Delete", this.moveLabel1ID);
     this.cmd("SetText", currentParent.graphicID, risingNode, parentIndex);
     return tree.parent;
@@ -1450,6 +1551,11 @@ BPlusTree.prototype.getLabelX = function (tree, index) {
 };
 
 BPlusTree.prototype.resizeTree = function () {
+  if (this.pendingBlock) {
+    this.markAnimationStep("resize tree", {
+      tags: ["layout", "resize"],
+    });
+  }
   this.resizeWidths(this.treeRoot);
   this.setNewPositions(this.treeRoot, this.starting_x, STARTING_Y);
   this.animateNewPositions(this.treeRoot);

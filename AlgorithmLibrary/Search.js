@@ -24,6 +24,12 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import {
+  Algorithm,
+  addControlToAlgorithmBar,
+  addRadioButtonGroupToAlgorithmBar,
+} from "../AlgorithmLibrary/Algorithm.js";
+
 Search.CODE_START_X = 10;
 Search.CODE_START_Y = 10;
 Search.CODE_LINE_HEIGHT = 14;
@@ -92,7 +98,7 @@ var SIZE_SMALL = 32;
 var SIZE_LARGE = 180;
 var SIZE = SIZE_SMALL;
 
-function Search(am, w, h) {
+export function Search(am, w, h) {
   this.init(am, w, h);
 }
 
@@ -197,6 +203,25 @@ Search.prototype.disableUI = function (event) {
   for (var i = 0; i < this.controls.length; i++) {
     this.controls[i].disabled = true;
   }
+};
+
+Search.prototype.beginSearchAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "Search", operation, ...meta });
+};
+
+Search.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "Search",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+Search.prototype.finishSearchAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
 };
 
 Search.prototype.getIndexX = function (index) {
@@ -480,7 +505,9 @@ Search.prototype.binarySearchCallback = function (event) {
 };
 
 Search.prototype.binarySearch = function (searchVal) {
-  this.commands = new Array();
+  this.beginSearchAnimation("binarySearch", `binary search ${searchVal}`, {
+    tags: ["search", "binary"],
+  });
   this.setCodeAlpha(this.binaryCodeID, 1);
   this.setCodeAlpha(this.linearCodeID, 0);
 
@@ -490,245 +517,97 @@ Search.prototype.binarySearch = function (searchVal) {
   this.cmd("SetALpha", this.midBoxLabel, 1);
   this.cmd("SetALpha", this.highBoxID, 1);
   this.cmd("SetALpha", this.highBoxLabel, 1);
-
   this.cmd("SetAlpha", this.lowCircleID, 1);
   this.cmd("SetAlpha", this.midCircleID, 1);
   this.cmd("SetAlpha", this.highCircleID, 1);
-  this.cmd("SetPosition", this.lowCircleID, LOW_POS_X, LOW_POS_Y);
-  this.cmd("SetPosition", this.midCircleID, MID_POS_X, MID_POS_Y);
-  this.cmd("SetPosition", this.highCircleID, HIGH_POS_X, HIGH_POS_Y);
-  this.cmd("SetAlpha", this.indexBoxID, 0);
-  this.cmd("SetAlpha", this.indexBoxLabel, 0);
-
   this.cmd("SetText", this.resultString, "");
   this.cmd("SetText", this.resultBoxID, "");
   this.cmd("SetText", this.movingLabelID, "");
+  this.cmd("SetText", this.searchForBoxID, searchVal);
 
   var low = 0;
   var high = SIZE - 1;
-  this.cmd("Move", this.lowCircleID, this.getIndexX(0), this.getIndexY(0));
-  this.cmd("SetText", this.searchForBoxID, searchVal);
-  this.cmd(
-    "SetForegroundColor",
-    this.binaryCodeID[1][0],
-    Search.CODE_HIGHLIGHT_COLOR,
-  );
-  this.cmd("SetHighlight", this.lowBoxID, 1);
-  this.cmd("SetText", this.lowBoxID, 0);
-  this.cmd("step");
-  this.cmd(
-    "SetForegroundColor",
-    this.binaryCodeID[1][0],
-    Search.CODE_STANDARD_COLOR,
-  );
-  this.cmd("SetHighlight", this.lowBoxID, 0);
-  this.cmd(
-    "SetForegroundColor",
-    this.binaryCodeID[2][0],
-    Search.CODE_HIGHLIGHT_COLOR,
-  );
-  this.cmd("SetHighlight", this.highBoxID, 1);
-  this.cmd("SetText", this.highBoxID, SIZE - 1);
-  this.cmd(
-    "Move",
-    this.highCircleID,
-    this.getIndexX(SIZE - 1),
-    this.getIndexY(SIZE - 1),
-  );
-  this.cmd("step");
-  this.cmd(
-    "SetForegroundColor",
-    this.binaryCodeID[2][0],
-    Search.CODE_STANDARD_COLOR,
-  );
-  this.cmd("SetHighlight", this.highBoxID, 0);
-  var keepGoing = true;
+  var foundIndex = -1;
 
-  while (keepGoing) {
-    this.cmd("SetHighlight", this.highBoxID, 1);
-    this.cmd("SetHighlight", this.lowBoxID, 1);
-    this.cmd(
-      "SetForegroundColor",
-      this.binaryCodeID[3][1],
-      Search.CODE_HIGHLIGHT_COLOR,
-    );
-    this.cmd("step");
-    this.cmd("SetHighlight", this.highBoxID, 0);
-    this.cmd("SetHighlight", this.lowBoxID, 0);
-    this.cmd(
-      "SetForegroundColor",
-      this.binaryCodeID[3][1],
-      Search.CODE_STANDARD_COLOR,
-    );
-    if (low > high) {
-      keepGoing = false;
-    } else {
-      var mid = Math.floor((high + low) / 2);
-      this.cmd(
-        "SetForegroundColor",
-        this.binaryCodeID[4][0],
-        Search.CODE_HIGHLIGHT_COLOR,
-      );
-      this.cmd("SetHighlight", this.highBoxID, 1);
-    this.cmd("Move", this.lowCircleID, this.getIndexX(0), this.getIndexCircleY(0));
-      this.cmd("SetHighlight", this.midBoxID, 1);
-      this.cmd("SetText", this.midBoxID, mid);
-      this.cmd(
-        "Move",
-        this.midCircleID,
-        this.getIndexX(mid),
-        this.getIndexY(mid),
-      );
+  this.cmd("SetText", this.lowBoxID, low);
+  this.cmd("SetText", this.highBoxID, high);
+  this.cmd("Move", this.lowCircleID, this.getIndexX(low), this.getIndexY(low));
+  this.cmd("Move", this.highCircleID, this.getIndexX(high), this.getIndexY(high));
+  this.markAnimationStep("initialize bounds", {
+    tags: ["search", "binary", "bounds"],
+  });
 
-      this.cmd("step");
-      this.cmd(
-        "SetForegroundColor",
-        this.binaryCodeID[4][0],
-        Search.CODE_STANDARD_COLOR,
-      );
-      this.cmd("SetHighlight", this.midBoxID, 0);
-      this.cmd("SetHighlight", this.highBoxID, 0);
-      this.cmd("SetHighlight", this.lowBoxID, 0);
-      this.cmd("SetHighlight", this.searchForBoxID, 1);
-      this.cmd("SetHighlight", this.arrayID[mid], 1);
-      this.cmd(
-        "SetForegroundColor",
-    this.cmd("Move", this.highCircleID, this.getIndexX(SIZE - 1), this.getIndexCircleY(SIZE - 1));
-        Search.CODE_HIGHLIGHT_COLOR,
-      );
-      this.cmd("step");
-      this.cmd("SetHighlight", this.searchForBoxID, 0);
-      this.cmd("SetHighlight", this.arrayID[mid], 0);
-      this.cmd(
-        "SetForegroundColor",
-        this.binaryCodeID[5][1],
-        Search.CODE_STANDARD_COLOR,
-      );
-      if (this.arrayData[mid] == searchVal) {
-        // HIGHLIGHT CODE!
-        keepGoing = false;
-      } else {
-        this.cmd(
-          "SetForegroundColor",
-          this.binaryCodeID[7][1],
-          Search.CODE_HIGHLIGHT_COLOR,
-        );
-        this.cmd("SetHighlight", this.searchForBoxID, 1);
-        this.cmd("SetHighlight", this.arrayID[mid], 1);
-        this.cmd("step");
-        this.cmd(
-          "SetForegroundColor",
-          this.binaryCodeID[7][1],
-          Search.CODE_STANDARD_COLOR,
-        );
-        this.cmd("SetHighlight", this.searchForBoxID, 0);
-        this.cmd("SetHighlight", this.arrayID[mid], 0);
-        if (this.arrayData[mid] < searchVal) {
-          this.cmd(
-            "SetForegroundColor",
-            this.binaryCodeID[8][0],
-            Search.CODE_HIGHLIGHT_COLOR,
-          );
-          this.cmd("SetHighlight", this.lowID, 1);
-          this.cmd("SetText", this.lowBoxID, mid + 1);
-          this.cmd(
-        this.cmd("Move", this.midCircleID, this.getIndexX(mid), this.getIndexCircleY(mid));
-            this.lowCircleID,
-            this.getIndexX(mid + 1),
-            this.getIndexY(mid + 1),
-          );
+  while (low <= high) {
+    var mid = Math.floor((low + high) / 2);
+    this.cmd("SetText", this.midBoxID, mid);
+    this.cmd("Move", this.midCircleID, this.getIndexX(mid), this.getIndexY(mid));
+    this.cmd("SetHighlight", this.arrayID[mid], 1);
+    this.cmd("SetHighlight", this.searchForBoxID, 1);
+    this.markAnimationStep(`inspect mid ${mid}`, {
+      tags: ["search", "binary", "inspect"],
+      focusNodeId: this.arrayID[mid],
+    });
+    this.cmd("SetHighlight", this.arrayID[mid], 0);
+    this.cmd("SetHighlight", this.searchForBoxID, 0);
 
-          low = mid + 1;
-          for (var i = 0; i < low; i++) {
-            this.cmd("SetAlpha", this.arrayID[i], 0.2);
-          }
-          this.cmd("Step");
-          this.cmd(
-            "SetForegroundColor",
-            this.binaryCodeID[8][0],
-            Search.CODE_STANDARD_COLOR,
-          );
-          this.cmd("SetHighlight", this.lowBoxID, 0);
-        } else {
-          this.cmd(
-            "SetForegroundColor",
-            this.binaryCodeID[10][0],
-            Search.CODE_HIGHLIGHT_COLOR,
-          );
-          this.cmd("SetHighlight", this.highBoxID, 1);
-          high = mid - 1;
-          this.cmd("SetText", this.highBoxID, high);
-          this.cmd(
-            "Move",
-            this.highCircleID,
-            this.getIndexX(high),
-            this.getIndexY(high),
-          );
+    if (this.arrayData[mid] == searchVal) {
+      foundIndex = mid;
+      break;
+    }
 
-          for (var i = high + 1; i < SIZE; i++) {
-            this.cmd("SetAlpha", this.arrayID[i], 0.2);
-          }
-          this.cmd("Step");
-
-          this.cmd(
-            "SetForegroundColor",
-            this.binaryCodeID[10][0],
-            Search.CODE_STANDARD_COLOR,
-          );
-          this.cmd("SetHighlight", this.midBoxID, 0);
-        }
+    if (this.arrayData[mid] < searchVal) {
+      low = mid + 1;
+      this.cmd("SetText", this.lowBoxID, low);
+      if (low < SIZE) {
+        this.cmd("Move", this.lowCircleID, this.getIndexX(low), this.getIndexY(low));
       }
+      this.markAnimationStep(`move low to ${low}`, {
+        tags: ["search", "binary", "bounds"],
+      });
+    } else {
+      high = mid - 1;
+      this.cmd("SetText", this.highBoxID, high);
+      if (high >= 0) {
+        this.cmd("Move", this.highCircleID, this.getIndexX(high), this.getIndexY(high));
+      }
+      this.markAnimationStep(`move high to ${high}`, {
+        tags: ["search", "binary", "bounds"],
+      });
     }
   }
-  if (high < low) {
+
+  if (foundIndex >= 0) {
+    this.beginBlock(`found at ${foundIndex}`, {
+      source: "Search",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "binary", "found"],
+      focusNodeId: this.arrayID[foundIndex],
+    });
+    this.cmd("SetText", this.resultString, "   Element found");
+    this.cmd("SetText", this.movingLabelID, foundIndex);
+    this.cmd("SetPosition", this.movingLabelID, this.getIndexX(foundIndex), this.getIndexY(foundIndex));
+    this.cmd("AlignRight", this.resultString, this.resultBoxID);
+  } else {
+    this.beginBlock("element not found", {
+      source: "Search",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "binary", "not-found"],
+    });
     this.cmd("SetText", this.resultString, "   Element Not found");
     this.cmd("SetText", this.resultBoxID, -1);
     this.cmd("AlignRight", this.resultString, this.resultBoxID);
-            this.cmd("Move", this.lowCircleID, this.getIndexX(mid + 1), this.getIndexCircleY(mid + 1));
-      "SetForegroundColor",
-      this.binaryCodeID[11][0],
-      Search.CODE_HIGHLIGHT_COLOR,
-    );
-    this.cmd("Step");
-    this.cmd(
-      "SetForegroundColor",
-      this.binaryCodeID[11][0],
-      Search.CODE_STANDARD_COLOR,
-    );
-  } else {
-    this.cmd("SetText", this.resultString, "   Element found");
-    this.cmd("SetText", this.movingLabelID, mid);
-    this.cmd(
-      "SetPosition",
-      this.movingLabelID,
-      this.getIndexX(mid),
-      this.getIndexY(mid),
-    );
-
-            this.cmd("Move", this.highCircleID, this.getIndexX(high), this.getIndexCircleY(high));
-
-    this.cmd("AlignRight", this.resultString, this.resultBoxID);
-    this.cmd(
-      "SetForegroundColor",
-      this.binaryCodeID[6][0],
-      Search.CODE_HIGHLIGHT_COLOR,
-    );
-    this.cmd("Step");
-    this.cmd(
-      "SetForegroundColor",
-      this.binaryCodeID[6][0],
-      Search.CODE_STANDARD_COLOR,
-    );
   }
 
   for (var i = 0; i < SIZE; i++) {
     this.cmd("SetAlpha", this.arrayID[i], 1);
   }
-  return this.commands;
+  return this.finishSearchAnimation();
 };
 
 Search.prototype.linearSearch = function (searchVal) {
-  this.commands = new Array();
+  this.beginSearchAnimation("linearSearch", `linear search ${searchVal}`, {
+    tags: ["search", "linear"],
+  });
   this.setCodeAlpha(this.binaryCodeID, 0);
   this.setCodeAlpha(this.linearCodeID, 1);
 
@@ -764,7 +643,9 @@ Search.prototype.linearSearch = function (searchVal) {
   this.cmd("SetText", this.indexBoxID, "0");
   this.cmd("Move", this.lowCircleID, this.getIndexX(0), this.getIndexY(0));
 
-  this.cmd("Step");
+  this.markAnimationStep("initialize index 0", {
+    tags: ["search", "linear", "start"],
+  });
   this.cmd(
     "SetForegroundColor",
     this.linearCodeID[1][0],
@@ -795,7 +676,10 @@ Search.prototype.linearSearch = function (searchVal) {
         this.linearCodeID[2][3],
         Search.CODE_HIGHLIGHT_COLOR,
       );
-      this.cmd("Step");
+      this.markAnimationStep(`inspect index ${foundIndex}`, {
+        tags: ["search", "linear", "inspect"],
+        focusNodeId: this.arrayID[foundIndex],
+      });
       this.cmd(
         "SetForegroundColor",
         this.linearCodeID[2][3],
@@ -854,7 +738,16 @@ Search.prototype.linearSearch = function (searchVal) {
       this.linearCodeID[5][0],
       Search.CODE_STANDARD_COLOR,
     );
+    this.markAnimationStep("element not found", {
+      tags: ["search", "linear", "not-found"],
+    });
   } else if (this.arrayData[foundIndex] == searchVal) {
+    this.beginBlock(`found at ${foundIndex}`, {
+      source: "Search",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "linear", "found"],
+      focusNodeId: this.arrayID[foundIndex],
+    });
     this.cmd(
       "SetForegroundColor",
       this.linearCodeID[4][1],
@@ -916,6 +809,11 @@ Search.prototype.linearSearch = function (searchVal) {
       Search.CODE_STANDARD_COLOR,
     );
   } else {
+    this.beginBlock("element not found", {
+      source: "Search",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "linear", "not-found"],
+    });
     this.cmd("SetHighlight", this.arrayID[foundIndex], 1);
     this.cmd("SetHighlight", this.searchForBoxID, 1);
     this.cmd(
@@ -947,7 +845,7 @@ Search.prototype.linearSearch = function (searchVal) {
       Search.CODE_STANDARD_COLOR,
     );
   }
-  return this.commands;
+  return this.finishSearchAnimation();
 };
 
 var currentAlg;

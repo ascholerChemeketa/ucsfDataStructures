@@ -106,6 +106,28 @@ BSTIterator.prototype.init = function (am, w, h) {
   this.animationManager.clearHistory();
 };
 
+BSTIterator.prototype.beginBSTIteratorAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "BSTIterator", operation, ...meta });
+};
+
+BSTIterator.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "BSTIterator",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+BSTIterator.prototype.finishBSTIteratorAnimation = function () {
+  return this.finishAnimation();
+};
+
 BSTIterator.prototype.addControls = function () {
   addSeparatorToAlgorithmBar();
 
@@ -202,7 +224,10 @@ BSTIterator.prototype.pushIterator = function (node) {
     "SetMessage",
     `push ${node.data} onto iterator stack`,
   );
-  this.cmd("Step");
+  this.markAnimationStep(`push ${node.data}`, {
+    focusNodeId: node.graphicID,
+    tags: ["iterator", "push"],
+  });
   this.cmd("SetHighlight", node.graphicID, 0);
 };
 
@@ -211,7 +236,10 @@ BSTIterator.prototype.popIterator = function () {
   if (!item) return null;
 
   this.cmd("SetMessage", `Done at ${item.node.data}, pop from iterator stack`);
-  this.cmd("Step");
+  this.markAnimationStep(`pop ${item.node.data}`, {
+    focusNodeId: item.node.graphicID,
+    tags: ["iterator", "pop"],
+  });
 
   // Do not Delete labels (breaks undo/redo); hide them instead.
   this.cmd("SetHighlight", item.node.graphicID, 0);
@@ -224,12 +252,16 @@ BSTIterator.prototype.popIterator = function () {
 };
 
 BSTIterator.prototype.makeIterator = function () {
-  this.commands = [];
+  this.beginBSTIteratorAnimation("makeIterator", "make iterator", {
+    tags: ["iterator", "create"],
+  });
 
   if (this.treeRoot == null) {
     this.cmd("SetMessage", "Tree is empty; cannot create iterator.");
-    this.cmd("Step");
-    return this.commands;
+    this.markAnimationStep("tree empty", {
+      tags: ["iterator", "empty"],
+    });
+    return this.finishBSTIteratorAnimation();
   }
 
   this.clearIterator();
@@ -238,7 +270,10 @@ BSTIterator.prototype.makeIterator = function () {
     "SetMessage",
     "Create iterator: push root onto stack, then walk left pushing each node.",
   );
-  this.cmd("Step");
+  this.markAnimationStep("start iterator setup", {
+    focusNodeId: this.treeRoot.graphicID,
+    tags: ["iterator", "setup"],
+  });
 
   // current = root
   let current = this.treeRoot;
@@ -252,7 +287,10 @@ BSTIterator.prototype.makeIterator = function () {
     );
     this.cmd("SetHighlight", current.graphicID, 1);
     this.cmd("SetEdgeHighlight", current.graphicID, current.left.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`walk left from ${current.data}`, {
+      focusNodeId: current.left.graphicID,
+      tags: ["iterator", "walk-left"],
+    });
     this.cmd("SetEdgeHighlight", current.graphicID, current.left.graphicID, 0);
     this.cmd("SetHighlight", current.graphicID, 0);
 
@@ -263,27 +301,39 @@ BSTIterator.prototype.makeIterator = function () {
   this.iteratorReady = true;
   this.syncControlState();
 
+  this.beginBlock("iterator ready", {
+    source: "BSTIterator",
+    operation: this.currentAnimationOperation,
+    focusNodeId: current.graphicID,
+    tags: ["iterator", "ready"],
+  });
   this.cmd("SetHighlight", current.graphicID, 1);
   this.cmd("SetMessage", "No more left children; iterator ready.");
-  return this.commands;
+  return this.finishBSTIteratorAnimation();
 };
 
 BSTIterator.prototype.advanceIterator = function () {
-  this.commands = [];
+  this.beginBSTIteratorAnimation("advanceIterator", "advance iterator", {
+    tags: ["iterator", "advance"],
+  });
 
   if (!this.iteratorReady) {
     this.cmd("SetMessage", "Iterator not created yet. Click 'Make Iterator'.");
-    this.cmd("Step");
+    this.markAnimationStep("iterator not ready", {
+      tags: ["iterator", "invalid"],
+    });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishBSTIteratorAnimation();
   }
 
   if (this.iteratorStack.length === 0) {
     this.cmd("SetMessage", "Iterator finished (stack is empty).");
     this.advanceIteratorButton.disabled = true;
-    this.cmd("Step");
+    this.markAnimationStep("iterator already finished", {
+      tags: ["iterator", "finished"],
+    });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishBSTIteratorAnimation();
   }
 
   // current = pop
@@ -291,7 +341,7 @@ BSTIterator.prototype.advanceIterator = function () {
   if (current == null) {
     this.cmd("SetMessage", "Iterator finished.");
     this.syncControlState();
-    return this.commands;
+    return this.finishBSTIteratorAnimation();
   }
 
   if (this.iteratorCurrentNode != null) {
@@ -302,7 +352,13 @@ BSTIterator.prototype.advanceIterator = function () {
 
   // this.cmd("SetHighlight", current.graphicID, 1);
   // this.cmd("SetMessage", `return ${current.data}`);
-  this.cmd("Step");
+  this.beginBlock(`return ${current.data}`, {
+    source: "BSTIterator",
+    operation: this.currentAnimationOperation,
+    focusNodeId: current.graphicID,
+    tags: ["iterator", "return"],
+  });
+  this.cmd("SetMessage", `Return ${current.data} from iterator.`);
 
   // if current has right child
   if (current.right != null) {
@@ -312,7 +368,10 @@ BSTIterator.prototype.advanceIterator = function () {
       `Popped node has right child; set current = right (${current.data} -> ${walk.data})`,
     );
     this.cmd("SetEdgeHighlight", current.graphicID, current.right.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`move to right child of ${current.data}`, {
+      focusNodeId: current.right.graphicID,
+      tags: ["iterator", "right-child"],
+    });
     this.cmd("SetEdgeHighlight", current.graphicID, current.right.graphicID, 0);
 
     // push current
@@ -326,7 +385,10 @@ BSTIterator.prototype.advanceIterator = function () {
       );
       this.cmd("SetHighlight", walk.graphicID, 1);
       this.cmd("SetEdgeHighlight", walk.graphicID, walk.left.graphicID, 1);
-      this.cmd("Step");
+      this.markAnimationStep(`walk left from ${walk.data}`, {
+        focusNodeId: walk.left.graphicID,
+        tags: ["iterator", "walk-left"],
+      });
       this.cmd("SetEdgeHighlight", walk.graphicID, walk.left.graphicID, 0);
       this.cmd("SetHighlight", walk.graphicID, 0);
 
@@ -337,31 +399,49 @@ BSTIterator.prototype.advanceIterator = function () {
     // Safety: ensure the right edge is definitely unhighlighted.
     this.cmd("SetEdgeHighlight", current.graphicID, current.right.graphicID, 0);
   } else {
+    this.beginBlock(`no right child for ${current.data}`, {
+      source: "BSTIterator",
+      operation: this.currentAnimationOperation,
+      focusNodeId: current.graphicID,
+      tags: ["iterator", "no-right-child"],
+    });
     this.cmd(
       "SetMessage",
       `Popped node has no right child. Nothing to do.`,
     );
-      this.cmd("Step");
   }
 
   this.syncControlState();
 
   if (this.iteratorStack.length === 0) {
+    this.beginBlock("iterator finished", {
+      source: "BSTIterator",
+      operation: this.currentAnimationOperation,
+      tags: ["iterator", "finished"],
+    });
     this.cmd("SetMessage", "Iterator is now finished (stack is empty).");
   } else {
+    this.beginBlock("iterator advanced", {
+      source: "BSTIterator",
+      operation: this.currentAnimationOperation,
+      focusNodeId: this.iteratorStack[this.iteratorStack.length - 1].node.graphicID,
+      tags: ["iterator", "advanced"],
+    });
     this.cmd("SetHighlight", this.iteratorStack[this.iteratorStack.length - 1].node.graphicID, 1);
     this.cmd("SetMessage", "Iterator advanced.");
   }
   // this.cmd("Step");
   // this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishBSTIteratorAnimation();
 };
 
 // ---- BST building (no UI; used for initialData) ----
 
 BSTIterator.prototype.insertElement = function (insertedValue) {
-  this.commands = [];
+  this.beginBSTIteratorAnimation("insert", `insert ${insertedValue}`, {
+    tags: ["insert"],
+  });
 
   const nodeID = this.nextIndex++;
   const newNode = new BSTIteratorNode(insertedValue, nodeID, 100, 100);
@@ -380,14 +460,16 @@ BSTIterator.prototype.insertElement = function (insertedValue) {
     this.treeRoot = newNode;
     this.cmd("SetNull", this.rootIndex, 0);
     this.cmd("Connect", this.rootIndex, newNode.graphicID, BSTIterator.LINK_COLOR);
+    this.markAnimationStep("create root", {
+      focusNodeId: newNode.graphicID,
+      tags: ["insert", "root"],
+    });
   } else {
     this.insert(newNode, this.treeRoot);
   }
 
   this.resizeTree();
-  this.cmd("Step");
-
-  return this.commands;
+  return this.finishBSTIteratorAnimation();
 };
 
 BSTIterator.prototype.insert = function (elem, tree) {
@@ -441,7 +523,11 @@ BSTIterator.prototype.resizeTree = function () {
   if (this.treeRoot != null) {
     this.setNewPositions(this.treeRoot, startingPoint, BSTIterator.STARTING_Y, 0);
     this.animateNewPositions(this.treeRoot);
-    this.cmd("Step");
+    if (this.pendingBlock) {
+      this.markAnimationStep("resize tree", {
+        tags: ["layout", "resize"],
+      });
+    }
   }
 };
 

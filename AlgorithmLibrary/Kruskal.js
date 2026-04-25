@@ -124,6 +124,28 @@ Kruskal.prototype.init = function (am, w, h, graphOpts) {
   // Setup called in base class init function
 };
 
+Kruskal.prototype.beginKruskalAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "Kruskal", operation, ...meta });
+};
+
+Kruskal.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "Kruskal",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+Kruskal.prototype.finishKruskalAnimation = function () {
+  return this.finishAnimation();
+};
+
 Kruskal.prototype.setup = function () {
   Kruskal.superclass.setup.call(this);
   this.messageID = new Array();
@@ -174,7 +196,10 @@ Kruskal.prototype.startCallback = function (event) {
 
 Kruskal.prototype.disjointSetFind = function (valueToFind, highlightCircleID) {
   this.cmd("SetTextColor", this.setID[valueToFind], "#FF0000");
-  this.cmd("Step");
+  this.markAnimationStep(`find root of ${valueToFind}`, {
+    focusNodeId: this.circleID[valueToFind],
+    tags: ["find", "disjoint-set"],
+  });
   while (this.setData[valueToFind] >= 0) {
     this.cmd("SetTextColor", this.setID[valueToFind], "#000000");
     this.cmd(
@@ -184,17 +209,25 @@ Kruskal.prototype.disjointSetFind = function (valueToFind, highlightCircleID) {
       Kruskal.SET_ARRAY_START_Y +
         this.setData[valueToFind] * Kruskal.SET_ARRAY_ELEM_HEIGHT,
     );
-    this.cmd("Step");
+    this.markAnimationStep(`follow parent from ${valueToFind}`, {
+      focusNodeId: this.circleID[valueToFind],
+      tags: ["find", "disjoint-set", "follow"],
+    });
     valueToFind = this.setData[valueToFind];
     this.cmd("SetTextColor", this.setID[valueToFind], "#FF0000");
-    this.cmd("Step");
+    this.markAnimationStep(`inspect representative ${valueToFind}`, {
+      focusNodeId: this.circleID[valueToFind],
+      tags: ["find", "disjoint-set", "inspect"],
+    });
   }
   this.cmd("SetTextColor", this.setID[valueToFind], "#000000");
   return valueToFind;
 };
 
 Kruskal.prototype.doKruskal = function (ignored) {
-  this.commands = new Array();
+  this.beginKruskalAnimation("run", "run kruskal", {
+    tags: ["mst", "kruskal"],
+  });
 
   const mstEdges = [];
 
@@ -258,7 +291,7 @@ Kruskal.prototype.doKruskal = function (ignored) {
     }
   }
   this.cmd("SetMessage", "Created edge list from graph");
-  this.cmd("Step");
+  this.markAnimationStep("create edge list", { tags: ["mst", "edges"] });
 
   // Sort edge list based on edge cost
   var edgeCount = this.edgesListLeftID.length;
@@ -310,7 +343,7 @@ Kruskal.prototype.doKruskal = function (ignored) {
     );
   }
   this.cmd("SetMessage", "Sorted edges by increasing weight");
-  this.cmd("Step");
+  this.markAnimationStep("sort edges by weight", { tags: ["mst", "sort"] });
 
   var findLabelLeft = this.nextIndex++;
   var findLabelRight = this.nextIndex++;
@@ -382,7 +415,10 @@ Kruskal.prototype.doKruskal = function (ignored) {
         edgeU * Kruskal.SET_ARRAY_ELEM_HEIGHT,
     );
     this.cmd("SetMessage", `Find representative for ${edgeU}`);
-    this.cmd("Step");
+    this.markAnimationStep(`consider edge ${edgeU}-${edgeV}`, {
+      focusNodeId: this.circleID[edgeU],
+      tags: ["mst", "consider"],
+    });
 
     var left = this.disjointSetFind(
       edgeU,
@@ -443,14 +479,19 @@ Kruskal.prototype.doKruskal = function (ignored) {
       "SetMessage",
       `Compare representatives: ${left} vs ${right}`,
     );
-    this.cmd("Step");
+    this.markAnimationStep(`compare components ${left} and ${right}`, {
+      tags: ["mst", "compare-components"],
+    });
 
     if (left != right) {
       this.cmd(
         "SetMessage",
         `Different components. Add edge and union(${left}, ${right})`,
       );
-      this.cmd("Step");
+      this.markAnimationStep(`add edge ${edgeU}-${edgeV}`, {
+        focusNodeId: this.circleID[edgeU],
+        tags: ["mst", "add-edge"],
+      });
 
       mstEdges.push([edgeU, edgeV]);
 
@@ -486,7 +527,9 @@ Kruskal.prototype.doKruskal = function (ignored) {
           "SetMessage",
           `Union by size: attach root ${right} under root ${left}`,
         );
-        this.cmd("Step");
+        this.markAnimationStep(`union ${right} into ${left}`, {
+          tags: ["mst", "union"],
+        });
         this.cmd("Delete", moveLabelID);
         this.setData[left] = this.setData[left] + this.setData[right];
         this.setData[right] = left;
@@ -509,7 +552,9 @@ Kruskal.prototype.doKruskal = function (ignored) {
           "SetMessage",
           `Union by size: attach root ${left} under root ${right}`,
         );
-        this.cmd("Step");
+        this.markAnimationStep(`union ${left} into ${right}`, {
+          tags: ["mst", "union"],
+        });
         this.cmd("Delete", moveLabelID);
         this.setData[right] = this.setData[right] + this.setData[left];
         this.setData[left] = right;
@@ -521,7 +566,10 @@ Kruskal.prototype.doKruskal = function (ignored) {
         "SetMessage",
         "Vertices already in the same component. Skip edge to avoid cycle",
       );
-      this.cmd("Step");
+      this.markAnimationStep(`skip edge ${edgeU}-${edgeV}`, {
+        focusNodeId: this.circleID[edgeU],
+        tags: ["mst", "skip-cycle"],
+      });
     }
 
     this.highlightEdge(edgeU, edgeV, 0);
@@ -540,15 +588,19 @@ Kruskal.prototype.doKruskal = function (ignored) {
   this.cmd("Delete", findLabelRight);
 
   if (mstEdges.length > 0) {
+    this.beginBlock("highlight mst", {
+      source: "Kruskal",
+      operation: this.currentAnimationOperation,
+      tags: ["mst", "complete"],
+    });
     this.cmd("SetMessage", "Kruskal complete: highlighting MST edges");
     for (i = 0; i < mstEdges.length; i++) {
       this.highlightEdge(mstEdges[i][0], mstEdges[i][1], 1);
       this.highlightEdge(mstEdges[i][1], mstEdges[i][0], 1);
     }
-    this.cmd("Step");
   }
 
-  return this.commands;
+  return this.finishKruskalAnimation();
 };
 
 Kruskal.prototype.reset = function () {

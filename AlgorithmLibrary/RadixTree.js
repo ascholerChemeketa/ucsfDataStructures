@@ -24,6 +24,11 @@
 // authors and should not be interpreted as representing official policies, either expressed
 // or implied, of the University of San Francisco
 
+import {
+  Algorithm,
+  addControlToAlgorithmBar,
+} from "../AlgorithmLibrary/Algorithm.js";
+
 // Constants.
 
 RadixTree.NODE_WIDTH = 60;
@@ -44,7 +49,7 @@ RadixTree.FIRST_PRINT_POS_X = 50;
 RadixTree.PRINT_VERTICAL_GAP = 20;
 RadixTree.PRINT_HORIZONTAL_GAP = 50;
 
-function RadixTree(canvas) {
+export function RadixTree(canvas) {
   let am = initCanvas(canvas);
   this.init(am, canvas.width, canvas.height);
 }
@@ -132,6 +137,25 @@ RadixTree.prototype.reset = function () {
   this.root = null;
 };
 
+RadixTree.prototype.beginRadixTreeAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "RadixTree", operation, ...meta });
+};
+
+RadixTree.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "RadixTree",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+RadixTree.prototype.finishRadixTreeAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 RadixTree.prototype.insertCallback = function (event) {
   var insertedValue = this.insertField.value.toUpperCase();
   insertedValue = insertedValue.replace(/[^a-z]/gi, "");
@@ -157,7 +181,7 @@ RadixTree.prototype.printCallback = function (event) {
 };
 
 RadixTree.prototype.printTree = function (unused) {
-  this.commands = [];
+  this.beginRadixTreeAnimation("print", "print tree", { tags: ["print"] });
 
   if (this.root != null) {
     this.highlightID = this.nextIndex++;
@@ -192,14 +216,16 @@ RadixTree.prototype.printTree = function (unused) {
     this.cmd("Delete", this.highlightID);
     this.cmd("Delete", this.printLabel1);
     this.cmd("Delete", this.printLabel2);
-    this.cmd("Step");
+    this.markAnimationStep("finish print", { tags: ["print", "complete"] });
 
     for (var i = firstLabel; i < this.nextIndex; i++) {
       this.cmd("Delete", i);
     }
     this.nextIndex = this.highlightID; /// Reuse objects.  Not necessary.
+  } else {
+    this.markAnimationStep("tree empty", { tags: ["print", "empty"] });
   }
-  return this.commands;
+  return this.finishRadixTreeAnimation();
 };
 
 RadixTree.prototype.printTreeRec = function (tree, stringSoFar) {
@@ -260,7 +286,9 @@ RadixTree.prototype.findCallback = function (event) {
 };
 
 RadixTree.prototype.findElement = function (findValue) {
-  this.commands = [];
+  this.beginRadixTreeAnimation("find", `find ${findValue}`, {
+    tags: ["search", "find"],
+  });
   this.cmd("SetText", 0, "Seaching for: ");
   this.cmd("SetText", 1, findValue);
   this.cmd("AlignRight", 1, 0);
@@ -270,13 +298,20 @@ RadixTree.prototype.findElement = function (findValue) {
   var res = this.doFind(this.root, findValue);
   if (res) {
     this.cmd("SetText", 0, "String " + findValue + " found");
+    this.markAnimationStep(`found ${findValue}`, {
+      tags: ["search", "found"],
+      focusNodeId: res.graphicID,
+    });
   } else {
     this.cmd("SetText", 0, "String " + findValue + " not found");
+    this.markAnimationStep(`not found ${findValue}`, {
+      tags: ["search", "not-found"],
+    });
   }
   this.cmd("SetText", 1, "");
   this.cmd("SetText", 2, "");
 
-  return this.commands;
+  return this.finishRadixTreeAnimation();
 };
 
 RadixTree.prototype.doFind = function (tree, value) {
@@ -389,7 +424,9 @@ RadixTree.prototype.doFind = function (tree, value) {
 };
 
 RadixTree.prototype.deleteElement = function (deletedValue) {
-  this.commands = [];
+  this.beginRadixTreeAnimation("delete", `delete ${deletedValue}`, {
+    tags: ["delete"],
+  });
   this.cmd("SetText", 0, "Deleting: ");
   this.cmd("SetText", 1, deletedValue);
   this.cmd("AlignRight", 1, 0);
@@ -398,23 +435,29 @@ RadixTree.prototype.deleteElement = function (deletedValue) {
 
   if (node == null) {
     this.cmd("SetText", 2, "String not in the tree, nothing to delete");
-    this.cmd("Step");
+    this.markAnimationStep("value not found", { tags: ["delete", "not-found"] });
     this.cmd("SetText", 0, "");
     this.cmd("SetText", 1, "");
     this.cmd("SetText", 2, "");
   } else {
     node.isword = false;
     this.cmd("SetText", 2, 'Found string to delete, setting node to "False"');
-    this.cmd("Step");
+    this.markAnimationStep(`unset word flag for ${deletedValue}`, {
+      tags: ["delete", "unset-word"],
+      focusNodeId: node.graphicID,
+    });
     this.cmd("SetBackgroundColor", node.graphicID, RadixTree.FALSE_COLOR);
-    this.cmd("Step");
+    this.markAnimationStep(`cleanup ${deletedValue}`, {
+      tags: ["delete", "cleanup"],
+      focusNodeId: node.graphicID,
+    });
     this.cleanupAfterDelete(node);
     this.cmd("SetText", 0, "");
     this.cmd("SetText", 1, "");
     this.cmd("SetText", 2, "");
   }
 
-  return this.commands;
+  return this.finishRadixTreeAnimation();
 };
 
 RadixTree.prototype.numChildren = function (tree) {
@@ -539,11 +582,15 @@ RadixTree.prototype.resizeTree = function () {
 };
 
 RadixTree.prototype.add = function (word) {
-  this.commands = new Array();
+  this.beginRadixTreeAnimation("insert", `insert ${word}`, {
+    tags: ["insert"],
+  });
   this.cmd("SetText", 0, "Inserting; ");
   this.cmd("SetText", 1, word);
   this.cmd("AlignRight", 1, 0);
-  this.cmd("Step");
+  this.markAnimationStep(`start insert ${word}`, {
+    tags: ["insert", "start"],
+  });
   this.highlightID = this.nextIndex++;
   this.root = this.addR(
     word.toUpperCase(),
@@ -556,7 +603,7 @@ RadixTree.prototype.add = function (word) {
   this.cmd("SetText", 0, "");
   this.cmd("SetText", 1, "");
 
-  return this.commands;
+  return this.finishRadixTreeAnimation();
 };
 
 RadixTree.prototype.addR = function (s, rt, startX, startY, wordIndex) {
@@ -576,7 +623,10 @@ RadixTree.prototype.addR = function (s, rt, startX, startY, wordIndex) {
       2,
       "Reached an empty tree.  Creating a node containing " + s,
     );
-    this.cmd("Step");
+    this.markAnimationStep(`create node ${s}`, {
+      tags: ["insert", "create"],
+      focusNodeId: this.nextIndex,
+    });
     this.cmd("SetText", 2, "");
     rt = new RadixNode(s, this.nextIndex, startX, startY);
     this.nextIndex += 1;
@@ -599,7 +649,10 @@ RadixTree.prototype.addR = function (s, rt, startX, startY, wordIndex) {
 
   if (indexDifference == rt.wordRemainder.length) {
     this.cmd("SetText", 2, "Reached the end of the prefix stored at this node");
-    this.cmd("Step");
+    this.markAnimationStep(`inspect prefix ${rt.wordRemainder}`, {
+      tags: ["insert", "inspect"],
+      focusNodeId: rt.graphicID,
+    });
 
     if (s.length > indexDifference) {
       this.cmd(
@@ -626,7 +679,10 @@ RadixTree.prototype.addR = function (s, rt, startX, startY, wordIndex) {
             s.charAt(indexDifference) +
             "' does not exit.  Creating ...",
         );
-        this.cmd("Step");
+        this.markAnimationStep(`descend ${s.charAt(indexDifference)}`, {
+          tags: ["insert", "descend"],
+          focusNodeId: rt.graphicID,
+        });
       } else {
         this.cmd(
           "CreateHighlightCircle",
@@ -708,6 +764,10 @@ RadixTree.prototype.addR = function (s, rt, startX, startY, wordIndex) {
   this.cmd("SetBackgroundColor", this.nextIndex, RadixTree.FALSE_COLOR);
   this.cmd("SetWidth", this.nextIndex, RadixTree.NODE_WIDTH);
   this.cmd("Step");
+  this.markAnimationStep(`split prefix ${firstRemainder}`, {
+    tags: ["insert", "split"],
+    focusNodeId: this.nextIndex,
+  });
 
   var newNode = new RadixNode(firstRemainder, this.nextIndex, 0, 0);
   this.nextIndex += 1;

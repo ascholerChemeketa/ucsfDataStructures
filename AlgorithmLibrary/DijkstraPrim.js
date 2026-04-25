@@ -125,6 +125,28 @@ DijkstraPrim.prototype.init = function (am, runningDijkstra, w, h, graphOpts) {
   // Setup called in base class init function
 };
 
+DijkstraPrim.prototype.beginDijkstraPrimAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "DijkstraPrim", operation, ...meta });
+};
+
+DijkstraPrim.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "DijkstraPrim",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+DijkstraPrim.prototype.finishDijkstraPrimAnimation = function () {
+  return this.finishAnimation();
+};
+
 DijkstraPrim.prototype.setup = function () {
   this.message1ID = this.nextIndex++;
   DijkstraPrim.superclass.setup.call(this);
@@ -253,7 +275,10 @@ DijkstraPrim.prototype.findCheapestUnknown = function () {
     "SetMessage",
     "Scan all unknown vertices and select the smallest tentative distance.",
   );
-  this.cmd("Step");
+  this.markAnimationStep(`select cheapest unknown ${bestIndex}`, {
+    focusNodeId: this.circleID[bestIndex],
+    tags: ["search", "select"],
+  });
   for (var i = 0; i < this.size; i++) {
     if (!this.known[i]) {
       this.cmd("SetHighlight", this.distanceID[i], 0);
@@ -263,7 +288,11 @@ DijkstraPrim.prototype.findCheapestUnknown = function () {
 };
 
 DijkstraPrim.prototype.doDijkstraPrim = function (startVertex) {
-  this.commands = new Array();
+  this.beginDijkstraPrimAnimation(
+    this.runningDijkstra ? "dijkstra" : "prim",
+    `${this.runningDijkstra ? "dijkstra" : "prim"} from ${startVertex}`,
+    { tags: [this.runningDijkstra ? "dijkstra" : "prim"] },
+  );
 
   if (!this.runningDijkstra) {
     this.recolorGraph();
@@ -300,7 +329,10 @@ DijkstraPrim.prototype.doDijkstraPrim = function (startVertex) {
 
     this.cmd("SetHighlight", this.circleID[current], 1);
     this.cmd("SetMessage", `Select vertex ${current} as next cheapest unknown.`);
-    this.cmd("Step");
+    this.markAnimationStep(`choose vertex ${current}`, {
+      focusNodeId: this.circleID[current],
+      tags: ["search", "choose"],
+    });
     this.cmd("SetHighlight", this.distanceID[current], 0);
     this.cmd("SetText", this.message1ID, "Setting known field to True");
     this.cmd("SetHighlight", this.knownID[current], 1);
@@ -308,7 +340,10 @@ DijkstraPrim.prototype.doDijkstraPrim = function (startVertex) {
     this.cmd("SetText", this.knownID[current], "T");
     this.cmd("SetTextColor", this.knownID[current], "#AAAAAA");
     this.cmd("SetMessage", `Mark vertex ${current} as known (finalize its value).`);
-    this.cmd("Step");
+    this.markAnimationStep(`mark ${current} known`, {
+      focusNodeId: this.circleID[current],
+      tags: ["search", "known"],
+    });
     this.cmd("SetHighlight", this.knownID[current], 0);
     this.cmd(
       "SetText",
@@ -411,7 +446,10 @@ DijkstraPrim.prototype.doDijkstraPrim = function (startVertex) {
           }
         }
 
-        this.cmd("Step");
+        this.markAnimationStep(`consider edge ${current} -> ${neighbor}`, {
+          focusNodeId: this.circleID[neighbor],
+          tags: ["search", "edge"],
+        });
         this.cmd("Delete", this.comparisonMessageID);
         this.highlightEdge(current, neighbor, 0);
         if (this.known[neighbor]) {
@@ -469,10 +507,15 @@ DijkstraPrim.prototype.doDijkstraPrim = function (startVertex) {
       }
     }
   }
-  this.cmd("Step");
 
   this.cmd("SetText", this.message1ID, "");
-  return this.commands;
+  this.beginBlock("algorithm complete", {
+    source: "DijkstraPrim",
+    operation: this.currentAnimationOperation,
+    tags: ["search", "complete"],
+  });
+  this.cmd("SetMessage", "");
+  return this.finishDijkstraPrimAnimation();
 };
 
 DijkstraPrim.prototype.createPaths = function () {
@@ -504,7 +547,10 @@ DijkstraPrim.prototype.createPaths = function () {
           "SetMessage",
           `Trace predecessor for vertex ${vertex}: next = ${nextInPath}.`,
         );
-        this.cmd("Step");
+        this.markAnimationStep(`trace path for ${vertex}`, {
+          focusNodeId: this.circleID[vertex],
+          tags: ["path", "trace"],
+        });
         if (this.path[nextInPath] != -1) {
           nextLabelID = this.nextIndex++;
           this.cmd(
@@ -535,7 +581,10 @@ DijkstraPrim.prototype.createPaths = function () {
             "SetMessage",
             `Extend path display for vertex ${vertex} by adding predecessor ${this.path[nextInPath]}.`,
           );
-          this.cmd("Step");
+          this.markAnimationStep(`extend path for ${vertex}`, {
+            focusNodeId: this.circleID[vertex],
+            tags: ["path", "extend"],
+          });
           pathList.push(nextLabelID);
         }
         this.cmd("SetHighlight", this.pathID[nextInPath], 0);
@@ -556,7 +605,10 @@ DijkstraPrim.prototype.highlightTree = function () {
         "SetMessage",
         `Tree edge ${this.path[vertex]} - ${vertex} is selected in the MST.`,
       );
-      this.cmd("Step");
+      this.markAnimationStep(`select tree edge ${this.path[vertex]}-${vertex}`, {
+        focusNodeId: this.circleID[vertex],
+        tags: ["tree", "edge"],
+      });
       this.cmd("SetHighlight", this.vertexID[vertex], 0);
       this.cmd("SetHighlight", this.pathID[vertex], 0);
       this.highlightEdge(vertex, this.path[vertex], 0);

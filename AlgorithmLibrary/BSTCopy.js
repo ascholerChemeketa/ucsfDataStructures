@@ -113,6 +113,28 @@ BSTCopy.prototype.init = function (am, w, h) {
   this.animationManager.clearHistory();
 };
 
+BSTCopy.prototype.beginBSTCopyAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "BSTCopy", operation, ...meta });
+};
+
+BSTCopy.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "BSTCopy",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+BSTCopy.prototype.finishBSTCopyAnimation = function () {
+  return this.finishAnimation();
+};
+
 BSTCopy.prototype.addControls = function () {
   addSeparatorToAlgorithmBar();
   this.copyButton = addControlToAlgorithmBar("Button", "Copy");
@@ -124,13 +146,17 @@ BSTCopy.prototype.copyCallback = function () {
 };
 
 BSTCopy.prototype.copyTree = function () {
-  this.commands = [];
+  this.beginBSTCopyAnimation("copy", "copy tree", {
+    tags: ["copy"],
+  });
 
   if (this.treeRoot == null) {
     this.cmd("SetMessage", "Source tree is empty; nothing to copy.");
-    this.cmd("Step");
+    this.markAnimationStep("source tree empty", {
+      tags: ["copy", "empty"],
+    });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishBSTCopyAnimation();
   }
 
   if (this.rootCopy != null) {
@@ -140,7 +166,10 @@ BSTCopy.prototype.copyTree = function () {
   this.sourceToCopyID = new Map();
 
   this.cmd("SetMessage", "Preorder traversal: copy each visited node into the new tree.");
-  this.cmd("Step");
+  this.markAnimationStep("start preorder copy", {
+    focusNodeId: this.treeRoot.graphicID,
+    tags: ["copy", "preorder"],
+  });
 
   // this.highlightID = this.nextIndex++;
   // this.cmd(
@@ -159,7 +188,10 @@ BSTCopy.prototype.copyTree = function () {
 
   if (this.rootCopy != null) {
     this.cmd("SetNull", this.rootCopyIndex, 0);
-    this.cmd("Step");
+    this.markAnimationStep("prepare rootCopy pointer", {
+      focusNodeId: this.rootCopy.graphicID,
+      tags: ["copy", "root"],
+    });
     this.cmd(
       "Connect",
       this.rootCopyIndex,
@@ -167,7 +199,10 @@ BSTCopy.prototype.copyTree = function () {
       BSTCopy.LINK_COLOR,
     );
     this.cmd("SetMessage", "Set rootCopy pointer.");
-    this.cmd("Step");
+    this.markAnimationStep("set rootCopy pointer", {
+      focusNodeId: this.rootCopy.graphicID,
+      tags: ["copy", "root", "pointer"],
+    });
   }
 
   // this.cmd("Delete", this.highlightID);
@@ -177,7 +212,7 @@ BSTCopy.prototype.copyTree = function () {
   if (this.copyButton) {
     this.copyButton.disabled = true;
   }
-  return this.commands;
+  return this.finishBSTCopyAnimation();
 };
 
 BSTCopy.prototype.setSourceAndCopyHighlight = function (sourceNode, highlight) {
@@ -216,7 +251,10 @@ BSTCopy.prototype.copyTreeRec = function (sourceNode, parentCopyNode, isLeftChil
 
   // With the mapping established, keep the source highlight mirrored on the copy.
   this.cmd("SetHighlight", copyNode.graphicID, 1);
-  this.cmd("Step");
+  this.markAnimationStep(`copy node ${sourceNode.data}`, {
+    focusNodeId: sourceNode.graphicID,
+    tags: ["copy", "node"],
+  });
   this.setSourceAndCopyHighlight(sourceNode, 0);
 
   // Make the copy root available immediately so resizeCopyTree() works
@@ -259,11 +297,17 @@ BSTCopy.prototype.copyTreeRec = function (sourceNode, parentCopyNode, isLeftChil
       `Returned from copying left child of ${copyNode.data}. Set left pointer to returned node.`,
     );
     this.cmd("SetHighlight", copyNode.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`attach left child of ${copyNode.data}`, {
+      focusNodeId: copyNode.graphicID,
+      tags: ["copy", "attach", "left"],
+    });
     this.cmd("SetHighlight", copyNode.graphicID, 0);
 
     this.cmd("SetEdgeAlpha", copyNode.graphicID, leftCopy.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`reveal left edge of ${copyNode.data}`, {
+      focusNodeId: copyNode.graphicID,
+      tags: ["copy", "edge", "left"],
+    });
   }
 
   // Recurse right
@@ -274,7 +318,10 @@ BSTCopy.prototype.copyTreeRec = function (sourceNode, parentCopyNode, isLeftChil
       `Returned from copying right child of ${copyNode.data}. Set right pointer to returned node.`,
     );
     this.cmd("SetHighlight", copyNode.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`attach right child of ${copyNode.data}`, {
+      focusNodeId: copyNode.graphicID,
+      tags: ["copy", "attach", "right"],
+    });
     this.cmd("SetHighlight", copyNode.graphicID, 0);
   }
 
@@ -304,7 +351,9 @@ BSTCopy.prototype.clearCopyOnly = function () {
 
 // Source BST building (no UI for insert/delete; used only for initialData)
 BSTCopy.prototype.insertElement = function (insertedValue) {
-  this.commands = [];
+  this.beginBSTCopyAnimation("insert", `insert ${insertedValue}`, {
+    tags: ["insert"],
+  });
 
   if (this.treeRoot == null) {
     this.cmd("CreateCircle", this.nextIndex, insertedValue, this.startingX, BSTCopy.STARTING_Y);
@@ -316,11 +365,18 @@ BSTCopy.prototype.insertElement = function (insertedValue) {
 
     this.treeRoot = new BSTCopyNode(insertedValue, this.nextIndex, this.startingX, BSTCopy.STARTING_Y);
     this.nextIndex += 1;
+    this.markAnimationStep("create source root", {
+      focusNodeId: this.treeRoot.graphicID,
+      tags: ["insert", "root"],
+    });
   } else {
     this.cmd("CreateCircle", this.nextIndex, insertedValue, this.startingX - 200, BSTCopy.STARTING_Y);
     this.cmd("SetForegroundColor", this.nextIndex, BSTCopy.FOREGROUND_COLOR);
     this.cmd("SetBackgroundColor", this.nextIndex, BSTCopy.BACKGROUND_COLOR);
-    this.cmd("Step");
+    this.markAnimationStep(`create source node ${insertedValue}`, {
+      focusNodeId: this.nextIndex,
+      tags: ["insert", "create"],
+    });
     const insertElem = new BSTCopyNode(insertedValue, this.nextIndex, this.startingX - 200, BSTCopy.STARTING_Y);
     this.nextIndex += 1;
     this.insert(insertElem, this.treeRoot);
@@ -328,7 +384,7 @@ BSTCopy.prototype.insertElement = function (insertedValue) {
   }
 
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishBSTCopyAnimation();
 };
 
 BSTCopy.prototype.insert = function (elem, tree) {
@@ -365,7 +421,11 @@ BSTCopy.prototype.resizeTree = function () {
     }
     this.setNewPositions(this.treeRoot, startingPoint, BSTCopy.STARTING_Y, 0);
     this.animateNewPositions(this.treeRoot);
-    this.cmd("Step");
+    if (this.pendingBlock) {
+      this.markAnimationStep("resize source tree", {
+        tags: ["layout", "resize", "source"],
+      });
+    }
   }
 };
 

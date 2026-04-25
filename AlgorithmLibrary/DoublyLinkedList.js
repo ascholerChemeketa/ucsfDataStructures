@@ -146,6 +146,28 @@ DoublyLinkedList.prototype.init = function (am, w, h) {
   };
 };
 
+DoublyLinkedList.prototype.beginDoublyLinkedListAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "DoublyLinkedList", operation, ...meta });
+};
+
+DoublyLinkedList.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "DoublyLinkedList",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+DoublyLinkedList.prototype.finishDoublyLinkedListAnimation = function () {
+  return this.finishAnimation();
+};
+
 DoublyLinkedList.prototype.addControls = function () {
   addSeparatorToAlgorithmBar();
   this.controls = [];
@@ -444,19 +466,26 @@ DoublyLinkedList.prototype.insertAfterCurrentCallback = function () {
 };
 
 DoublyLinkedList.prototype.makeHeadPointer = function () {
-  this.commands = [];
+  this.beginDoublyLinkedListAnimation("makeCurrent", "make current pointer", {
+    tags: ["pointer", "current"],
+  });
 
   if (this.nodeIDs.length === 0) {
     this.cmd("SetMessage", "List is empty; no node to point at.");
-    this.cmd("Step");
+    this.markAnimationStep("list empty", {
+      tags: ["pointer", "empty"],
+    });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishDoublyLinkedListAnimation();
   }
 
   const headNodeID = this.nodeIDs[0];
 
   this.cmd("SetMessage", "Create current pointer at head");
-  this.cmd("Step");
+  this.markAnimationStep("create current pointer", {
+    focusNodeId: headNodeID,
+    tags: ["pointer", "create"],
+  });
 
   if (!this.hasCurrentPointer) {
     this.cmd(
@@ -484,10 +513,13 @@ DoublyLinkedList.prototype.makeHeadPointer = function () {
 
   this.cmd("Connect", this.currentID, headNodeID, "#000000", 0.1, true, "", 2);
   this.currentNodeID = headNodeID;
-  this.cmd("Step");
+  this.markAnimationStep("point current at head", {
+    focusNodeId: headNodeID,
+    tags: ["pointer", "head"],
+  });
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishDoublyLinkedListAnimation();
 };
 
 DoublyLinkedList.prototype.removeCurrentPointer = function () {
@@ -508,10 +540,12 @@ DoublyLinkedList.prototype.removeCurrentPointer = function () {
 };
 
 DoublyLinkedList.prototype.advanceCurrent = function () {
-  this.commands = [];
+  this.beginDoublyLinkedListAnimation("advanceCurrent", "advance current", {
+    tags: ["pointer", "advance"],
+  });
 
   if (!this.hasCurrentPointer || this.currentNodeID == null) {
-    return this.commands;
+    return this.finishDoublyLinkedListAnimation();
   }
 
   const idx = this.nodeIDs.indexOf(this.currentNodeID);
@@ -520,33 +554,40 @@ DoublyLinkedList.prototype.advanceCurrent = function () {
     this.currentNodeID = null;
     this.cmd("Delete", this.currentID);
     this.cmd("Delete", this.currentLabelID);
-    return this.commands;
+    return this.finishDoublyLinkedListAnimation();
   }
 
   const next = idx + 1 < this.nodeIDs.length ? this.nodeIDs[idx + 1] : this.dummyTailID;
 
   if (next === this.dummyTailID) {
     this.cmd("SetMessage", "Current is at last node; advancing reaches dummy tail");
-    this.cmd("Step");
+    this.markAnimationStep("advance reaches tail", {
+      tags: ["pointer", "tail"],
+    });
     this.cmd("Disconnect", this.currentID, this.currentNodeID);
     this.cmd("SetNull", this.currentID, 1);
-    this.cmd("Step");
+    this.markAnimationStep("remove current pointer", {
+      tags: ["pointer", "remove"],
+    });
     this.cmd("Delete", this.currentID);
     this.cmd("Delete", this.currentLabelID);
     this.hasCurrentPointer = false;
     this.currentNodeID = null;
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishDoublyLinkedListAnimation();
   }
 
   this.cmd("SetMessage", "Advance current to next node (current = current->next)");
-  this.cmd("Step");
+  this.markAnimationStep("advance to next node", {
+    focusNodeId: next,
+    tags: ["pointer", "advance"],
+  });
   this.cmd("Disconnect", this.currentID, this.currentNodeID);
   this.cmd("Connect", this.currentID, next, "#000000", 0.1, true, "", 2);
   this.currentNodeID = next;
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishDoublyLinkedListAnimation();
 };
 
 DoublyLinkedList.prototype.createTempPointer = function (label, x, y, targetID) {
@@ -562,7 +603,9 @@ DoublyLinkedList.prototype.createTempPointer = function (label, x, y, targetID) 
 };
 
 DoublyLinkedList.prototype.insertBack = function (value) {
-  this.commands = [];
+  this.beginDoublyLinkedListAnimation("insertBack", `insert back ${value}`, {
+    tags: ["insert", "back"],
+  });
 
   const newNodeID = this.nextIndex++;
   const oldLast = this.nodeIDs.length > 0 ? this.nodeIDs[this.nodeIDs.length - 1] : this.dummyHeadID;
@@ -575,7 +618,9 @@ DoublyLinkedList.prototype.insertBack = function (value) {
   } catch (e) {}
 
   this.cmd("SetMessage", "Insert at tail: " + value);
-  this.cmd("Step");
+  this.markAnimationStep("create new tail node", {
+    tags: ["insert", "create"],
+  });
 
   this.cmd(
     "CreateLinkedList",
@@ -606,12 +651,18 @@ DoublyLinkedList.prototype.insertBack = function (value) {
   );
   this.cmd("SetNull", this.tempID, 0);
   this.cmd("Connect", this.tempID, newNodeID, "#000000", 0.1);
-  this.cmd("Step");
+  this.markAnimationStep("track new node", {
+    focusNodeId: newNodeID,
+    tags: ["insert", "temp-pointer"],
+  });
 
   this.cmd("SetMessage", "Set newNode->prev and newNode->next");
   this.cmd("Connect", newNodeID, this.dummyTailID, "#000000", 0.1);
   this.cmd("Connect", newNodeID, oldLast, "#000000", 0.1, true, "", 1);
-  this.cmd("Step");
+  this.markAnimationStep("link new node", {
+    focusNodeId: newNodeID,
+    tags: ["insert", "link"],
+  });
 
   this.cmd("SetMessage", "Update oldLast.next and dummyTail.prev");
   this.cmd("Disconnect", oldLast, this.dummyTailID);
@@ -619,7 +670,10 @@ DoublyLinkedList.prototype.insertBack = function (value) {
 
   this.cmd("Disconnect", this.dummyTailID, oldLast);
   this.cmd("Connect", this.dummyTailID, newNodeID, "#000000", 0.1, true, "", 1);
-  this.cmd("Step");
+  this.markAnimationStep("update tail neighbors", {
+    focusNodeId: newNodeID,
+    tags: ["insert", "rewire"],
+  });
 
   this.cmd("Disconnect", this.tempID, newNodeID);
   this.cmd("Delete", this.tempID);
@@ -628,16 +682,19 @@ DoublyLinkedList.prototype.insertBack = function (value) {
   this.nodeIDs.push(newNodeID);
   this.values.push(value);
   this.cmd("SetMessage", "Update size display");
-  this.cmd("Step");
   this.cmd("SetText", this.sizeID, String(this.nodeIDs.length));
-  this.cmd("Step");
+  this.markAnimationStep("update size", {
+    tags: ["insert", "size"],
+  });
 
   this.cmd("SetMessage", "Position nodes. (Just for clarity, not part of algorithm)");
   this.resetPositions();
-  this.cmd("Step");
+  this.markAnimationStep("position nodes", {
+    tags: ["layout", "position"],
+  });
 
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishDoublyLinkedListAnimation();
 };
 
 DoublyLinkedList.prototype.insertFront = function (value) {
@@ -1080,10 +1137,14 @@ DoublyLinkedList.prototype.findElement = function (valueToFind) {
 };
 
 DoublyLinkedList.prototype.clearData = function () {
-  this.commands = [];
+  this.beginDoublyLinkedListAnimation("clear", "clear list", {
+    tags: ["clear"],
+  });
 
   this.cmd("SetMessage", "Clear list");
-  this.cmd("Step");
+  this.markAnimationStep("start clear", {
+    tags: ["clear", "start"],
+  });
 
   // Remove current pointer if it exists
   if (this.hasCurrentPointer) {
@@ -1102,9 +1163,10 @@ DoublyLinkedList.prototype.clearData = function () {
   this.nodeIDs = [];
   this.values = [];
   this.cmd("SetMessage", "Update size display");
-  this.cmd("Step");
   this.cmd("SetText", this.sizeID, "0");
-  this.cmd("Step");
+  this.markAnimationStep("clear nodes", {
+    tags: ["clear", "nodes"],
+  });
 
   // Restore empty-dummy connections
   this.cmd("Disconnect", this.dummyHeadID, this.dummyTailID);
@@ -1123,8 +1185,10 @@ DoublyLinkedList.prototype.clearData = function () {
 
   this.cmd("SetMessage", "Position nodes");
   this.resetPositions();
-  this.cmd("Step");
+  this.markAnimationStep("restore empty layout", {
+    tags: ["clear", "layout"],
+  });
 
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishDoublyLinkedListAnimation();
 };

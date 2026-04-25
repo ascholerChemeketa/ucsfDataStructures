@@ -177,6 +177,25 @@ RedBlack.prototype.reset = function () {
   this.treeRoot = null;
 };
 
+RedBlack.prototype.beginRedBlackAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "RedBlack", operation, ...meta });
+};
+
+RedBlack.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "RedBlack",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+RedBlack.prototype.finishRedBlackAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 RedBlack.prototype.insertCallback = function (event) {
   var insertedValue = this.inputField.value;
   // Get text value
@@ -215,9 +234,11 @@ RedBlack.prototype.clearCallback = function (event) {
 };
 
 RedBlack.prototype.clearData = function () {
-  if (this.treeRoot == null) return;
-
-  this.commands = [];
+  this.beginRedBlackAnimation("clear", "clear tree", { tags: ["clear"] });
+  if (this.treeRoot == null) {
+    this.markAnimationStep("tree already empty", { tags: ["clear", "empty"] });
+    return this.finishRedBlackAnimation();
+  }
 
   function clearTree(tree, handler) {
     if (tree == null) return;
@@ -242,7 +263,8 @@ RedBlack.prototype.clearData = function () {
   this.groupBoxes = {};
   this.cmd("SetNull", this.rootIndex, 1);
   this.cmd("SetMessage", "");
-  return this.commands;
+  this.markAnimationStep("tree cleared", { tags: ["clear", "complete"] });
+  return this.finishRedBlackAnimation();
 };
 
 RedBlack.prototype.insertRandomCallback = function (event) {
@@ -435,7 +457,7 @@ RedBlack.prototype.toggleNullLeaves = function (unused) {
 };
 
 RedBlack.prototype.printTree = function (unused) {
-  this.commands = [];
+  this.beginRedBlackAnimation("print", "print tree", { tags: ["print", "in"] });
 
   if (this.treeRoot != null) {
     this.highlightID = this.nextIndex++;
@@ -451,11 +473,13 @@ RedBlack.prototype.printTree = function (unused) {
     this.yPosOfNextLabel = this.first_print_pos_y;
     this.printTreeRec(this.treeRoot);
     this.cmd("Delete", this.highlightID);
-    this.cmd("Step");
+    this.markAnimationStep("finish print", { tags: ["print", "complete"] });
     for (var i = firstLabel; i < this.nextIndex; i++) this.cmd("Delete", i);
     this.nextIndex = this.highlightID; /// Reuse objects.  Not necessary.
+  } else {
+    this.markAnimationStep("tree empty", { tags: ["print", "empty"] });
   }
-  return this.commands;
+  return this.finishRedBlackAnimation();
 };
 
 RedBlack.prototype.printTreeRec = function (tree) {
@@ -487,13 +511,15 @@ RedBlack.prototype.printTreeRec = function (tree) {
 };
 
 RedBlack.prototype.findElement = function (findValue) {
-  this.commands = [];
+  this.beginRedBlackAnimation("find", `find ${findValue}`, {
+    tags: ["search", "find"],
+  });
 
   this.highlightID = this.nextIndex++;
 
   this.findImpl(this.treeRoot, findValue);
 
-  return this.commands;
+  return this.finishRedBlackAnimation();
 };
 
 RedBlack.prototype.findImpl = function (tree, value) {
@@ -514,6 +540,13 @@ RedBlack.prototype.findImpl = function (tree, value) {
       this.cmd("Step");
       this.cmd("SetMessage", "Found:" + value);
       this.cmd("SetHighlight", tree.graphicID, 0);
+      this.beginBlock(`found ${value}`, {
+        source: "RedBlack",
+        operation: this.currentAnimationOperation,
+        tags: ["search", "found"],
+        focusNodeId: tree.graphicID,
+      });
+      this.cmd("SetMessage", "Found:" + value);
     } else {
       if (tree.data > value) {
         this.cmd(
@@ -540,6 +573,10 @@ RedBlack.prototype.findImpl = function (tree, value) {
           this.cmd("Step");
           this.cmd("Delete", this.highlightID);
         }
+        this.markAnimationStep(`${tree.data}: search left`, {
+          tags: ["search", "compare", "left"],
+          focusNodeId: tree.graphicID,
+        });
         this.findImpl(tree.left, value);
       } else {
         this.cmd(
@@ -566,6 +603,10 @@ RedBlack.prototype.findImpl = function (tree, value) {
           this.cmd("Step");
           this.cmd("Delete", this.highlightID);
         }
+        this.markAnimationStep(`${tree.data}: search right`, {
+          tags: ["search", "compare", "right"],
+          focusNodeId: tree.graphicID,
+        });
         this.findImpl(tree.right, value);
       }
     }
@@ -575,6 +616,15 @@ RedBlack.prototype.findImpl = function (tree, value) {
       " Searching for " + value + " : " + "< Empty Tree > (Element not found)",
     );
     this.cmd("Step");
+    this.cmd(
+      "SetMessage",
+      " Searching for " + value + " : " + " (Element not found)",
+    );
+    this.beginBlock("value not found", {
+      source: "RedBlack",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "not-found"],
+    });
     this.cmd(
       "SetMessage",
       " Searching for " + value + " : " + " (Element not found)",
@@ -660,9 +710,13 @@ RedBlack.prototype.attachNullLeaves = function (node) {
 };
 
 RedBlack.prototype.insertElement = function (insertedValue) {
-  this.commands = new Array();
+  this.beginRedBlackAnimation("insert", `insert ${insertedValue}`, {
+    tags: ["insert"],
+  });
   this.cmd("SetMessage", " Inserting " + insertedValue);
-  this.cmd("Step");
+  this.markAnimationStep(`start insert ${insertedValue}`, {
+    tags: ["insert", "start"],
+  });
 
   this.highlightID = this.nextIndex++;
   var treeNodeID;
@@ -700,6 +754,10 @@ RedBlack.prototype.insertElement = function (insertedValue) {
 
     this.attachNullLeaves(this.treeRoot);
     this.resizeTree();
+    this.markAnimationStep("create root", {
+      tags: ["insert", "root"],
+      focusNodeId: treeNodeID,
+    });
   } else {
     treeNodeID = this.nextIndex++;
     let labelID = this.nextIndex++;
@@ -734,9 +792,13 @@ RedBlack.prototype.insertElement = function (insertedValue) {
     insertElem.height = 1;
     this.insert(insertElem, this.treeRoot);
     this.resizeTree();
+    this.markAnimationStep(`insert node ${insertedValue}`, {
+      tags: ["insert", "node"],
+      focusNodeId: treeNodeID,
+    });
   }
   this.cmd("SetMessage", " ");
-  return this.commands;
+  return this.finishRedBlackAnimation();
 };
 
 RedBlack.prototype.singleRotateRight = function (tree) {
@@ -1059,9 +1121,11 @@ RedBlack.prototype.fixDoubleRed = function (tree) {
 };
 
 RedBlack.prototype.deleteElement = function (deletedValue) {
-  this.commands = new Array();
+  this.beginRedBlackAnimation("delete", `delete ${deletedValue}`, {
+    tags: ["delete"],
+  });
   this.cmd("SetMessage", "Deleting " + deletedValue);
-  this.cmd("Step");
+  this.markAnimationStep("start delete", { tags: ["delete", "start"] });
   this.cmd("SetMessage", " ");
   this.highlightID = this.nextIndex++;
   this.treeDelete(this.treeRoot, deletedValue);
@@ -1076,12 +1140,18 @@ RedBlack.prototype.deleteElement = function (deletedValue) {
   this.resizeTree();
   if (this.treeRoot == null) {
     // resizeTree() doesn't Step when the tree is empty; force a refresh.
-    this.cmd("Step");
+    this.markAnimationStep("tree empty after delete", {
+      tags: ["delete", "empty"],
+    });
   }
 
+  this.beginBlock("delete complete", {
+    source: "RedBlack",
+    operation: this.currentAnimationOperation,
+    tags: ["delete", "complete"],
+  });
   this.cmd("SetMessage", " ");
-  // Do delete
-  return this.commands;
+  return this.finishRedBlackAnimation();
 };
 
 RedBlack.prototype.fixLeftNull = function (tree) {

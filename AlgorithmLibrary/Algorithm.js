@@ -152,6 +152,120 @@ function addSeparatorToAlgorithmBar() {
 
 function Algorithm(am) {}
 
+function legacyCommandToStep(command, args) {
+  const name = String(command ?? "").trim();
+  switch (name.toUpperCase()) {
+    case "CREATECIRCLE":
+      return { type: "createCircle", id: args[0], label: args[1], x: args[2], y: args[3] };
+    case "CONNECT":
+      return {
+        type: "connect",
+        from: args[0],
+        to: args[1],
+        color: args[2],
+        curve: args[3],
+        directed: args[4],
+        label: args[5],
+        connectionPoint: args[6],
+      };
+    case "CREATERECTANGLE":
+      return {
+        type: "createRectangle",
+        id: args[0],
+        label: args[1],
+        width: args[2],
+        height: args[3],
+        x: args[4],
+        y: args[5],
+        xJustify: args[6],
+        yJustify: args[7],
+      };
+    case "MOVE":
+      return { type: "move", objectId: args[0], toX: args[1], toY: args[2] };
+    case "MOVETOALIGNRIGHT":
+      return { type: "moveToAlignRight", objectId: args[0], otherId: args[1] };
+    case "SETFOREGROUNDCOLOR":
+      return { type: "setForegroundColor", id: args[0], color: args[1] };
+    case "SETBACKGROUNDCOLOR":
+      return { type: "setBackgroundColor", id: args[0], color: args[1] };
+    case "SETHIGHLIGHT":
+      return { type: "setHighlight", id: args[0], value: args[1] };
+    case "DISCONNECT":
+      return { type: "disconnect", from: args[0], to: args[1] };
+    case "SETALPHA":
+      return { type: "setAlpha", id: args[0], alpha: args[1] };
+    case "SETMESSAGE":
+      return { type: "setMessage", message: args[0] };
+    case "SETTEXT":
+      return { type: "setText", id: args[0], text: args[1], index: args[2] };
+    case "DELETE":
+      return { type: "delete", id: args[0] };
+    case "CREATEHIGHLIGHTCIRCLE":
+      return { type: "createHighlightCircle", id: args[0], color: args[1], x: args[2], y: args[3], radius: args[4] };
+    case "CREATELABEL":
+      return { type: "createLabel", id: args[0], text: args[1], x: args[2], y: args[3], centered: args[4], fontSizePercent: args[5] };
+    case "SETEDGECOLOR":
+      return { type: "setEdgeColor", from: args[0], to: args[1], color: args[2] };
+    case "SETEDGEALPHA":
+      return { type: "setEdgeAlpha", from: args[0], to: args[1], alpha: args[2] };
+    case "SETEDGEHIGHLIGHT":
+      return { type: "setEdgeHighlight", from: args[0], to: args[1], value: args[2] };
+    case "SETHEIGHT":
+      return { type: "setHeight", id: args[0], height: args[1] };
+    case "SETLAYER":
+      return { type: "setLayer", id: args[0], layer: args[1] };
+    case "CREATELINKEDLIST":
+      return {
+        type: "createLinkedList",
+        id: args[0],
+        label: args[1],
+        width: args[2],
+        height: args[3],
+        x: args[4],
+        y: args[5],
+        linkPercent: args[6],
+        vertical: args[7],
+        linkAtEnd: args[8],
+        numLabels: args[9],
+        numLinks: args[10],
+      };
+    case "SETNULL":
+      return { type: "setNull", id: args[0], value: args[1], index: args[2] };
+    case "SETTEXTCOLOR":
+      return { type: "setTextColor", id: args[0], color: args[1], index: args[2] };
+    case "CREATEBTREENODE":
+      return {
+        type: "createBTreeNode",
+        id: args[0],
+        widthPerElement: args[1],
+        height: args[2],
+        numElems: args[3],
+        x: args[4],
+        y: args[5],
+        backgroundColor: args[6],
+        foregroundColor: args[7],
+      };
+    case "SETWIDTH":
+      return { type: "setWidth", id: args[0], width: args[1] };
+    case "SETNUMELEMENTS":
+      return { type: "setNumElements", id: args[0], count: args[1] };
+    case "SETPOSITION":
+      return { type: "setPosition", id: args[0], x: args[1], y: args[2] };
+    case "ALIGNRIGHT":
+      return { type: "alignRight", id: args[0], otherId: args[1] };
+    case "ALIGNLEFT":
+      return { type: "alignLeft", id: args[0], otherId: args[1] };
+    case "ALIGNTOP":
+      return { type: "alignTop", id: args[0], otherId: args[1] };
+    case "ALIGNBOTTOM":
+      return { type: "alignBottom", id: args[0], otherId: args[1] };
+    case "SETHIGHLIGHTINDEX":
+      return { type: "setHighlightIndex", id: args[0], index: args[1] };
+    default:
+      throw new Error("Unknown command: " + name);
+  }
+}
+
 Algorithm.prototype.setCodeAlpha = function (code, newAlpha) {
   var i, j;
   for (i = 0; i < code.length; i++)
@@ -204,6 +318,7 @@ Algorithm.prototype.init = function (am, w, h) {
   this.actionHistory = [];
   this.recordAnimation = true;
   this.commands = [];
+  this.pendingBlock = null;
 };
 
 // Overload in subclass
@@ -378,17 +493,80 @@ Algorithm.prototype.clearHistory = function () {
   this.actionHistory = [];
 };
 
+Algorithm.prototype.beginAnimation = function () {
+  this.commands = [];
+  this.pendingBlock = null;
+};
+
+Algorithm.prototype.beginBlock = function (label, meta) {
+  if (this.pendingBlock && this.pendingBlock.steps.length > 0) {
+    this.commands.push(this.pendingBlock);
+  }
+  this.pendingBlock = {
+    ...(label ? { label } : {}),
+    ...(meta ? { meta } : {}),
+    steps: [],
+  };
+};
+
+Algorithm.prototype.emit = function (step) {
+  if (!this.recordAnimation) {
+    return;
+  }
+  if (!this.pendingBlock) {
+    this.beginBlock();
+  }
+  this.pendingBlock.steps.push(step);
+};
+
+Algorithm.prototype.step = function (label, meta) {
+  if (!this.recordAnimation) {
+    return;
+  }
+  if (!this.pendingBlock) {
+    this.beginBlock(label, meta);
+    return;
+  }
+  if (this.pendingBlock.steps.length > 0) {
+    this.commands.push(this.pendingBlock);
+  }
+  this.pendingBlock = {
+    ...(label ? { label } : {}),
+    ...(meta ? { meta } : {}),
+    steps: [],
+  };
+};
+
+Algorithm.prototype.finishAnimation = function () {
+  if (this.pendingBlock && this.pendingBlock.steps.length > 0) {
+    this.commands.push(this.pendingBlock);
+  }
+  this.pendingBlock = null;
+  return this.commands;
+};
+
 // Helper method to add text input with nice border.
 //  AS3 probably has a built-in way to do this.   Replace when found.
 
 // Helper method to create a command string from a bunch of arguments
 Algorithm.prototype.cmd = function () {
   if (this.recordAnimation) {
-    var command = arguments[0];
-    for (let i = 1; i < arguments.length; i++) {
-      command = command + "<;>" + String(arguments[i]);
+    const command = arguments[0];
+    if (String(command).toUpperCase() === "STEP") {
+      if (this.pendingBlock) {
+        this.step();
+      } else {
+        this.commands.push({ type: "step" });
+      }
+      return;
     }
-    this.commands.push(command);
+    const args = Array.prototype.slice.call(arguments, 1);
+    const step = legacyCommandToStep(command, args);
+    if (this.pendingBlock) {
+      this.pendingBlock.steps.push(step);
+    } else {
+      this.commands.push(step);
+    }
   }
 };
 

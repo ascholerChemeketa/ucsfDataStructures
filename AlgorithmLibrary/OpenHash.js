@@ -129,11 +129,34 @@ OpenHash.prototype.addControls = function () {
   // Add new controls
 };
 
+OpenHash.prototype.beginOpenHashAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "OpenHash", operation, ...meta });
+};
+
+OpenHash.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "OpenHash",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+OpenHash.prototype.finishOpenHashAnimation = function () {
+  return this.finishAnimation();
+};
+
 OpenHash.prototype.insertElement = function (elem) {
-  this.commands = new Array();
+  this.beginOpenHashAnimation("insert", `insert ${elem}`, { tags: ["insert"] });
   // this.cmd("SetText", this.ExplainLabel, "Inserting element: " + String(elem));
   this.cmd("SetMessage", "Inserting element: " + String(elem));
   var index = this.doHash(elem);
+  this.markAnimationStep(`hash to bucket ${index}`, { tags: ["insert", "hash"] });
   var node = new LinkedListNode(elem, this.nextIndex++, 100, 75);
   this.cmd(
     "CreateLinkedList",
@@ -162,12 +185,17 @@ OpenHash.prototype.insertElement = function (elem) {
   node.next = this.hashTableValues[index];
   this.hashTableValues[index] = node;
 
+  this.beginBlock(`insert into bucket ${index}`, {
+    source: "OpenHash",
+    operation: this.currentAnimationOperation,
+    tags: ["insert", "bucket"],
+  });
   this.repositionList(index);
 
   // this.cmd("SetText", this.ExplainLabel, "");
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishOpenHashAnimation();
 };
 
 OpenHash.prototype.repositionList = function (index) {
@@ -184,17 +212,23 @@ OpenHash.prototype.repositionList = function (index) {
 };
 
 OpenHash.prototype.deleteElement = function (elem) {
-  this.commands = new Array();
+  this.beginOpenHashAnimation("delete", `delete ${elem}`, { tags: ["delete"] });
   // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem);
   this.cmd("SetMessage", "Deleting element: " + elem);
   var index = this.doHash(elem);
+  this.markAnimationStep(`hash to bucket ${index}`, { tags: ["delete", "hash"] });
   if (this.hashTableValues[index] == null) {
     // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem + "  Element not in table");
+    this.beginBlock(`bucket ${index} empty`, {
+      source: "OpenHash",
+      operation: this.currentAnimationOperation,
+      tags: ["delete", "empty"],
+    });
     this.cmd("SetMessage", "Deleting element: " + elem + "  Element not in table");
-    return this.commands;
+    return this.finishOpenHashAnimation();
   }
   this.cmd("SetHighlight", this.hashTableValues[index].graphicID, 1);
-  this.cmd("Step");
+  this.markAnimationStep(`inspect bucket ${index} head`, { tags: ["delete", "inspect"] });
   this.cmd("SetHighlight", this.hashTableValues[index].graphicID, 0);
   if (this.hashTableValues[index].data == elem) {
     if (this.hashTableValues[index].next != null) {
@@ -208,15 +242,23 @@ OpenHash.prototype.deleteElement = function (elem) {
     }
     this.cmd("Delete", this.hashTableValues[index].graphicID);
     this.hashTableValues[index] = this.hashTableValues[index].next;
+    this.beginBlock(`delete ${elem} from bucket ${index}`, {
+      source: "OpenHash",
+      operation: this.currentAnimationOperation,
+      tags: ["delete", "found"],
+    });
     this.repositionList(index);
-    return this.commands;
+    return this.finishOpenHashAnimation();
   }
   var tmpPrev = this.hashTableValues[index];
   var tmp = this.hashTableValues[index].next;
   var found = false;
   while (tmp != null && !found) {
     this.cmd("SetHighlight", tmp.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`inspect chained node ${tmp.data}`, {
+      focusNodeId: tmp.graphicID,
+      tags: ["delete", "inspect"],
+    });
     this.cmd("SetHighlight", tmp.graphicID, 0);
     if (tmp.data == elem) {
       found = true;
@@ -229,6 +271,11 @@ OpenHash.prototype.deleteElement = function (elem) {
       }
       tmpPrev.next = tmpPrev.next.next;
       this.cmd("Delete", tmp.graphicID);
+      this.beginBlock(`delete ${elem} from bucket ${index}`, {
+        source: "OpenHash",
+        operation: this.currentAnimationOperation,
+        tags: ["delete", "found"],
+      });
       this.repositionList(index);
     } else {
       tmpPrev = tmp;
@@ -239,14 +286,23 @@ OpenHash.prototype.deleteElement = function (elem) {
     // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem + "  Element not in table");
     this.cmd("SetMessage", "Deleting element: " + elem + "  Element not in table");
   }
-  return this.commands;
+  if (!found) {
+    this.beginBlock(`not found ${elem}`, {
+      source: "OpenHash",
+      operation: this.currentAnimationOperation,
+      tags: ["delete", "not-found"],
+    });
+    this.cmd("SetMessage", "Deleting element: " + elem + "  Element not in table");
+  }
+  return this.finishOpenHashAnimation();
 };
 OpenHash.prototype.findElement = function (elem) {
-  this.commands = new Array();
+  this.beginOpenHashAnimation("find", `find ${elem}`, { tags: ["search", "find"] });
   // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem);
   this.cmd("SetMessage", "Finding Element: " + elem);
 
   var index = this.doHash(elem);
+  this.markAnimationStep(`hash to bucket ${index}`, { tags: ["search", "hash"] });
   var compareIndex = this.nextIndex++;
   var found = false;
   var tmp = this.hashTableValues[index];
@@ -259,20 +315,33 @@ OpenHash.prototype.findElement = function (elem) {
     } else {
       this.cmd("SetText", compareIndex, tmp.data + "!=" + elem);
     }
-    this.cmd("Step");
+    this.markAnimationStep(`inspect ${tmp.data}`, {
+      focusNodeId: tmp.graphicID,
+      tags: ["search", "inspect"],
+    });
     this.cmd("SetHighlight", tmp.graphicID, 0);
     tmp = tmp.next;
   }
   if (found) {
     // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem + "  Found!");
+    this.beginBlock(`found ${elem}`, {
+      source: "OpenHash",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "found"],
+    });
     this.cmd("SetMessage", "Finding Element: " + elem + "  Found!");
   } else {
     // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem + "  Not Found!");
+    this.beginBlock(`not found ${elem}`, {
+      source: "OpenHash",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "not-found"],
+    });
     this.cmd("SetMessage", "Finding Element: " + elem + "  Not Found!");
   }
   this.cmd("Delete", compareIndex);
   this.nextIndex--;
-  return this.commands;
+  return this.finishOpenHashAnimation();
 };
 
 // Programmatic bindings

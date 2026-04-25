@@ -93,13 +93,14 @@ AVL.prototype.init = function (am, w, h) {
   fn.call(this, am, w, h);
   this.startingX = 150; // w / 2;
   this.nextIndex = 0;
-  this.commands = [];
+  this.beginAnimation();
   this.rootIndex = 0;
+  this.beginBlock("initialize tree", { source: "AVL", operation: "init", tags: ["init"] });
   this.cmd("CreateRectangle", this.nextIndex++, "", 50, 25, this.startingX - 100, AVL.STARTING_Y - 10);
   this.cmd("SetNull", this.rootIndex, 1);
-	this.cmd("CreateLabel", this.nextIndex++, "root", this.startingX - 150, AVL.STARTING_Y - 10);
+ 	this.cmd("CreateLabel", this.nextIndex++, "root", this.startingX - 150, AVL.STARTING_Y - 10);
 
-  this.animationManager.StartNewAnimation(this.commands);
+  this.animationManager.StartNewAnimation(this.finishAnimation());
   this.animationManager.skipForward();
   this.animationManager.clearHistory();
 
@@ -124,6 +125,24 @@ AVL.prototype.init = function (am, w, h) {
     this.animationManager.clearHistory();
     this.animationManager.animatedObjects.draw();
   };
+};
+
+AVL.prototype.beginAVLAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "AVL", operation, ...meta });
+};
+
+AVL.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = { source: "AVL", operation: this.currentAnimationOperation, ...meta };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+AVL.prototype.finishAVLAnimation = function () {
+  return this.finishAnimation();
 };
 
 AVL.prototype.addControls = function () {
@@ -201,7 +220,7 @@ AVL.prototype.clearCallback = function (event) {
 AVL.prototype.clearData = function () {
   if (this.treeRoot == null)
   return;
-  this.commands = new Array();
+  this.beginAVLAnimation("clear", "clear tree", { tags: ["clear"] });
   
   function clearTree(tree, handler) {
     if (tree != null) {
@@ -220,7 +239,7 @@ AVL.prototype.clearData = function () {
   this.treeRoot = null;
   this.cmd("SetNull", this.rootIndex, 1);
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishAVLAnimation();
 };
 
 
@@ -281,20 +300,25 @@ AVL.prototype.sizeChanged = function (newWidth, newHeight) {
 };
 
 AVL.prototype.printTree = function (order) {
-  this.commands = [];
+  this.beginAVLAnimation("print", `print ${order} order`, {
+    tags: ["print", String(order).toLowerCase()],
+  });
   this.printOutput = "";
 
   if (this.treeRoot != null) {
     this.cmd("SetMessage", "Starting from root");
     this.cmd("SetHighlight", this.treeRoot.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep("visit root", {
+      focusNodeId: this.treeRoot.graphicID,
+      tags: ["print", "visit"],
+    });
 
     this.cmd("SetHighlight", this.treeRoot.graphicID, 0);
     this.printTreeRec(this.treeRoot, order);
 
     this.cmd("SetMessage", "Final output: " + this.printOutput);
   }
-  return this.commands;
+  return this.finishAVLAnimation();
 };
 
 AVL.prototype.printTreeRec = function (tree, order) {
@@ -345,12 +369,14 @@ AVL.prototype.printTreeRec = function (tree, order) {
 // };
 
 AVL.prototype.findElement = function (findValue) {
-  this.commands = [];
+  this.beginAVLAnimation("find", `find ${findValue}`, {
+    tags: ["search", "find"],
+  });
 
   this.highlightID = this.nextIndex++;
   this.findHelp(this.treeRoot, findValue);
 
-  return this.commands;
+  return this.finishAVLAnimation();
 };
 
 AVL.prototype.findHelp = function (tree, value) {
@@ -440,7 +466,9 @@ AVL.prototype.findHelp = function (tree, value) {
 };
 
 AVL.prototype.insertElement = function (insertedValue) {
-  this.commands = [];
+  this.beginAVLAnimation("insert", `insert ${insertedValue}`, {
+    tags: ["insert"],
+  });
   this.cmd("SetMessage", " Inserting " + insertedValue);
 
   if (this.treeRoot == null) {
@@ -461,7 +489,10 @@ AVL.prototype.insertElement = function (insertedValue) {
       "SetMessage",
       `Root is null. Inserting ${insertedValue} as the root`,
     );
-    this.cmd("Step");
+    this.markAnimationStep("create root", {
+      focusNodeId: treeNodeID,
+      tags: ["insert", "root"],
+    });
 
     this.cmd(
       "CreateLabel",
@@ -471,7 +502,10 @@ AVL.prototype.insertElement = function (insertedValue) {
       AVL.STARTING_Y - 20,
     );
     this.cmd("SetForegroundColor", labelID, AVL.HEIGHT_LABEL_COLOR);
-    this.cmd("Step");
+    this.markAnimationStep("create height label", {
+      focusNodeId: treeNodeID,
+      tags: ["insert", "height"],
+    });
     
     
     this.cmd("SetNull", this.rootIndex, 0);
@@ -497,7 +531,10 @@ AVL.prototype.insertElement = function (insertedValue) {
     this.cmd("SetBackgroundColor", treeNodeID, AVL.BACKGROUND_COLOR);
     this.cmd("CreateLabel", labelID, "", 100 - 20, 100 - 20);
     this.cmd("SetForegroundColor", labelID, AVL.HEIGHT_LABEL_COLOR);
-    this.cmd("Step");
+    this.markAnimationStep(`create node ${insertedValue}`, {
+      focusNodeId: treeNodeID,
+      tags: ["insert", "create"],
+    });
     var insertElem = new AVLNode(insertedValue, treeNodeID, labelID, 100, 100);
 
     this.cmd("SetHighlight", insertElem.graphicID, 1);
@@ -506,7 +543,7 @@ AVL.prototype.insertElement = function (insertedValue) {
     //				this.resizeTree();
   }
   this.cmd("SetMessage", " ");
-  return this.commands;
+  return this.finishAVLAnimation();
 };
 
 AVL.prototype.singleRotateRight = function (tree) {
@@ -520,7 +557,10 @@ AVL.prototype.singleRotateRight = function (tree) {
   this.cmd("SetEdgeHighlight", B.graphicID, A.graphicID, 1);
   
   this.setHighlights([A.graphicID, B.graphicID], 1);
-  this.cmd("Step");
+  this.markAnimationStep(`rotate right around ${B.data}`, {
+    focusNodeId: B.graphicID,
+    tags: ["rotate", "right"],
+  });
   
   this.setHighlights([A.graphicID, B.graphicID], 0);
 
@@ -564,7 +604,10 @@ AVL.prototype.singleRotateLeft = function (tree) {
   this.cmd("SetEdgeHighlight", A.graphicID, B.graphicID, 1);
   
   this.setHighlights([A.graphicID, B.graphicID], 1);
-  this.cmd("Step");
+  this.markAnimationStep(`rotate left around ${A.data}`, {
+    focusNodeId: A.graphicID,
+    tags: ["rotate", "left"],
+  });
   
   this.setHighlights([A.graphicID, B.graphicID], 0);
 
@@ -639,7 +682,10 @@ AVL.prototype.doubleRotateRight = function (tree) {
   this.cmd("SetEdgeHighlight", C.graphicID, A.graphicID, 1);
   this.cmd("SetEdgeHighlight", A.graphicID, B.graphicID, 1);
 
-  this.cmd("Step");
+  this.markAnimationStep(`double rotate right around ${C.data}`, {
+    focusNodeId: C.graphicID,
+    tags: ["rotate", "double", "right"],
+  });
 
 
   this.setHighlights([A.graphicID, B.graphicID, C.graphicID], 0);
@@ -648,7 +694,10 @@ AVL.prototype.doubleRotateRight = function (tree) {
 
   this.singleRotateLeft(A);
   this.cmd("SetMessage", `Left rotation around pivot ${A.data} complete. Now rotate right around pivot ${C.data}.`);
-  this.cmd("Step");
+  this.markAnimationStep(`finish left half of double right rotation`, {
+    focusNodeId: A.graphicID,
+    tags: ["rotate", "double", "right"],
+  });
   this.singleRotateRight(C);
 };
 
@@ -672,7 +721,10 @@ AVL.prototype.doubleRotateLeft = function (tree) {
   this.cmd("SetEdgeHighlight", A.graphicID, C.graphicID, 1);
   this.cmd("SetEdgeHighlight", C.graphicID, B.graphicID, 1);
 
-  this.cmd("Step");
+  this.markAnimationStep(`double rotate left around ${A.data}`, {
+    focusNodeId: A.graphicID,
+    tags: ["rotate", "double", "left"],
+  });
 
   this.setHighlights([A.graphicID, B.graphicID, C.graphicID], 0);
   this.cmd("SetEdgeHighlight", A.graphicID, C.graphicID, 0);
@@ -680,7 +732,10 @@ AVL.prototype.doubleRotateLeft = function (tree) {
 
   this.singleRotateRight(C);
   this.cmd("SetMessage", `Right rotation around pivot ${C.data} complete. Now rotate left around pivot ${A.data}.`);
-  this.cmd("Step");
+  this.markAnimationStep(`finish right half of double left rotation`, {
+    focusNodeId: C.graphicID,
+    tags: ["rotate", "double", "left"],
+  });
   this.singleRotateLeft(A);
 };
 
@@ -934,14 +989,16 @@ AVL.prototype.insert = function (elem, tree) {
 };
 
 AVL.prototype.deleteElement = function (deletedValue) {
-  this.commands = [];
+  this.beginAVLAnimation("delete", `delete ${deletedValue}`, {
+    tags: ["delete"],
+  });
   this.cmd("SetMessage", "Deleting " + deletedValue);
-  this.cmd("Step");
+  this.markAnimationStep("start delete", { tags: ["delete", "start"] });
   this.cmd("SetMessage", " ");
   this.highlightID = this.nextIndex++;
   this.treeDelete(this.treeRoot, deletedValue);
   this.cmd("SetMessage", " ");
-  return this.commands;
+  return this.finishAVLAnimation();
 };
 
 AVL.prototype.treeDelete = function (tree, valueToDelete) {
@@ -1393,7 +1450,7 @@ AVL.prototype.resizeTree = function () {
     }
     this.setNewPositions(this.treeRoot, startingPoint, AVL.STARTING_Y, 0);
     this.animateNewPositions(this.treeRoot);
-    this.cmd("Step");
+    this.markAnimationStep("resize tree", { tags: ["layout", "resize"] });
   }
 };
 

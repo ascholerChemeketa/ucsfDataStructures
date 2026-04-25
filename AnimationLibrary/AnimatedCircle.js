@@ -101,7 +101,7 @@ AnimatedCircle.prototype.updateCircle = function () {
 
   if(!this.svgCircle) return;
   
-  let bg = this.backgroundColor ? this.backgroundColor : 'var(--svgColor--background)';
+  let bg = this.backgroundColor ? this.backgroundColor : 'var(--svgFillColor)';
   let fg = this.highlighted ? 'var(--svgColor--highlight)' : this.foregroundColor;
   let sw = this.highlighted ? 3 : 1;
 

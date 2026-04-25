@@ -157,6 +157,32 @@ LinkedListTail.prototype.init = function (am, w, h) {
   this.createdNodeCount = 0;
 };
 
+LinkedListTail.prototype.beginLinkedListTailAnimation = function (
+  operation,
+  label,
+  meta = {},
+) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "LinkedListTail", operation, ...meta });
+};
+
+LinkedListTail.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "LinkedListTail",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+LinkedListTail.prototype.finishLinkedListTailAnimation = function () {
+  return this.finishAnimation();
+};
+
 LinkedListTail.prototype.recomputeLeftMostX = function () {
   if (this.top <= 0) {
     this.leftMostX = LINKED_LIST_START_X;
@@ -374,19 +400,21 @@ LinkedListTail.prototype.removeCurrentPointerCallback = function (event) {
 };
 
 LinkedListTail.prototype.makeHeadPointer = function (ignored) {
-  this.commands = [];
+  this.beginLinkedListTailAnimation("makeCurrent", "make current pointer", {
+    tags: ["pointer", "current"],
+  });
 
   if (this.top <= 0) {
     this.cmd("SetMessage", "List is empty; no head to point at.");
-    this.cmd("Step");
+    this.markAnimationStep("empty list", { tags: ["pointer", "empty"] });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishLinkedListTailAnimation();
   }
 
   const headNodeID = this.LinkedListTailElemID[this.top - 1];
 
   this.cmd("SetMessage", "Create current pointer at head");
-  this.cmd("Step");
+  this.markAnimationStep("create current pointer", { tags: ["pointer", "create"] });
   if (!this.hasCurrentPointer) {
     this.cmd(
       "CreateLabel",
@@ -413,10 +441,13 @@ LinkedListTail.prototype.makeHeadPointer = function (ignored) {
 
   this.cmd("connect", this.currentID, headNodeID, "#000000", 0.1, true, "", 2);
   this.currentNodeID = headNodeID;
-  this.cmd("Step");
+  this.markAnimationStep("point current at head", {
+    focusNodeId: headNodeID,
+    tags: ["pointer", "head"],
+  });
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishLinkedListTailAnimation();
 };
 
 LinkedListTail.prototype.removeCurrentPointer = function (ignored) {
@@ -457,10 +488,13 @@ LinkedListTail.prototype.insertAfterCurrentCallback = function (event) {
 };
 
 LinkedListTail.prototype.advanceCurrent = function (ignored) {
-  this.commands = [];
+  this.beginLinkedListTailAnimation("advanceCurrent", "advance current", {
+    tags: ["pointer", "advance"],
+  });
 
   if (!this.hasCurrentPointer || this.currentNodeID == null) {
-    return this.commands;
+    this.markAnimationStep("no current pointer", { tags: ["pointer", "missing"] });
+    return this.finishLinkedListTailAnimation();
   }
 
   // Find current node's index in our array (indices can shift on insertBack)
@@ -478,21 +512,21 @@ LinkedListTail.prototype.advanceCurrent = function (ignored) {
     this.currentNodeID = null;
     this.cmd("Delete", this.currentID);
     this.cmd("Delete", this.currentLabelID);
-    return this.commands;
+    this.markAnimationStep("stale current pointer", { tags: ["pointer", "stale"] });
+    return this.finishLinkedListTailAnimation();
   }
 
   if (currentIndex === 0) {
     this.cmd("SetMessage", "Current is at tail; advancing reaches null");
-    this.cmd("Step");
+    this.markAnimationStep("advance current to null", { tags: ["pointer", "null"] });
     this.cmd("Disconnect", this.currentID, this.currentNodeID);
     this.cmd("SetNull", this.currentID, 1);
-    this.cmd("Step");
     this.cmd("Delete", this.currentID);
     this.cmd("Delete", this.currentLabelID);
     this.hasCurrentPointer = false;
     this.currentNodeID = null;
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishLinkedListTailAnimation();
   }
 
   const nextNodeID = this.LinkedListTailElemID[currentIndex - 1];
@@ -503,7 +537,11 @@ LinkedListTail.prototype.advanceCurrent = function (ignored) {
   this.currentNodeID = nextNodeID;
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  this.markAnimationStep("advance to next node", {
+    focusNodeId: nextNodeID,
+    tags: ["pointer", "advance"],
+  });
+  return this.finishLinkedListTailAnimation();
 };
 
 LinkedListTail.prototype.deleteNext = function (ignored) {
@@ -839,7 +877,9 @@ LinkedListTail.prototype.clearCallback = function (event) {
 
 // Insert at tail (like QueueLL enqueue)
 LinkedListTail.prototype.insertBack = function (value) {
-  this.commands = [];
+  this.beginLinkedListTailAnimation("insertBack", `insert back ${value}`, {
+    tags: ["insert", "tail"],
+  });
 
   this.cmd("SetText", this.leftoverLabelID, "");
   this.createdNodeCount++;
@@ -854,7 +894,7 @@ LinkedListTail.prototype.insertBack = function (value) {
   this.LinkedListTailElemID[0] = this.nextIndex++;
 
   this.cmd("SetMessage", "Insert at tail: " + value);
-  this.cmd("Step");
+  this.markAnimationStep(`allocate tail node ${value}`, { tags: ["insert", "allocate"] });
 
   // Spawn the new tail node close to the existing tail node (if any), rather
   // than spreading nodes based on total inserts (which can jump far right).
@@ -907,7 +947,10 @@ LinkedListTail.prototype.insertBack = function (value) {
   this.cmd("SetMessage", "Make a node with value");
   this.cmd("SetNull", this.LinkedListTailElemID[0], 1);
   this.cmd("SetText", this.LinkedListTailElemID[0], value);
-  this.cmd("Step");
+  this.markAnimationStep(`create node ${value}`, {
+    focusNodeId: this.LinkedListTailElemID[0],
+    tags: ["insert", "create"],
+  });
 
   this.cmd("SetMessage", "Temporary newNode pointer gets address of new node");
   this.cmd("CreateLabel", this.tempLabelID, "newNode", TEMP_LABEL_X, TEMP_LABEL_Y);
@@ -922,7 +965,7 @@ LinkedListTail.prototype.insertBack = function (value) {
   );
   this.cmd("SetNull", this.tempID, 0);
   this.cmd("connect", this.tempID, this.LinkedListTailElemID[0], "#000000", 0.1);
-  this.cmd("Step");
+  this.markAnimationStep("track new tail node", { tags: ["insert", "track"] });
 
   if (this.top == 0) {
     this.cmd("SetNull", this.headID, 0);
@@ -935,6 +978,7 @@ LinkedListTail.prototype.insertBack = function (value) {
       0.1,
     );
     this.cmd("SetMessage", "List was empty; head and tail point to this node.");
+    this.markAnimationStep("initialize head and tail", { tags: ["insert", "empty"] });
   } else {
     this.cmd("SetNull", this.LinkedListTailElemID[1], 0);
     this.cmd(
@@ -945,7 +989,7 @@ LinkedListTail.prototype.insertBack = function (value) {
       0.1,
     );
     this.cmd("SetMessage", "Set old tail->next to new node.");
-    this.cmd("Step");
+    this.markAnimationStep("link old tail to new tail", { tags: ["insert", "link"] });
     this.cmd("Disconnect", this.tailID, this.LinkedListTailElemID[1]);
     this.cmd("SetMessage", "Update tail pointer to new node.");
   }
@@ -961,25 +1005,32 @@ LinkedListTail.prototype.insertBack = function (value) {
     1,
   );
 
-  this.cmd("Step");
-
   this.cmd("Disconnect", this.tempID, this.LinkedListTailElemID[0]);
   this.cmd("Delete", this.tempID);
   this.cmd("Delete", this.tempLabelID);
   this.top = this.top + 1;
+  this.markAnimationStep("update tail pointer", { tags: ["insert", "tail-pointer"] });
+  this.beginBlock("update size", {
+    source: "LinkedListTail",
+    operation: this.currentAnimationOperation,
+    tags: ["insert", "size"],
+  });
   this.cmd("SetMessage", "Update size to " + this.top);
-  this.cmd("Step");
   this.cmd("SetText", this.sizeID, String(this.top));
-  this.cmd("Step");
+  this.beginBlock("insert complete", {
+    source: "LinkedListTail",
+    operation: this.currentAnimationOperation,
+    tags: ["insert", "complete"],
+  });
   this.cmd("SetMessage", "");
-  this.cmd("Step");
-
-  return this.commands;
+  return this.finishLinkedListTailAnimation();
 };
 
 // Insert at head
 LinkedListTail.prototype.insertFront = function (value) {
-  this.commands = [];
+  this.beginLinkedListTailAnimation("insertFront", `insert front ${value}`, {
+    tags: ["insert", "head"],
+  });
 
   this.cmd("SetText", this.leftoverLabelID, "");
   this.createdNodeCount++;
@@ -988,7 +1039,7 @@ LinkedListTail.prototype.insertFront = function (value) {
   this.LinkedListTailElemID[this.top] = this.nextIndex++;
 
   this.cmd("SetMessage", "insertStart(" + value + ")");
-  this.cmd("Step");
+  this.markAnimationStep(`allocate head node ${value}`, { tags: ["insert", "allocate"] });
 
   const insertX =
     this.top === 0 ? LINKED_LIST_START_X : this.leftMostX - LINKED_LIST_ELEM_SPACING;
@@ -1034,7 +1085,10 @@ LinkedListTail.prototype.insertFront = function (value) {
     "#000000",
     0.1,
   );
-  this.cmd("Step");
+  this.markAnimationStep(`create node ${value}`, {
+    focusNodeId: this.LinkedListTailElemID[this.top],
+    tags: ["insert", "create"],
+  });
 
   if (this.top == 0) {
     this.cmd("SetNull", this.headID, 0);
@@ -1057,6 +1111,7 @@ LinkedListTail.prototype.insertFront = function (value) {
       1,
     );
     this.cmd("SetMessage", "List was empty; head and tail point to this node.");
+    this.markAnimationStep("initialize head and tail", { tags: ["insert", "empty"] });
   } else {
     const oldHeadIndex = this.top - 1;
 
@@ -1069,7 +1124,7 @@ LinkedListTail.prototype.insertFront = function (value) {
       "#000000",
       0.1,
     );
-    this.cmd("Step");
+    this.markAnimationStep("link new head to old head", { tags: ["insert", "link"] });
 
     this.cmd("SetMessage", "Update head pointer to new node.");
     this.cmd("Disconnect", this.headID, this.LinkedListTailElemID[oldHeadIndex]);
@@ -1085,17 +1140,21 @@ LinkedListTail.prototype.insertFront = function (value) {
   this.cmd("Disconnect", this.tempID, this.LinkedListTailElemID[this.top]);
   this.cmd("Delete", this.tempID);
   this.cmd("Delete", this.tempLabelID);
-
-  this.cmd("Step");
   this.top = this.top + 1;
+  this.beginBlock("update size", {
+    source: "LinkedListTail",
+    operation: this.currentAnimationOperation,
+    tags: ["insert", "size"],
+  });
   this.cmd("SetMessage", "Update size to " + this.top);
-  this.cmd("Step");
   this.cmd("SetText", this.sizeID, String(this.top));
-  this.cmd("Step");
+  this.beginBlock("insert complete", {
+    source: "LinkedListTail",
+    operation: this.currentAnimationOperation,
+    tags: ["insert", "complete"],
+  });
   this.cmd("SetMessage", "");
-  this.cmd("Step");
-
-  return this.commands;
+  return this.finishLinkedListTailAnimation();
 };
 
 // Delete from head (like QueueLL dequeue)
@@ -1424,7 +1483,7 @@ LinkedListTail.prototype.printList = function (ignored) {
 };
 
 LinkedListTail.prototype.clearData = function () {
-  this.commands = [];
+  this.beginLinkedListTailAnimation("clear", "clear list", { tags: ["clear"] });
 
   if (this.top == 0) {
     this.cmd("SetMessage", "");
@@ -1439,23 +1498,21 @@ LinkedListTail.prototype.clearData = function () {
     this.cmd("SetAlpha", this.tempID, 0);
     this.cmd("SetAlpha", this.tempLabelID, 0);
     this.cmd("SetMessage", "Update size to 0");
-    this.cmd("Step");
     this.cmd("SetText", this.sizeID, "0");
-    this.cmd("Step");
-    return this.commands;
+    this.markAnimationStep("already empty", { tags: ["clear", "empty"] });
+    return this.finishLinkedListTailAnimation();
   }
 
   this.cmd("SetMessage", "Clearing list...");
-  this.cmd("Step");
+  this.markAnimationStep("start clear", { tags: ["clear", "start"] });
 
   // Reuse Delete Front logic so Clear also animates the toDelete pointer.
   while (this.top > 0) {
     this.deleteFront("", true);
   }
   this.cmd("SetMessage", "Update size to 0");
-  this.cmd("Step");
   this.cmd("SetText", this.sizeID, "0");
-  this.cmd("Step");
+  this.markAnimationStep("update size", { tags: ["clear", "size"] });
 
   this.cmd("SetNull", this.tempID, 1);
   this.cmd("SetAlpha", this.tempID, 0);
@@ -1473,5 +1530,11 @@ LinkedListTail.prototype.clearData = function () {
     this.hasCurrentPointer = false;
     this.currentNodeID = null;
   }
-  return this.commands;
+  this.beginBlock("clear complete", {
+    source: "LinkedListTail",
+    operation: this.currentAnimationOperation,
+    tags: ["clear", "complete"],
+  });
+  this.cmd("SetMessage", "");
+  return this.finishLinkedListTailAnimation();
 };

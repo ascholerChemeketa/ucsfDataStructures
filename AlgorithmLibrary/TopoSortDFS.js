@@ -121,6 +121,29 @@ TopoSortDFS.prototype.init = function (am, w, h, graphOpts) {
   // Setup called in base class init function
 };
 
+TopoSortDFS.prototype.beginTopoSortAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, {
+    source: "TopoSortDFS",
+    operation,
+    ...meta,
+  });
+};
+
+TopoSortDFS.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "TopoSortDFS",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+TopoSortDFS.prototype.finishTopoSortAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 TopoSortDFS.prototype.setup = function () {
   TopoSortDFS.superclass.setup.call(this);
   this.animationManager.setAllLayers([0, this.currentLayer]);
@@ -182,6 +205,9 @@ TopoSortDFS.prototype.doTopoSort = function () {
 TopoSortDFS.prototype.doTopoSortAction = function (ignored) {
   this.visited = new Array(this.size);
   this.commands = new Array();
+  this.beginTopoSortAnimation("topoSort", "topological sort", {
+    tags: ["graph", "topological-sort"],
+  });
   this.topoOrderArrayL = new Array();
   this.topoOrderArrayAL = new Array();
   this.topoOrderArrayAM = new Array();
@@ -196,6 +222,9 @@ TopoSortDFS.prototype.doTopoSortAction = function (ignored) {
 
   this.cmd("SetMessage", "Run DFS and build topological order.");
   this.cmd("Step");
+  this.markAnimationStep("initialize topological order", {
+    tags: ["initialize"],
+  });
 
   var headerID = this.nextIndex++;
   this.messageID.push(headerID);
@@ -239,6 +268,10 @@ TopoSortDFS.prototype.doTopoSortAction = function (ignored) {
         this.callStackDepth = 0;
         this.stackRowCount = 0;
       }
+      this.markAnimationStep("start dfs root " + vertex, {
+        vertex,
+        tags: ["dfs", "root"],
+      });
       this.cmd("SetMessage", "Start DFS from vertex " + vertex + ".");
       this.cmd("Step");
       this.cmd(
@@ -274,7 +307,13 @@ TopoSortDFS.prototype.doTopoSortAction = function (ignored) {
     }
   }
 
-  return this.commands;
+  this.beginBlock("topological sort complete", {
+    source: "TopoSortDFS",
+    operation: this.currentAnimationOperation,
+    tags: ["complete"],
+  });
+  this.cmd("SetMessage", "Topological sort complete.");
+  return this.finishTopoSortAnimation();
 };
 
 TopoSortDFS.prototype.setup_large = function () {
@@ -305,6 +344,10 @@ TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
   this.stackLabelIDs.push(stackLabelID);
   this.cmd("CreateLabel", stackLabelID, "DFS(" + String(startVertex) + ")", this.stackBaseX + indentDepth * this.stackIndent, this.stackSectionY + this.stackRowCount * this.stackLineHeight);
   this.stackRowCount++;
+  this.markAnimationStep("visit " + startVertex, {
+    vertex: startVertex,
+    tags: ["visit"],
+  });
   this.cmd("SetMessage", "First visit to " + String(startVertex) + ".");
   this.cmd("Step");
   this.cmd("SetMessage", "DFS(" + String(startVertex) + ")");
@@ -330,6 +373,11 @@ TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
     this.cmd("Step");
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[startVertex][neighbor] > 0) {
+        this.markAnimationStep("check edge " + startVertex + " -> " + neighbor, {
+          from: startVertex,
+          to: neighbor,
+          tags: ["edge"],
+        });
         this.highlightEdge(startVertex, neighbor, 1);
         if (this.visited[neighbor]) {
           this.cmd("SetMessage", "Neighbor " + String(neighbor) + " already visited; skip.");
@@ -343,6 +391,11 @@ TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
         }
 
         if (!this.visited[neighbor]) {
+          this.markAnimationStep("recurse " + startVertex + " -> " + neighbor, {
+            from: startVertex,
+            to: neighbor,
+            tags: ["dfs", "recurse"],
+          });
           this.cmd(
             "Disconnect",
             this.circleID[startVertex],
@@ -378,6 +431,11 @@ TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
 
           this.cmd("Step");
           this.dfsVisit(neighbor, messageX + 10, printCCNum);
+          this.markAnimationStep("return to " + startVertex, {
+            from: neighbor,
+            to: startVertex,
+            tags: ["dfs", "return"],
+          });
           this.cmd("SetMessage", "Return from DFS(" + String(neighbor) + ")");
 
           this.cmd(
@@ -405,6 +463,10 @@ TopoSortDFS.prototype.dfsVisit = function (startVertex, messageX, printCCNum) {
     }
 
     this.f_times[startVertex] = this.currentTime++;
+    this.markAnimationStep("finish " + startVertex, {
+      vertex: startVertex,
+      tags: ["finish"],
+    });
     this.cmd("CreateLabel", this.f_timesID_L[startVertex], "f = " + String(this.f_times[startVertex]), this.x_pos_logical[startVertex] - 44, this.y_pos_logical[startVertex] + 14);
     this.cmd(
       "CreateLabel",

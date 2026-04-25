@@ -210,6 +210,25 @@ StackArray.prototype.reset = function () {
   this.nextIndex = this.initialIndex;
 };
 
+StackArray.prototype.beginStackArrayAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "StackArray", operation, ...meta });
+};
+
+StackArray.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "StackArray",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+StackArray.prototype.finishStackArrayAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 StackArray.prototype.pushCallback = function (event) {
   if (this.inputField.value !== "") {
     var pushVal = this.inputField.value;
@@ -231,12 +250,14 @@ StackArray.prototype.peekCallback = function (event) {
 };
 
 StackArray.prototype.push = function (elemToPush) {
-  this.commands = new Array();
+  this.beginStackArrayAnimation("push", `push ${elemToPush}`, {
+    tags: ["stack", "push"],
+  });
 
   if (this.top >= SIZE) {
     this.cmd("SetMessage", "Top == size. Stack is full. Cannot push.");
-    this.cmd("Step");
-    return this.commands;
+    this.markAnimationStep("stack full", { tags: ["stack", "push", "full"] });
+    return this.finishStackArrayAnimation();
   }
 
   var labPushValID = this.nextIndex++;
@@ -252,7 +273,10 @@ StackArray.prototype.push = function (elemToPush) {
     STACK_ELEMENT_Y,
   );
 
-  this.cmd("Step");
+  this.markAnimationStep(`stage ${elemToPush}`, {
+    tags: ["stack", "push", "stage"],
+    focusNodeId: labPushValID,
+  });
   this.cmd("SetMessage", "Top gives next available location.");
   this.cmd(
     "CreateHighlightCircle",
@@ -261,17 +285,25 @@ StackArray.prototype.push = function (elemToPush) {
     TOP_POS_X,
     TOP_POS_Y,
   );
-  this.cmd("Step");
+  this.markAnimationStep(`identify slot ${this.top}`, {
+    tags: ["stack", "push", "slot"],
+  });
 
   var xpos = (this.top % ARRAY_ELEMS_PER_LINE) * ARRAY_ELEM_WIDTH + ARRAY_START_X;
   var ypos =
     Math.floor(this.top / ARRAY_ELEMS_PER_LINE) * ARRAY_LINE_SPACING + ARRAY_START_Y;
 
   this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT);
-  this.cmd("Step");
+  this.markAnimationStep(`move to slot ${this.top}`, {
+    tags: ["stack", "push", "move"],
+    focusNodeId: this.arrayID[this.top],
+  });
 
   this.cmd("Move", labPushValID, xpos, ypos);
-  this.cmd("Step");
+  this.markAnimationStep(`place ${elemToPush} at ${this.top}`, {
+    tags: ["stack", "push", "place"],
+    focusNodeId: this.arrayID[this.top],
+  });
 
   this.cmd("Settext", this.arrayID[this.top], elemToPush);
   this.cmd("Delete", labPushValID);
@@ -279,23 +311,29 @@ StackArray.prototype.push = function (elemToPush) {
 
   this.cmd("SetHighlight", this.topID, 1);
   this.cmd("SetMessage", "Advance top to next location.");
-  this.cmd("Step");
+  this.markAnimationStep("advance top pointer", {
+    tags: ["stack", "push", "top-pointer"],
+  });
   this.top = this.top + 1;
   this.cmd("SetText", this.topID, this.top);
-  this.cmd("Step");
+  this.markAnimationStep("push complete", {
+    tags: ["stack", "push", "complete"],
+  });
   this.cmd("SetHighlight", this.topID, 0);
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishStackArrayAnimation();
 };
 
 StackArray.prototype.pop = function (ignored) {
-  this.commands = new Array();
+  this.beginStackArrayAnimation("pop", "pop", {
+    tags: ["stack", "pop"],
+  });
 
   if (this.top <= 0) {
     this.cmd("SetMessage", "Top == 0. Stack is empty.");
-    this.cmd("Step");
-    return this.commands;
+    this.markAnimationStep("stack empty", { tags: ["stack", "pop", "empty"] });
+    return this.finishStackArrayAnimation();
   }
 
   var labPopValID = this.nextIndex++;
@@ -304,10 +342,14 @@ StackArray.prototype.pop = function (ignored) {
 
   this.cmd("SetHighlight", this.topID, 1);
   this.cmd("SetMessage", "Decrement top to previous location.");
-  this.cmd("Step");
+  this.markAnimationStep("decrement top pointer", {
+    tags: ["stack", "pop", "top-pointer"],
+  });
   this.top = this.top - 1;
   this.cmd("SetText", this.topID, this.top);
-  this.cmd("Step");
+  this.markAnimationStep(`identify slot ${this.top}`, {
+    tags: ["stack", "pop", "slot"],
+  });
   this.cmd("SetHighlight", this.topID, 0);
 
   this.cmd(
@@ -318,7 +360,10 @@ StackArray.prototype.pop = function (ignored) {
     TOP_POS_Y,
   );
   this.cmd("SetMessage", "Top gives location of last value.");
-  this.cmd("Step");
+  this.markAnimationStep(`move to slot ${this.top}`, {
+    tags: ["stack", "pop", "move"],
+    focusNodeId: this.arrayID[this.top],
+  });
 
   var xpos = (this.top % ARRAY_ELEMS_PER_LINE) * ARRAY_ELEM_WIDTH + ARRAY_START_X;
   var ypos =
@@ -333,22 +378,27 @@ StackArray.prototype.pop = function (ignored) {
   this.cmd("Settext", this.arrayID[this.top], "");
   this.cmd("Move", labPopValID, STACK_ELEMENT_X, STACK_ELEMENT_Y);
   this.cmd("SetMessage", `Pop ${poppedVal}`);
-  this.cmd("Step");
+  this.markAnimationStep(`extract ${poppedVal}`, {
+    tags: ["stack", "pop", "extract"],
+    focusNodeId: this.arrayID[this.top],
+  });
 
   this.cmd("Delete", labPopValID);
   this.cmd("SetText", this.leftoverLabelID, "Popped Value: " + poppedVal);
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishStackArrayAnimation();
 };
 
 StackArray.prototype.peek = function (ignored) {
-  this.commands = new Array();
+  this.beginStackArrayAnimation("peek", "peek", {
+    tags: ["stack", "peek"],
+  });
 
   if (this.top <= 0) {
     this.cmd("SetMessage", "Top == 0. Stack is empty.");
-    this.cmd("Step");
-    return this.commands;
+    this.markAnimationStep("stack empty", { tags: ["stack", "peek", "empty"] });
+    return this.finishStackArrayAnimation();
   }
 
   const labPeekValID = this.nextIndex++;
@@ -357,7 +407,7 @@ StackArray.prototype.peek = function (ignored) {
 
   this.cmd("SetText", this.leftoverLabelID, "");
   this.cmd("SetMessage", "Peek at top value");
-  this.cmd("Step");
+  this.markAnimationStep("start peek", { tags: ["stack", "peek", "start"] });
 
   this.cmd(
     "CreateHighlightCircle",
@@ -367,7 +417,10 @@ StackArray.prototype.peek = function (ignored) {
     TOP_POS_Y,
   );
   this.cmd("SetMessage", "Top-1 gives location of last value.");
-  this.cmd("Step");
+  this.markAnimationStep(`inspect slot ${peekIndex}`, {
+    tags: ["stack", "peek", "inspect"],
+    focusNodeId: this.arrayID[peekIndex],
+  });
 
   const xpos = (peekIndex % ARRAY_ELEMS_PER_LINE) * ARRAY_ELEM_WIDTH + ARRAY_START_X;
   const ypos =
@@ -380,17 +433,22 @@ StackArray.prototype.peek = function (ignored) {
   this.cmd("CreateLabel", labPeekValID, peekedVal, xpos, ypos);
   this.cmd("Move", labPeekValID, STACK_ELEMENT_X, STACK_ELEMENT_Y);
   this.cmd("SetMessage", "Peeked Value: " + peekedVal);
-  this.cmd("Step");
+  this.markAnimationStep(`peek ${peekedVal}`, {
+    tags: ["stack", "peek", "value"],
+    focusNodeId: this.arrayID[peekIndex],
+  });
 
   this.cmd("Delete", labPeekValID);
   this.cmd("SetText", this.leftoverLabelID, "Peeked Value: " + peekedVal);
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishStackArrayAnimation();
 };
 
 StackArray.prototype.clearAll = function () {
-  this.commands = new Array();
+  this.beginStackArrayAnimation("clear", "clear stack", {
+    tags: ["stack", "clear"],
+  });
   this.cmd("SetText", this.leftoverLabelID, "");
   this.cmd("SetMessage", "");
 
@@ -400,5 +458,8 @@ StackArray.prototype.clearAll = function () {
 
   this.top = 0;
   this.cmd("SetText", this.topID, "0");
-  return this.commands;
+  this.markAnimationStep("stack cleared", {
+    tags: ["stack", "clear", "complete"],
+  });
+  return this.finishStackArrayAnimation();
 };

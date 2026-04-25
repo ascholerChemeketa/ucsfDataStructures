@@ -144,6 +144,28 @@ ClosedHash.prototype.init = function (am, w, h) {
   this.setup();
 };
 
+ClosedHash.prototype.beginClosedHashAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "ClosedHash", operation, ...meta });
+};
+
+ClosedHash.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "ClosedHash",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+ClosedHash.prototype.finishClosedHashAnimation = function () {
+  return this.finishAnimation();
+};
+
 ClosedHash.prototype.addControls = function () {
   ClosedHash.superclass.addControls.call(this);
 
@@ -191,10 +213,12 @@ ClosedHash.prototype.doGrow = function (newSize) {
 };
 
 ClosedHash.prototype.growTable = function (newSize) {
-  this.commands = [];
+  this.beginClosedHashAnimation("grow", `grow table to ${newSize || 16}`, {
+    tags: ["grow"],
+  });
 
   if (this.hasGrown) {
-    return this.commands;
+    return this.finishClosedHashAnimation();
   }
 
   const targetSize = newSize || 16;
@@ -222,7 +246,9 @@ ClosedHash.prototype.growTable = function (newSize) {
     "SetMessage",
     `Grow table: expand to ${targetSize}`,
   );
-  this.cmd("Step");
+  this.markAnimationStep("start grow", {
+    tags: ["grow", "start"],
+  });
 
   // Create the staging array boxes/indices.
   for (let i = 0; i < oldSize; i++) {
@@ -369,7 +395,9 @@ ClosedHash.prototype.growTable = function (newSize) {
   }
 
   this.cmd("SetMessage", `Created new table of size ${targetSize}`);
-  this.cmd("Step");
+  this.markAnimationStep("create grown table", {
+    tags: ["grow", "create-table"],
+  });
 
   // Reinsert from the staging list, one-by-one.
   for (let k = 0; k < oldSize; k++) {
@@ -384,7 +412,9 @@ ClosedHash.prototype.growTable = function (newSize) {
     } else {
       this.cmd("SetMessage", `Ignoring staging slot ${fromSlot}`);
     }
-    this.cmd("Step");
+    this.markAnimationStep(`stage slot ${fromSlot}`, {
+      tags: ["grow", "stage"],
+    });
 
     if(isValid) {
       this.cmd(
@@ -396,7 +426,9 @@ ClosedHash.prototype.growTable = function (newSize) {
       );
       this.cmd("SetText", stagingRects[fromSlot], "");
       
-      this.cmd("Step");
+      this.markAnimationStep(`lift ${value} from staging`, {
+        tags: ["grow", "reinsert"],
+      });
 
       // Hash + probing are animated inside doHash/getEmptyIndex.
       let index = this.doHash(value);
@@ -410,7 +442,9 @@ ClosedHash.prototype.growTable = function (newSize) {
           this.indexYPos[index] - ARRAY_ELEM_HEIGHT,
         );
         this.cmd("SetMessage", `Reinsert ${value} at index ${index}`);
-        this.cmd("Step");
+        this.markAnimationStep(`reinsert ${value} at ${index}`, {
+          tags: ["grow", "reinsert"],
+        });
         this.cmd("Delete", labelID);
         this.cmd("SetText", this.hashTableVisual[index], value);
         this.hashTableValues[index] = value;
@@ -419,7 +453,9 @@ ClosedHash.prototype.growTable = function (newSize) {
       } else {
         // Shouldn't happen with an empty table, but keep a graceful path.
         this.cmd("SetMessage", `Table full while reinserting ${value}`);
-        this.cmd("Step");
+        this.markAnimationStep(`reinsert ${value} failed`, {
+          tags: ["grow", "error"],
+        });
         this.cmd("Delete", labelID);
       }
     }
@@ -428,7 +464,9 @@ ClosedHash.prototype.growTable = function (newSize) {
   }
 
   this.cmd("SetMessage", "Grow complete");
-  this.cmd("Step");
+  this.markAnimationStep("grow complete", {
+    tags: ["grow", "complete"],
+  });
 
   this.hasGrown = true;
   if (this.growButton) {
@@ -441,7 +479,7 @@ ClosedHash.prototype.growTable = function (newSize) {
     this.cmd("Delete", stagingIndices[i]);
   }
 
-  return this.commands;
+  return this.finishClosedHashAnimation();
 };
 
 ClosedHash.prototype.changeProbeType = function (newProbingType) {
@@ -494,7 +532,9 @@ ClosedHash.prototype.linearProbeCallback = function (event) {
 };
 
 ClosedHash.prototype.insertElement = function (elem) {
-  this.commands = new Array();
+  this.beginClosedHashAnimation("insert", `insert ${elem}`, {
+    tags: ["insert"],
+  });
   // this.cmd("SetText", this.ExplainLabel, "Inserting element: " + String(elem));
   this.cmd("SetMessage", "Inserting element: " + String(elem));
   var index = this.doHash(elem);
@@ -512,14 +552,16 @@ ClosedHash.prototype.insertElement = function (elem) {
       this.indexYPos[index] - ARRAY_ELEM_HEIGHT,
     );
     this.cmd("SetMessage", `Insert at index ${index}`);
-    this.cmd("Step");
+    this.markAnimationStep(`insert at ${index}`, {
+      tags: ["insert", "place"],
+    });
     this.cmd("Delete", labID);
     this.cmd("SetText", this.hashTableVisual[index], elem);
     this.hashTableValues[index] = elem;
     this.empty[index] = false;
     this.deleted[index] = false;
   }
-  return this.commands;
+  return this.finishClosedHashAnimation();
 };
 
 ClosedHash.prototype.resetSkipDist = function (elem, labelID) {
@@ -545,6 +587,11 @@ ClosedHash.prototype.resetSkipDist = function (elem, labelID) {
       String(skipVal)
       );
    this.cmd("Step");
+   if (this.pendingBlock) {
+     this.markAnimationStep("compute secondary hash", {
+       tags: ["probe", "double-hash"],
+     });
+   }
   this.skipDist[0] = 0;
   for (var i = 1; i < this.table_size; i++) {
     this.skipDist[i] = this.skipDist[i - 1] + skipVal;
@@ -567,7 +614,9 @@ ClosedHash.prototype.getEmptyIndex = function (index, elem) {
         this.cmd("SetMessage", `Probe number ${i}. Advance ${moveDist} to ${candidateIndex} and probe for empty`);
       }
     }
-    this.cmd("Step");
+    this.markAnimationStep(`probe slot ${candidateIndex}`, {
+      tags: ["probe", "empty-check"],
+    });
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 0);
     if (this.empty[candidateIndex]) {
       foundIndex = candidateIndex;
@@ -595,7 +644,9 @@ ClosedHash.prototype.getElemIndex = function (index, elem) {
     var candidateIndex = (index + this.skipDist[i]) % this.table_size;
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 1);
     this.cmd("SetMessage", `Probe slot ${candidateIndex} for element ${elem}`);
-    this.cmd("Step");
+    this.markAnimationStep(`probe slot ${candidateIndex} for ${elem}`, {
+      tags: ["probe", "find-check"],
+    });
     this.cmd("SetHighlight", this.hashTableVisual[candidateIndex], 0);
     if (
       !this.empty[candidateIndex] &&
@@ -614,7 +665,9 @@ ClosedHash.prototype.getElemIndex = function (index, elem) {
 };
 
 ClosedHash.prototype.deleteElement = function (elem) {
-  this.commands = new Array();
+  this.beginClosedHashAnimation("delete", `delete ${elem}`, {
+    tags: ["delete"],
+  });
   // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem);
   this.cmd("SetMessage", "Deleting element: " + elem);
   var index = this.doHash(elem);
@@ -622,19 +675,31 @@ ClosedHash.prototype.deleteElement = function (elem) {
   index = this.getElemIndex(index, elem);
 
   if (index > 0) {
+    this.beginBlock(`delete ${elem} at ${index}`, {
+      source: "ClosedHash",
+      operation: this.currentAnimationOperation,
+      tags: ["delete", "tombstone"],
+    });
     // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem + "  Adding tombstone.");
     this.cmd("SetMessage", "Deleting element: " + elem + "  Adding tombstone.");
     this.empty[index] = true;
     this.deleted[index] = true;
     this.cmd("SetText", this.hashTableVisual[index], "<deleted>");
   } else {
+    this.beginBlock(`delete ${elem} not found`, {
+      source: "ClosedHash",
+      operation: this.currentAnimationOperation,
+      tags: ["delete", "not-found"],
+    });
     // this.cmd("SetText", this.ExplainLabel, "Deleting element: " + elem + "  Element not in table");
     this.cmd("SetMessage", "Deleting element: " + elem + "  Element not in table");
   }
-  return this.commands;
+  return this.finishClosedHashAnimation();
 };
 ClosedHash.prototype.findElement = function (elem) {
-  this.commands = new Array();
+  this.beginClosedHashAnimation("find", `find ${elem}`, {
+    tags: ["search", "find"],
+  });
 
   // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem);
   this.cmd("SetMessage", "Finding Element: " + elem);
@@ -642,13 +707,23 @@ ClosedHash.prototype.findElement = function (elem) {
 
   var found = this.getElemIndex(index, elem) != -1;
   if (found) {
+    this.beginBlock(`found ${elem}`, {
+      source: "ClosedHash",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "found"],
+    });
     // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem + "  Found!");
     this.cmd("SetMessage", "Finding Element: " + elem + "  Found!");
   } else {
+    this.beginBlock(`value ${elem} not found`, {
+      source: "ClosedHash",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "not-found"],
+    });
     // this.cmd("SetText", this.ExplainLabel, "Finding Element: " + elem + "  Not Found!");
     this.cmd("SetMessage", "Finding Element: " + elem + "  Not Found!");
   }
-  return this.commands;
+  return this.finishClosedHashAnimation();
 };
 
 ClosedHash.prototype.setup = function () {

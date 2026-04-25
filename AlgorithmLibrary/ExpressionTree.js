@@ -145,6 +145,34 @@ ExpressionTree.prototype.init = function (am, w, h) {
   };
 };
 
+ExpressionTree.prototype.beginExpressionTreeAnimation = function (
+  operation,
+  label,
+  meta = {},
+) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "ExpressionTree", operation, ...meta });
+};
+
+ExpressionTree.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "ExpressionTree",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags)
+      ? stepMeta.tags
+      : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+ExpressionTree.prototype.finishExpressionTreeAnimation = function () {
+  return this.finishAnimation();
+};
+
 ExpressionTree.prototype.deleteTreeGraphicsRec = function (node, opts = {}) {
   if (!node) return;
   const doStep = opts.step !== false;
@@ -179,7 +207,7 @@ ExpressionTree.prototype.deleteTreeGraphicsRec = function (node, opts = {}) {
 };
 
 ExpressionTree.prototype.clearTree = function () {
-  this.commands = [];
+  this.beginExpressionTreeAnimation("clear", "clear tree", { tags: ["clear"] });
 
   // Remove any evaluation labels still present.
   if (Array.isArray(this.evalLabelIDs)) {
@@ -198,13 +226,13 @@ ExpressionTree.prototype.clearTree = function () {
 
   if (this.treeRoot) {
     this.cmd("SetMessage", "Clearing existing tree");
-    this.cmd("Step");
+    this.markAnimationStep("start clear", { tags: ["clear", "start"] });
     this.deleteTreeGraphicsRec(this.treeRoot);
     this.treeRoot = null;
     this.cmd("SetMessage", "");
   }
 
-  return this.commands;
+  return this.finishExpressionTreeAnimation();
 };
 
 ExpressionTree.prototype.resetPrintOutputLabel = function () {
@@ -300,23 +328,26 @@ ExpressionTree.prototype.evaluateCallback = function (event) {
 };
 
 ExpressionTree.prototype.buildTreeFromInfix = function (expr) {
-  this.commands = [];
+  this.beginExpressionTreeAnimation("build", "build from infix", {
+    expression: String(expr ?? ""),
+    tags: ["build", "infix"],
+  });
 
   let root;
   try {
     root = this.parseInfixExpression(expr);
   } catch (e) {
     this.cmd("SetMessage", `Invalid expression: ${e?.message ?? String(e)}`);
-    // this.cmd("Step");
     this.cmd("SetMessage", "");
-    return this.commands;
+    this.markAnimationStep("invalid infix expression", { tags: ["build", "invalid"] });
+    return this.finishExpressionTreeAnimation();
   }
 
   if (!root) {
     this.cmd("SetMessage", "No expression provided");
-    // this.cmd("Step");
     this.cmd("SetMessage", "");
-    return this.commands;
+    this.markAnimationStep("no expression provided", { tags: ["build", "empty"] });
+    return this.finishExpressionTreeAnimation();
   }
 
   // Delegate to buildTree for actual rendering/clearing behavior.
@@ -634,7 +665,9 @@ ExpressionTree.prototype.computeLayout = function (root) {
 };
 
 ExpressionTree.prototype.buildTree = function (root) {
-  this.commands = [];
+  this.beginExpressionTreeAnimation("build", "build expression tree", {
+    tags: ["build"],
+  });
 
   // If there is an existing tree, clear it first so repeated programmatic builds work.
   if (this.treeRoot) {
@@ -657,13 +690,14 @@ ExpressionTree.prototype.buildTree = function (root) {
     this.deleteTreeGraphicsRec(this.treeRoot, { step: false });
     this.treeRoot = null;
     this.cmd("SetMessage", "");
+    this.markAnimationStep("clear previous tree", { tags: ["build", "clear"] });
   }
 
   if (!root) {
     this.cmd("SetMessage", "No expression provided");
-    this.cmd("Step");
+    this.markAnimationStep("no expression provided", { tags: ["build", "empty"] });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishExpressionTreeAnimation();
   }
 
   this.treeRoot = root;
@@ -681,7 +715,10 @@ ExpressionTree.prototype.buildTree = function (root) {
     }
 
     this.cmd("SetMessage", `Create node ${node.label}`);
-    // this.cmd("Step");
+    this.markAnimationStep(`create node ${node.label}`, {
+      focusNodeId: id,
+      tags: ["build", "create"],
+    });
 
     if (node.children) {
       for (const child of node.children) {
@@ -692,20 +729,21 @@ ExpressionTree.prototype.buildTree = function (root) {
 
   build(root, null);
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishExpressionTreeAnimation();
 };
 
 ExpressionTree.prototype.printTree = function (order) {
-  this.commands = [];
-  this.printOutput = "";
-
   if (order == undefined) order = "In";
+  this.beginExpressionTreeAnimation("print", `print ${order} order`, {
+    tags: ["print", String(order).toLowerCase()],
+  });
+  this.printOutput = "";
 
   if (!this.treeRoot) {
     this.cmd("SetMessage", "Tree is empty");
-    this.cmd("Step");
+    this.markAnimationStep("tree empty", { tags: ["print", "empty"] });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishExpressionTreeAnimation();
   }
 
   this.resetPrintOutputLabel();
@@ -713,13 +751,21 @@ ExpressionTree.prototype.printTree = function (order) {
 
   this.cmd("SetMessage", "Starting from root");
   this.cmd("SetHighlight", this.treeRoot.graphicID, 1);
-  this.cmd("Step");
+  this.markAnimationStep("visit root", {
+    focusNodeId: this.treeRoot.graphicID,
+    tags: ["print", "visit"],
+  });
   this.cmd("SetHighlight", this.treeRoot.graphicID, 0);
 
   this.printTreeRec(this.treeRoot, order);
+  this.beginBlock("final print output", {
+    source: "ExpressionTree",
+    operation: this.currentAnimationOperation,
+    tags: ["print", "output"],
+  });
   this.cmd("SetText", this.printOutputLabelID, "Output: " + this.printOutput);
   this.cmd("SetMessage", "Final output:\n" + this.printOutput);
-  return this.commands;
+  return this.finishExpressionTreeAnimation();
 };
 
 ExpressionTree.prototype.printSelf = function (node) {
@@ -735,7 +781,10 @@ ExpressionTree.prototype.printSelf = function (node) {
     "SetMessage",
     "Print " + node.label + "\nCurrent output:\n" + this.printOutput,
   );
-  this.cmd("Step");
+  this.markAnimationStep(`print ${node.label}`, {
+    focusNodeId: node.graphicID,
+    tags: ["print", "output"],
+  });
 };
 
 ExpressionTree.prototype.printToken = function (token, message) {
@@ -748,7 +797,7 @@ ExpressionTree.prototype.printToken = function (token, message) {
     this.cmd("SetText", this.printOutputLabelID, "Output: " + this.printOutput);
   }
   this.cmd("SetMessage", message ?? ("Print " + token));
-  this.cmd("Step");
+  this.markAnimationStep(`print token ${token}`, { tags: ["print", "token"] });
 };
 
 ExpressionTree.prototype.printChild = function (node, child, childIndex) {
@@ -758,7 +807,10 @@ ExpressionTree.prototype.printChild = function (node, child, childIndex) {
       `${node.label} has child ${childIndex}, visit it...`,
     );
     this.cmd("SetEdgeHighlight", node.graphicID, child.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`${node.label}: visit child ${childIndex}`, {
+      focusNodeId: node.graphicID,
+      tags: ["print", "traverse"],
+    });
     this.cmd("SetEdgeHighlight", node.graphicID, child.graphicID, 0);
   }
 };
@@ -815,11 +867,16 @@ ExpressionTree.prototype.printTreeRec = function (node, order) {
 
   this.cmd("SetMessage", "Done with " + node.label + " return to parent");
   this.cmd("SetHighlight", node.graphicID, 0);
-  this.cmd("Step");
+  this.markAnimationStep(`finish ${node.label}`, {
+    focusNodeId: node.graphicID,
+    tags: ["print", "return"],
+  });
 };
 
 ExpressionTree.prototype.evaluateTree = function () {
-  this.commands = [];
+  this.beginExpressionTreeAnimation("evaluate", "evaluate expression tree", {
+    tags: ["evaluate"],
+  });
 
   // Clear previous evaluation labels (if any)
   if (Array.isArray(this.evalLabelIDs)) {
@@ -831,17 +888,23 @@ ExpressionTree.prototype.evaluateTree = function () {
 
   if (!this.treeRoot) {
     this.cmd("SetMessage", "No expression to evaluate");
-    this.cmd("Step");
+    this.markAnimationStep("no expression to evaluate", {
+      tags: ["evaluate", "empty"],
+    });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishExpressionTreeAnimation();
   }
 
   this.cmd("SetMessage", "Evaluate expression tree");
-  this.cmd("Step");
+  this.markAnimationStep("start evaluation", { tags: ["evaluate", "start"] });
 
   const value = this.evaluateRec(this.treeRoot);
+  this.beginBlock(`final result ${String(value)}`, {
+    source: "ExpressionTree",
+    operation: this.currentAnimationOperation,
+    tags: ["evaluate", "result"],
+  });
   this.cmd("SetMessage", `Final result: ${String(value)}`);
-  this.cmd("Step");
 
   // Remove computed node values when evaluation finishes.
   if (Array.isArray(this.evalLabelIDs)) {
@@ -851,7 +914,7 @@ ExpressionTree.prototype.evaluateTree = function () {
   }
   this.evalLabelIDs = [];
 
-  return this.commands;
+  return this.finishExpressionTreeAnimation();
 };
 
 ExpressionTree.prototype.isOperator = function (token) {
@@ -897,14 +960,19 @@ ExpressionTree.prototype.showEvalValue = function (node, value) {
 
 ExpressionTree.prototype.evaluateRec = function (node) {
   this.cmd("SetHighlight", node.graphicID, 1);
-  
-  this.cmd("Step");
+  this.markAnimationStep(`evaluate ${node.label}`, {
+    focusNodeId: node.graphicID,
+    tags: ["evaluate", "visit"],
+  });
 
   const children = Array.isArray(node.children) ? node.children : [];
 
   if (children.length !== 0) {
     this.cmd("SetMessage", `Operator node ${node.label}, needs to evaluate children first`);
-    this.cmd("Step");
+    this.markAnimationStep(`evaluate children of ${node.label}`, {
+      focusNodeId: node.graphicID,
+      tags: ["evaluate", "operator"],
+    });
   }
 
   // Postorder: evaluate children first
@@ -913,7 +981,10 @@ ExpressionTree.prototype.evaluateRec = function (node) {
     const child = children[i];
     this.cmd("SetMessage", `Visit ${i == 0 ? "left" : "right"} child of ${node.label}`);
     this.cmd("SetEdgeHighlight", node.graphicID, child.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`visit child ${i} of ${node.label}`, {
+      focusNodeId: child.graphicID,
+      tags: ["evaluate", "traverse"],
+    });
     this.cmd("SetEdgeHighlight", node.graphicID, child.graphicID, 0);
     this.cmd("SetHighlight", node.graphicID, 0);
 
@@ -927,25 +998,37 @@ ExpressionTree.prototype.evaluateRec = function (node) {
   if (children.length === 0 && !this.isOperator(node.label)) {
     value = Number(node.label);
     this.cmd("SetMessage", `Leaf evaluates to ${String(value)}`);
-    this.cmd("Step");
+    this.markAnimationStep(`leaf ${node.label} = ${String(value)}`, {
+      focusNodeId: node.graphicID,
+      tags: ["evaluate", "leaf"],
+    });
   } else if (this.isOperator(node.label)) {
     value = this.applyOperator(node.label, childValues);
     this.cmd(
       "SetMessage",
       `Compute ${node.label}(${childValues.map((v) => String(v)).join(", ")}) = ${String(value)}`,
     );
-    this.cmd("Step");
+    this.markAnimationStep(`compute ${node.label}`, {
+      focusNodeId: node.graphicID,
+      tags: ["evaluate", "compute"],
+    });
   } else {
     // Not a number and not an operator.
     value = NaN;
     this.cmd("SetMessage", `Cannot evaluate token '${node.label}'`);
-    this.cmd("Step");
+    this.markAnimationStep(`cannot evaluate ${node.label}`, {
+      focusNodeId: node.graphicID,
+      tags: ["evaluate", "invalid"],
+    });
   }
 
   this.showEvalValue(node, value);
   this.cmd("SetMessage", `Value at ${node.label}: ${String(value)}`);
   this.cmd("SetHighlight", node.graphicID, 0);
-  this.cmd("Step");
+  this.markAnimationStep(`value at ${node.label}`, {
+    focusNodeId: node.graphicID,
+    tags: ["evaluate", "value"],
+  });
 
   return value;
 };

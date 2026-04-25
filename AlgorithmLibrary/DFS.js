@@ -145,6 +145,28 @@ DFS.prototype.init = function (am, w, h, graphOpts) {
   // Setup called in base class constructor
 };
 
+DFS.prototype.beginDFSAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "DFS", operation, ...meta });
+};
+
+DFS.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "DFS",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+DFS.prototype.finishDFSAnimation = function () {
+  return this.finishAnimation();
+};
+
 DFS.prototype.dfsModeChangedCallback = function (iterativeMode) {
   if (this.useIterative !== iterativeMode) {
     this.useIterative = iterativeMode;
@@ -294,7 +316,9 @@ DFS.prototype.doDFS = function (startVetex) {
 DFS.prototype.doDFSRecursive = function (startVetex) {
   this.visited = new Array(this.size);
   this.parent = new Array(this.size);
-  this.commands = new Array();
+  this.beginDFSAnimation("searchRecursive", `dfs recursive from ${startVetex}`, {
+    tags: ["search", "dfs", "recursive"],
+  });
   if (this.messageID != null) {
     for (var i = 0; i < this.messageID.length; i++) {
       this.cmd("Delete", this.messageID[i]);
@@ -344,6 +368,11 @@ DFS.prototype.doDFSRecursive = function (startVetex) {
   this.cmd("Delete", this.highlightCircleAL);
   this.cmd("Delete", this.highlightCircleAM);
 
+  this.beginBlock("dfs complete", {
+    source: "DFS",
+    operation: this.currentAnimationOperation,
+    tags: ["search", "complete"],
+  });
   this.cmd(
     "SetMessage",
     "DFS complete. Search tree highlighted.",
@@ -354,14 +383,15 @@ DFS.prototype.doDFSRecursive = function (startVetex) {
       this.highlightEdge(this.parent[i], i, 1);
     }
   }
-  this.cmd("Step");
-  return this.commands;
+  return this.finishDFSAnimation();
 };
 
 DFS.prototype.doDFSIterative = function (startVetex) {
   this.visited = new Array(this.size);
   this.parent = new Array(this.size);
-  this.commands = new Array();
+  this.beginDFSAnimation("searchIterative", `dfs iterative from ${startVetex}`, {
+    tags: ["search", "dfs", "iterative"],
+  });
 
   if (this.messageID != null) {
     for (var i = 0; i < this.messageID.length; i++) {
@@ -449,7 +479,10 @@ DFS.prototype.doDFSIterative = function (startVetex) {
   this.cmd("SetLayer", this.highlightCircleAM, 3);
 
   this.cmd("SetMessage", `Initialize stack with ${vertex}.`);
-  this.cmd("Step");
+  this.markAnimationStep(`initialize stack with ${vertex}`, {
+    focusNodeId: this.circleID[vertex],
+    tags: ["search", "stack", "init"],
+  });
 
   while (stackSize > 0) {
     // pop()
@@ -458,11 +491,17 @@ DFS.prototype.doDFSIterative = function (startVetex) {
     this.cmd("SetText", stackLabelID[stackSize], "");
     this.cmd("SetAlpha", stackLabelID[stackSize], 0);
     this.cmd("SetMessage", `Pop ${currentVertex} from stack.`);
-    this.cmd("Step");
+    this.markAnimationStep(`pop ${currentVertex}`, {
+      focusNodeId: this.circleID[currentVertex],
+      tags: ["search", "stack", "pop"],
+    });
 
     if (this.visited[currentVertex]) {
       this.cmd("SetMessage", `${currentVertex} is already visited; skip.`);
-      this.cmd("Step");
+      this.markAnimationStep(`skip visited ${currentVertex}`, {
+        focusNodeId: this.circleID[currentVertex],
+        tags: ["search", "skip"],
+      });
       continue;
     }
 
@@ -498,7 +537,10 @@ DFS.prototype.doDFSIterative = function (startVetex) {
       this.adj_matrix_y_start + currentVertex * this.adj_matrix_height,
     );
     this.cmd("SetMessage", `Visit ${currentVertex}; scan neighbors.`);
-    this.cmd("Step");
+    this.markAnimationStep(`visit ${currentVertex}`, {
+      focusNodeId: this.circleID[currentVertex],
+      tags: ["search", "visit"],
+    });
 
     for (var neighbor = this.size - 1; neighbor >= 0; neighbor--) {
 
@@ -519,7 +561,10 @@ DFS.prototype.doDFSIterative = function (startVetex) {
             `Explore edge ${currentVertex} -> ${neighbor}; neighbor unvisited (push).`,
           );
         }
-        this.cmd("Step");
+        this.markAnimationStep(`consider edge ${currentVertex} -> ${neighbor}`, {
+          focusNodeId: this.circleID[neighbor],
+          tags: ["search", "edge"],
+        });
 
         if (!this.visited[neighbor]) {
           // push(neighbor) and set parent at push time
@@ -548,7 +593,10 @@ DFS.prototype.doDFSIterative = function (startVetex) {
             "SetMessage",
             `Discover ${neighbor}; set parent to ${currentVertex} and push ${neighbor} onto stack (edge locks when ${neighbor} is visited).`,
           );
-          this.cmd("Step");
+          this.markAnimationStep(`push ${neighbor}`, {
+            focusNodeId: this.circleID[neighbor],
+            tags: ["search", "stack", "push"],
+          });
         } else {
           this.applyEdgeVisualState(
             currentVertex,
@@ -561,30 +609,39 @@ DFS.prototype.doDFSIterative = function (startVetex) {
             `Neighbor ${neighbor} already visited; skip edge ${currentVertex} -> ${neighbor}.`,
           );
         }
-        this.cmd("Step");
 
         this.clearAdjacencyRepEdgeHighlight(currentVertex, neighbor);
         this.cmd("SetHighlight", this.visitedID[neighbor], 0);
-        this.cmd("Step");
+        this.markAnimationStep(`finish edge ${currentVertex} -> ${neighbor}`, {
+          focusNodeId: this.circleID[currentVertex],
+          tags: ["search", "edge", "finish"],
+        });
       }
     }
 
     this.cmd("SetMessage", `Finished scanning neighbors of ${currentVertex}.`);
-    this.cmd("Step");
+    this.markAnimationStep(`finish ${currentVertex}`, {
+      focusNodeId: this.circleID[currentVertex],
+      tags: ["search", "finish"],
+    });
   }
 
   this.cmd("Delete", this.highlightCircleL);
   this.cmd("Delete", this.highlightCircleAL);
   this.cmd("Delete", this.highlightCircleAM);
 
+  this.beginBlock("dfs complete", {
+    source: "DFS",
+    operation: this.currentAnimationOperation,
+    tags: ["search", "complete"],
+  });
   this.cmd("SetMessage", "DFS complete. Search tree highlighted.");
   for (i = 0; i < this.size; i++) {
     if (this.parent[i] >= 0) {
       this.applyEdgeVisualState(this.parent[i], i, SEARCH_TREE_FINAL_COLOR, true);
     }
   }
-  this.cmd("Step");
-  return this.commands;
+  return this.finishDFSAnimation();
 };
 
 DFS.prototype.dfsVisit = function (startVertex, messageX) {
@@ -605,7 +662,10 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
     this.visited[startVertex] = true;
     this.cmd("SetText", this.visitedID[startVertex], "T");
     this.cmd("SetMessage", `Visit ${startVertex}; mark visited.`);
-    this.cmd("Step");
+    this.markAnimationStep(`visit ${startVertex}`, {
+      focusNodeId: this.circleID[startVertex],
+      tags: ["search", "visit"],
+    });
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[startVertex][neighbor] > 0) {
         const savedEdgeColor = this.edgeColorState[startVertex][neighbor];
@@ -635,7 +695,10 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
             `Explore edge ${startVertex} -> ${neighbor}; neighbor unvisited (recurse).`,
           );
         }
-        this.cmd("Step");
+        this.markAnimationStep(`consider edge ${startVertex} -> ${neighbor}`, {
+          focusNodeId: this.circleID[neighbor],
+          tags: ["search", "edge"],
+        });
 
         if (!this.visited[neighbor]) {
           // Selected edge: restore normal color but keep highlighted.
@@ -665,7 +728,10 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
             "SetMessage",
             `Discover ${neighbor}; set parent to ${startVertex} and recurse into DFS(${neighbor}).`,
           );
-          this.cmd("Step");
+          this.markAnimationStep(`recurse to ${neighbor}`, {
+            focusNodeId: this.circleID[neighbor],
+            tags: ["search", "recurse"],
+          });
           this.dfsVisit(neighbor, messageX + 10);
           // nextMessage = this.nextIndex;
           // this.cmd(
@@ -700,7 +766,10 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
             "SetMessage",
             `Returned to DFS(${startVertex}) from DFS(${neighbor}); continue scanning neighbors.`,
           );
-          this.cmd("Step");
+          this.markAnimationStep(`return to ${startVertex}`, {
+            focusNodeId: this.circleID[startVertex],
+            tags: ["search", "return"],
+          });
           // this.cmd("Delete", nextMessage);
         } else {
           // Not selected edge: restore prior visual state.
@@ -711,18 +780,19 @@ DFS.prototype.dfsVisit = function (startVertex, messageX) {
             savedEdgeHighlight,
           );
         }
-        this.cmd("Step");
 
         // Keep list/matrix edge highlighting temporary per check.
         this.clearAdjacencyRepEdgeHighlight(startVertex, neighbor);
         this.cmd("SetHighlight", this.visitedID[neighbor], 0);
-        this.cmd("Step");
 
         this.cmd(
           "SetMessage",
           `Finished processing edge ${startVertex} -> ${neighbor}.`,
         );
-        this.cmd("Step");
+        this.markAnimationStep(`finish edge ${startVertex} -> ${neighbor}`, {
+          focusNodeId: this.circleID[startVertex],
+          tags: ["search", "edge", "finish"],
+        });
       }
     }
   }

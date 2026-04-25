@@ -148,6 +148,25 @@ SPLAYTREE.prototype.reset = function () {
   this.treeRoot = null;
 };
 
+SPLAYTREE.prototype.beginSplayAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "SplayTree", operation, ...meta });
+};
+
+SPLAYTREE.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "SplayTree",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+SPLAYTREE.prototype.finishSplayAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 SPLAYTREE.prototype.insertCallback = function (event) {
   var insertedValue = this.inputField.value;
   // Get text value
@@ -173,9 +192,11 @@ SPLAYTREE.prototype.clearCallback = function (event) {
 };
 
 SPLAYTREE.prototype.clearData = function () {
-  if (this.treeRoot == null) return;
-
-  this.commands = [];
+  this.beginSplayAnimation("clear", "clear tree", { tags: ["clear"] });
+  if (this.treeRoot == null) {
+    this.markAnimationStep("tree already empty", { tags: ["clear", "empty"] });
+    return this.finishSplayAnimation();
+  }
 
   function clearTree(tree, handler) {
     if (tree != null) {
@@ -192,7 +213,8 @@ SPLAYTREE.prototype.clearData = function () {
   clearTree(this.treeRoot, this);
   this.treeRoot = null;
   this.cmd("SetMessage", "");
-  return this.commands;
+  this.markAnimationStep("tree cleared", { tags: ["clear", "complete"] });
+  return this.finishSplayAnimation();
 };
 
 SPLAYTREE.prototype.insertRandomCallback = function (event) {
@@ -269,7 +291,7 @@ SPLAYTREE.prototype.printCallback = function (event) {
 };
 
 SPLAYTREE.prototype.printTree = function (unused) {
-  this.commands = [];
+  this.beginSplayAnimation("print", "print tree", { tags: ["print", "in"] });
 
   if (this.treeRoot != null) {
     this.highlightID = this.nextIndex++;
@@ -285,14 +307,16 @@ SPLAYTREE.prototype.printTree = function (unused) {
     this.yPosOfNextLabel = this.first_print_pos_y;
     this.printTreeRec(this.treeRoot);
     this.cmd("Delete", this.highlightID);
-    this.cmd("Step");
+    this.markAnimationStep("finish print", { tags: ["print", "complete"] });
 
     for (var i = firstLabel; i < this.nextIndex; i++) {
       this.cmd("Delete", i);
     }
     this.nextIndex = this.highlightID; /// Reuse objects.  Not necessary.
+  } else {
+    this.markAnimationStep("tree empty", { tags: ["print", "empty"] });
   }
-  return this.commands;
+  return this.finishSplayAnimation();
 };
 
 SPLAYTREE.prototype.printTreeRec = function (tree) {
@@ -333,19 +357,32 @@ SPLAYTREE.prototype.findCallback = function (event) {
 };
 
 SPLAYTREE.prototype.findElement = function (findValue) {
-  this.commands = [];
+  this.beginSplayAnimation("find", `find ${findValue}`, {
+    tags: ["search", "find"],
+  });
 
   this.highlightID = this.nextIndex++;
 
   var found = this.doFind(this.treeRoot, findValue);
 
   if (found) {
+    this.beginBlock(`found ${findValue}`, {
+      source: "SplayTree",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "found"],
+      focusNodeId: this.treeRoot ? this.treeRoot.graphicID : undefined,
+    });
     this.cmd("SetMessage", "Element " + findValue + " found.");
   } else {
+    this.beginBlock(`not found ${findValue}`, {
+      source: "SplayTree",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "not-found"],
+    });
     this.cmd("SetMessage", "Element " + findValue + " not found.");
   }
 
-  return this.commands;
+  return this.finishSplayAnimation();
 };
 
 SPLAYTREE.prototype.doFind = function (tree, value) {
@@ -445,7 +482,9 @@ SPLAYTREE.prototype.doFind = function (tree, value) {
 };
 
 SPLAYTREE.prototype.insertElement = function (insertedValue) {
-  this.commands = new Array();
+  this.beginSplayAnimation("insert", `insert ${insertedValue}`, {
+    tags: ["insert"],
+  });
   this.cmd("SetMessage", "Inserting " + insertedValue);
   this.highlightID = this.nextIndex++;
 
@@ -467,6 +506,10 @@ SPLAYTREE.prototype.insertElement = function (insertedValue) {
       SPLAYTREE.STARTING_Y,
     );
     this.nextIndex += 1;
+    this.markAnimationStep("create root", {
+      tags: ["insert", "root"],
+      focusNodeId: this.treeRoot.graphicID,
+    });
   } else {
     this.cmd("CreateCircle", this.nextIndex, insertedValue, 100, 100);
     this.cmd("SetForegroundColor", this.nextIndex, SPLAYTREE.FOREGROUND_COLOR);
@@ -479,11 +522,14 @@ SPLAYTREE.prototype.insertElement = function (insertedValue) {
     this.insert(insertElem, this.treeRoot);
     this.resizeTree();
     this.cmd("SetMessage", "Splay inserted element to root of tree");
-    this.cmd("Step");
+    this.markAnimationStep(`insert node ${insertedValue}`, {
+      tags: ["insert", "node"],
+      focusNodeId: insertElem.graphicID,
+    });
     this.splayUp(insertElem);
   }
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishSplayAnimation();
 };
 
 SPLAYTREE.prototype.insert = function (elem, tree) {
@@ -553,15 +599,21 @@ SPLAYTREE.prototype.insert = function (elem, tree) {
 };
 
 SPLAYTREE.prototype.deleteElement = function (deletedValue) {
-  this.commands = [];
+  this.beginSplayAnimation("delete", `delete ${deletedValue}`, {
+    tags: ["delete"],
+  });
   this.cmd("SetMessage", "Deleting " + deletedValue);
-  this.cmd("Step");
+  this.markAnimationStep("start delete", { tags: ["delete", "start"] });
   this.cmd("SetMessage", "");
   this.highlightID = this.nextIndex++;
   this.treeDelete(this.treeRoot, deletedValue);
+  this.beginBlock("delete complete", {
+    source: "SplayTree",
+    operation: this.currentAnimationOperation,
+    tags: ["delete", "complete"],
+  });
   this.cmd("SetMessage", "");
-  // Do delete
-  return this.commands;
+  return this.finishSplayAnimation();
 };
 
 SPLAYTREE.prototype.treeDelete = function (tree, valueToDelete) {

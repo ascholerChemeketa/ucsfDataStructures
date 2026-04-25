@@ -153,6 +153,28 @@ HeapSort.prototype.addControls = function () {
   this.heapsortButton.onclick = this.heapsortCallback.bind(this);
 };
 
+HeapSort.prototype.beginHeapSortAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "HeapSort", operation, ...meta });
+};
+
+HeapSort.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "HeapSort",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+HeapSort.prototype.finishHeapSortAnimation = function () {
+  return this.finishAnimation();
+};
+
 HeapSort.prototype.createArray = function () {
   this.arrayData = new Array(ARRAY_SIZE);
   this.arrayLabels = new Array(ARRAY_SIZE);
@@ -217,7 +239,9 @@ HeapSort.prototype.randomizeCallback = function (ignored) {
 };
 
 HeapSort.prototype.randomizeArray = function () {
-  this.commands = new Array();
+  this.beginHeapSortAnimation("randomize", "randomize array", {
+    tags: ["randomize"],
+  });
   this.clearHeapDrawing();
   this.isHeapified = false;
   for (var i = 0; i < ARRAY_SIZE; i++) {
@@ -227,7 +251,8 @@ HeapSort.prototype.randomizeArray = function () {
     this.cmd("SetBackgroundColor", this.arrayRects[i], DEFAULT_ARRAY_BACKGROUND);
     this.oldData[i] = this.arrayData[i];
   }
-  return this.commands;
+  this.markAnimationStep("randomization complete", { tags: ["randomize", "complete"] });
+  return this.finishHeapSortAnimation();
 };
 
 HeapSort.prototype.reset = function () {
@@ -244,7 +269,9 @@ HeapSort.prototype.reset = function () {
 };
 
 HeapSort.prototype.heapsort = function (ignored) {
-  this.commands = new Array();
+  this.beginHeapSortAnimation("sort", "heap sort", {
+    tags: ["sort", "heap"],
+  });
 
   // Only enabled when heapified; keep as a safety check.
   if (!this.isHeapified) {
@@ -252,7 +279,8 @@ HeapSort.prototype.heapsort = function (ignored) {
       "SetMessage",
       "Heap Sort is disabled until the array is heapified.",
     );
-    return this.commands;
+    this.markAnimationStep("heap not heapified", { tags: ["sort", "blocked"] });
+    return this.finishHeapSortAnimation();
   }
 
   // Data is already heapified; do NOT rebuild the heap here.
@@ -263,11 +291,14 @@ HeapSort.prototype.heapsort = function (ignored) {
   }
 
   this.cmd("SetMessage", "Starting heapsort...");
-  this.cmd("Step");
+  this.markAnimationStep("start heapsort", { tags: ["sort", "start"] });
 
   for (var i = ARRAY_SIZE - 1; i > 0; i--) {
     this.cmd("SetMessage", "Removing max value");
-    this.cmd("Step");
+    this.markAnimationStep(`swap root with index ${i}`, {
+      focusNodeId: this.circleObjs[0],
+      tags: ["sort", "extract"],
+    });
     this.swap(i, 0);
     
   this.cmd("SetMessage", "Reduce logical heap size by 1");
@@ -275,20 +306,30 @@ HeapSort.prototype.heapsort = function (ignored) {
     this.cmd("Delete", this.circleObjs[i]);
     this.currentHeapSize = i;
     
-  this.cmd("Step");
+    this.markAnimationStep(`lock index ${i} in sorted suffix`, {
+      tags: ["sort", "sorted-suffix"],
+    });
     this.pushDown(0);
   }
   // After the final extraction, index 0 is also in sorted position.
+  this.beginBlock("heapsort complete", {
+    source: "HeapSort",
+    operation: this.currentAnimationOperation,
+    tags: ["sort", "complete"],
+  });
   this.cmd("SetBackgroundColor", this.arrayRects[0], SORTED_ARRAY_BACKGROUND);
   this.cmd("Delete", this.circleObjs[0]);
   this.currentHeapSize = 0;
   this.heapDrawn = false;
   this.isHeapified = false;
-  return this.commands;
+  this.cmd("SetMessage", "Heapsort complete");
+  return this.finishHeapSortAnimation();
 };
 
 HeapSort.prototype.heapify = function (ignored) {
-  this.commands = new Array();
+  this.beginHeapSortAnimation("heapify", "heapify array", {
+    tags: ["heapify"],
+  });
   this.clearHeapDrawing();
   this.isHeapified = false;
   for (var i = 0; i < ARRAY_SIZE; i++) {
@@ -296,9 +337,14 @@ HeapSort.prototype.heapify = function (ignored) {
     this.cmd("SetBackgroundColor", this.arrayRects[i], DEFAULT_ARRAY_BACKGROUND);
   }
   this.buildHeap("");
+  this.beginBlock("heapify complete", {
+    source: "HeapSort",
+    operation: this.currentAnimationOperation,
+    tags: ["heapify", "complete"],
+  });
   this.cmd("SetMessage", "Heapify complete: array now satisfies heap order");
   this.isHeapified = true;
-  return this.commands;
+  return this.finishHeapSortAnimation();
 };
 
 HeapSort.prototype.clearHeapDrawing = function () {
@@ -367,7 +413,9 @@ HeapSort.prototype.swap = function (index1, index2) {
     "SetMessage",
     "Swap: values between indices " + index1 + " and " + index2,
   );
-  this.cmd("Step");
+  this.markAnimationStep(`swap ${index1} and ${index2}`, {
+    tags: ["swap"],
+  });
   this.cmd("SetText", this.arrayRects[index1], this.arrayData[index1]);
   this.cmd("SetText", this.arrayRects[index2], this.arrayData[index2]);
   this.cmd("SetText", this.circleObjs[index1], this.arrayData[index1]);
@@ -393,12 +441,15 @@ HeapSort.prototype.pushDown = function (index) {
     if (left >= this.currentHeapSize) {
       return;
     }
-          this.cmd(
+    this.cmd(
         "SetMessage",
         "Heapify down at " + index,
       );
       this.setIndexHighlight(index, 1);
-      this.cmd("Step");
+      this.markAnimationStep(`push down from index ${index}`, {
+        focusNodeId: this.circleObjs[index],
+        tags: ["heapify", "push-down"],
+      });
       this.setIndexHighlight(index, 0);
 
     largestIndex = left;
@@ -410,7 +461,10 @@ HeapSort.prototype.pushDown = function (index) {
       );
       this.setIndexHighlight(left, 1);
       this.setIndexHighlight(right, 1);
-      this.cmd("Step");
+      this.markAnimationStep(`compare children of index ${index}`, {
+        focusNodeId: this.circleObjs[index],
+        tags: ["heapify", "compare", "children"],
+      });
       this.setIndexHighlight(left, 0);
       this.setIndexHighlight(right, 0);
       if (this.arrayData[right] > this.arrayData[left]) {
@@ -423,7 +477,10 @@ HeapSort.prototype.pushDown = function (index) {
     );
     this.setIndexHighlight(index, 1);
     this.setIndexHighlight(largestIndex, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`compare index ${index} with child ${largestIndex}`, {
+      focusNodeId: this.circleObjs[index],
+      tags: ["heapify", "compare", "parent-child"],
+    });
     this.setIndexHighlight(index, 0);
     this.setIndexHighlight(largestIndex, 0);
 
@@ -461,7 +518,7 @@ HeapSort.prototype.buildHeap = function (ignored) {
     "SetMessage",
     "Heapify: Calculate parent index of last element: " + nextElem,
   );
-  this.cmd("Step");
+  this.markAnimationStep("build heap drawing", { tags: ["heapify", "build"] });
   this.heapDrawn = true;
   while (nextElem >= 0) {
     this.pushDown(nextElem);
