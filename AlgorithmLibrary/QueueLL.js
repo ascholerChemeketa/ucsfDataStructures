@@ -214,6 +214,25 @@ QueueLL.prototype.reset = function () {
   this.nextIndex = this.initialIndex;
 };
 
+QueueLL.prototype.beginQueueLLAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "QueueLL", operation, ...meta });
+};
+
+QueueLL.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "QueueLL",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+QueueLL.prototype.finishQueueLLAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 QueueLL.prototype.enqueueCallback = function (event) {
   if (this.top < SIZE && this.inputField.value != "") {
     var pushVal = this.inputField.value;
@@ -233,7 +252,9 @@ QueueLL.prototype.clearCallback = function (event) {
 };
 
 QueueLL.prototype.enqueue = function (elemToPush) {
-  this.commands = new Array();
+  this.beginQueueLLAnimation("enqueue", `enqueue ${elemToPush}`, {
+    tags: ["queue", "enqueue"],
+  });
 
   this.arrayData[this.top] = elemToPush;
 
@@ -269,7 +290,10 @@ QueueLL.prototype.enqueue = function (elemToPush) {
 
   // this.cmd("Move", labPushValID, LINKED_LIST_INSERT_X, LINKED_LIST_INSERT_Y);
 
- this.cmd("Step");
+ this.markAnimationStep(`allocate node ${elemToPush}`, {
+   tags: ["queue", "enqueue", "allocate"],
+   focusNodeId: this.linkedListElemID[0],
+ });
  //var labPushValID = this.nextIndex++;
  this.cmd(
    "CreateLinkedList",
@@ -291,7 +315,10 @@ QueueLL.prototype.enqueue = function (elemToPush) {
  this.cmd("SetMessage", "Make a node with value");
   this.cmd("SetNull", this.linkedListElemID[0], 1);
   this.cmd("SetText", this.linkedListElemID[0], elemToPush);
-  this.cmd("Step");
+  this.markAnimationStep(`create node ${elemToPush}`, {
+    tags: ["queue", "enqueue", "create"],
+    focusNodeId: this.linkedListElemID[0],
+  });
  // this.cmd("Delete", labPushValID);
 
 
@@ -300,29 +327,44 @@ QueueLL.prototype.enqueue = function (elemToPush) {
     this.cmd("SetNull", this.tailID, 0);
     this.cmd("connect", this.headID, this.linkedListElemID[this.top], "#000000", 0.1);
     this.cmd("SetMessage", "Queue is empty, head and tail point to this node.");
+    this.markAnimationStep("initialize head and tail", {
+      tags: ["queue", "enqueue", "empty"],
+      focusNodeId: this.linkedListElemID[this.top],
+    });
   } else {
     this.cmd("SetNull", this.linkedListElemID[1], 0);
     this.cmd("Connect", this.linkedListElemID[1], this.linkedListElemID[0], "#000000", 0.1);
     this.cmd("SetMessage", "Set tail->next to point to new node.");
-    this.cmd("Step");
+    this.markAnimationStep("link old tail to new tail", {
+      tags: ["queue", "enqueue", "link"],
+      focusNodeId: this.linkedListElemID[1],
+    });
     this.cmd("Disconnect", this.tailID, this.linkedListElemID[1]);
     this.cmd("SetMessage", "Update tail pointer to new node.");
   }
   this.cmd("connect", this.tailID, this.linkedListElemID[0], "#000000", -0.1, true, "", 1);
 
-  this.cmd("Step");
+  this.markAnimationStep("update tail pointer", {
+    tags: ["queue", "enqueue", "tail-pointer"],
+    focusNodeId: this.linkedListElemID[0],
+  });
   this.top = this.top + 1;
   //this.resetLinkedListPositions();
   // this.cmd("Delete", labPushID);
+  this.beginBlock("enqueue complete", {
+    source: "QueueLL",
+    operation: this.currentAnimationOperation,
+    tags: ["queue", "enqueue", "complete"],
+  });
   this.cmd("SetMessage", "");
 
-  this.cmd("Step");
-
-  return this.commands;
+  return this.finishQueueLLAnimation();
 };
 
 QueueLL.prototype.dequeue = function (ignored) {
-  this.commands = new Array();
+  this.beginQueueLLAnimation("dequeue", "dequeue", {
+    tags: ["queue", "dequeue"],
+  });
 
   var labPopID = this.nextIndex++;
   var labPopValID = this.nextIndex++;
@@ -330,7 +372,7 @@ QueueLL.prototype.dequeue = function (ignored) {
   this.cmd("SetText", this.leftoverLabelID, "");
 
   this.cmd("SetMessage", "Dequeuing first value");
-  this.cmd("Step");
+  this.markAnimationStep("start dequeue", { tags: ["queue", "dequeue", "start"] });
 
   this.cmd(
     "CreateLabel",
@@ -348,7 +390,10 @@ QueueLL.prototype.dequeue = function (ignored) {
   );
 
   this.cmd("Move", labPopValID, PUSH_ELEMENT_X + 20, PUSH_ELEMENT_Y);
-  this.cmd("Step");
+  this.markAnimationStep(`capture ${this.arrayData[this.top - 1]}`, {
+    tags: ["queue", "dequeue", "capture"],
+    focusNodeId: this.linkedListElemID[this.top - 1],
+  });
   
 
   if (this.top == 1) {
@@ -359,28 +404,41 @@ QueueLL.prototype.dequeue = function (ignored) {
     this.cmd("SetNull", this.tailID, 1);
     this.cmd("Disconnect", this.headID, this.linkedListElemID[this.top - 1]);
     this.cmd("Disconnect", this.tailID, this.linkedListElemID[this.top - 1]);
+    this.markAnimationStep("clear head and tail", {
+      tags: ["queue", "dequeue", "empty"],
+      focusNodeId: this.linkedListElemID[this.top - 1],
+    });
   } else {
     this.cmd("SetMessage", "Advance head.");
     this.cmd("Disconnect", this.headID, this.linkedListElemID[this.top - 1]);
     this.cmd("Connect", this.headID, this.linkedListElemID[this.top - 2], "#000000", 0.1);
+    this.markAnimationStep("advance head", {
+      tags: ["queue", "dequeue", "head-pointer"],
+      focusNodeId: this.linkedListElemID[this.top - 2],
+    });
   }
-  this.cmd("Step");
   this.cmd("SetMessage", "Delete old head node.");
   this.cmd("Delete", this.linkedListElemID[this.top - 1]);
   this.top = this.top - 1;
   //this.resetLinkedListPositions();
-  this.cmd("Step");
+  this.markAnimationStep("delete old head node", {
+    tags: ["queue", "dequeue", "delete"],
+  });
 
   this.cmd("Delete", labPopValID);
   this.cmd("Delete", labPopID);
   this.cmd("SetMessage", "Dequeued Value: " + this.arrayData[this.top]);
-  this.cmd("Step");
+  this.markAnimationStep("dequeue complete", {
+    tags: ["queue", "dequeue", "complete"],
+  });
 
-  return this.commands;
+  return this.finishQueueLLAnimation();
 };
 
 QueueLL.prototype.clearData = function () {
-  this.commands = new Array();
+  this.beginQueueLLAnimation("clear", "clear queue", {
+    tags: ["queue", "clear"],
+  });
   
   this.cmd("SetNull", this.tailID, 1);
   this.cmd("SetNull", this.headID, 1);
@@ -392,7 +450,10 @@ QueueLL.prototype.clearData = function () {
   this.cmd("SetMessage", "");
   this.createdNodeCount = 0;
   this.top = 0;
-  return this.commands;
+  this.markAnimationStep("queue cleared", {
+    tags: ["queue", "clear", "complete"],
+  });
+  return this.finishQueueLLAnimation();
 };
 
 var currentAlg;

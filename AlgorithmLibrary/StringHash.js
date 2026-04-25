@@ -73,6 +73,25 @@ StringHash.prototype.reset = function () {
   this.commands = [];
 };
 
+StringHash.prototype.beginStringHashAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "StringHash", operation, ...meta });
+};
+
+StringHash.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "StringHash",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+StringHash.prototype.finishStringHashAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 StringHash.prototype.hashCallback = function () {
   const value = String(this.inputField.value);
   if (value !== "") {
@@ -82,16 +101,25 @@ StringHash.prototype.hashCallback = function () {
 };
 
 StringHash.prototype.runHash = function (str) {
-  this.commands = [];
+  this.beginStringHashAnimation("hash", `hash ${str}`, {
+    tags: ["hash", "string"],
+  });
   this.cmd("SetMessage", "Hash '" + str + "'");
-  this.cmd("Step");
+  this.markAnimationStep("start hash", {
+    tags: ["hash", "string", "start"],
+  });
 
   // Use Hash.doHash with the second param=true to run only the string hashing portion,
   // skipping bucket highlight/movement.
   Hash.prototype.doHash.call(this, str, true);
 
+  this.beginBlock("hash complete", {
+    source: "StringHash",
+    operation: this.currentAnimationOperation,
+    tags: ["hash", "string", "complete"],
+  });
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishStringHashAnimation();
 };
 
 // Disable/enable algorithm-specific UI during animations

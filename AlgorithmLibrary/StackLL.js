@@ -204,6 +204,25 @@ StackLL.prototype.reset = function () {
   this.nextIndex = this.initialIndex;
 };
 
+StackLL.prototype.beginStackLLAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "StackLL", operation, ...meta });
+};
+
+StackLL.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "StackLL",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+StackLL.prototype.finishStackLLAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 StackLL.prototype.pushCallback = function (event) {
   if (this.inputField.value !== "") {
     var pushVal = this.inputField.value;
@@ -225,12 +244,14 @@ StackLL.prototype.peekCallback = function (event) {
 };
 
 StackLL.prototype.push = function (elemToPush) {
-  this.commands = new Array();
+  this.beginStackLLAnimation("push", `push ${elemToPush}`, {
+    tags: ["stack", "push"],
+  });
 
   if (this.top >= SIZE) {
     this.cmd("SetMessage", "Top == size. Stack is full. Cannot push.");
-    this.cmd("Step");
-    return this.commands;
+    this.markAnimationStep("stack full", { tags: ["stack", "push", "full"] });
+    return this.finishStackLLAnimation();
   }
 
   var labPushValID = this.nextIndex++;
@@ -262,7 +283,10 @@ StackLL.prototype.push = function (elemToPush) {
 
   // this.cmd("Step");
   this.cmd("Move", labPushValID, LINKED_LIST_INSERT_X, LINKED_LIST_INSERT_Y);
-  this.cmd("Step");
+  this.markAnimationStep(`allocate node ${elemToPush}`, {
+    tags: ["stack", "push", "allocate"],
+    focusNodeId: this.linkedListElemID[this.top],
+  });
   this.cmd("SetText", this.linkedListElemID[this.top], elemToPush);
   this.cmd("Delete", labPushValID);
 
@@ -277,27 +301,37 @@ StackLL.prototype.push = function (elemToPush) {
       "#000000",
       0.1,
     );
-    this.cmd("Step");
+    this.markAnimationStep("link new top to previous top", {
+      tags: ["stack", "push", "link"],
+      focusNodeId: this.linkedListElemID[this.top],
+    });
     this.cmd("Disconnect", this.topID, this.linkedListElemID[this.top - 1]);
   }
   this.cmd("Connect", this.topID, this.linkedListElemID[this.top], "#000000", 0.1);
 
-  this.cmd("Step");
+  this.markAnimationStep("update top pointer", {
+    tags: ["stack", "push", "top-pointer"],
+    focusNodeId: this.linkedListElemID[this.top],
+  });
   this.top = this.top + 1;
   this.resetLinkedListPositions();
   this.cmd("SetMessage", "");
-  this.cmd("Step");
+  this.markAnimationStep("push complete", {
+    tags: ["stack", "push", "complete"],
+  });
 
-  return this.commands;
+  return this.finishStackLLAnimation();
 };
 
 StackLL.prototype.pop = function (ignored) {
-  this.commands = new Array();
+  this.beginStackLLAnimation("pop", "pop", {
+    tags: ["stack", "pop"],
+  });
 
   if (this.top <= 0) {
     this.cmd("SetMessage", "Top == 0. Stack is empty.");
-    this.cmd("Step");
-    return this.commands;
+    this.markAnimationStep("stack empty", { tags: ["stack", "pop", "empty"] });
+    return this.finishStackLLAnimation();
   }
 
   var labPopValID = this.nextIndex++;
@@ -305,7 +339,7 @@ StackLL.prototype.pop = function (ignored) {
 
   this.cmd("SetText", this.leftoverLabelID, "");
   this.cmd("SetMessage", "Popping top value");
-  this.cmd("Step");
+  this.markAnimationStep("start pop", { tags: ["stack", "pop", "start"] });
 
   this.cmd(
     "CreateLabel",
@@ -316,7 +350,10 @@ StackLL.prototype.pop = function (ignored) {
   );
 
   this.cmd("Move", labPopValID, STACK_ELEMENT_X, STACK_ELEMENT_Y);
-  this.cmd("Step");
+  this.markAnimationStep(`capture ${poppedVal}`, {
+    tags: ["stack", "pop", "capture"],
+    focusNodeId: this.linkedListElemID[this.top - 1],
+  });
 
   this.cmd("Disconnect", this.topID, this.linkedListElemID[this.top - 1]);
   if (this.top == 1) {
@@ -331,7 +368,9 @@ StackLL.prototype.pop = function (ignored) {
     );
   }
 
-  this.cmd("Step");
+  this.markAnimationStep("advance top pointer", {
+    tags: ["stack", "pop", "top-pointer"],
+  });
   this.cmd("Delete", this.linkedListElemID[this.top - 1]);
   this.top = this.top - 1;
   this.resetLinkedListPositions();
@@ -339,18 +378,22 @@ StackLL.prototype.pop = function (ignored) {
   this.cmd("Delete", labPopValID);
   this.cmd("SetText", this.leftoverLabelID, "Popped Value: " + poppedVal);
   this.cmd("SetMessage", "");
-  this.cmd("Step");
+  this.markAnimationStep("pop complete", {
+    tags: ["stack", "pop", "complete"],
+  });
 
-  return this.commands;
+  return this.finishStackLLAnimation();
 };
 
 StackLL.prototype.peek = function (ignored) {
-  this.commands = new Array();
+  this.beginStackLLAnimation("peek", "peek", {
+    tags: ["stack", "peek"],
+  });
 
   if (this.top <= 0) {
     this.cmd("SetMessage", "Top == 0. Stack is empty.");
-    this.cmd("Step");
-    return this.commands;
+    this.markAnimationStep("stack empty", { tags: ["stack", "peek", "empty"] });
+    return this.finishStackLLAnimation();
   }
 
   const labPeekValID = this.nextIndex++;
@@ -358,7 +401,7 @@ StackLL.prototype.peek = function (ignored) {
 
   this.cmd("SetText", this.leftoverLabelID, "");
   this.cmd("SetMessage", "Peeking at top value");
-  this.cmd("Step");
+  this.markAnimationStep("start peek", { tags: ["stack", "peek", "start"] });
 
   let srcX = LINKED_LIST_START_X;
   let srcY = LINKED_LIST_START_Y;
@@ -374,18 +417,25 @@ StackLL.prototype.peek = function (ignored) {
   this.cmd("CreateLabel", labPeekValID, peekedVal, srcX, srcY);
   this.cmd("Move", labPeekValID, STACK_ELEMENT_X, STACK_ELEMENT_Y);
   this.cmd("SetMessage", "Peeked Value: " + peekedVal);
-  this.cmd("Step");
+  this.markAnimationStep(`peek ${peekedVal}`, {
+    tags: ["stack", "peek", "value"],
+    focusNodeId: this.linkedListElemID[this.top - 1],
+  });
 
   this.cmd("Delete", labPeekValID);
   this.cmd("SetText", this.leftoverLabelID, "Peeked Value: " + peekedVal);
   this.cmd("SetMessage", "");
-  this.cmd("Step");
+  this.markAnimationStep("peek complete", {
+    tags: ["stack", "peek", "complete"],
+  });
 
-  return this.commands;
+  return this.finishStackLLAnimation();
 };
 
 StackLL.prototype.clearAll = function () {
-  this.commands = new Array();
+  this.beginStackLLAnimation("clear", "clear stack", {
+    tags: ["stack", "clear"],
+  });
   this.cmd("SetText", this.leftoverLabelID, "");
   this.cmd("SetMessage", "");
 
@@ -394,5 +444,8 @@ StackLL.prototype.clearAll = function () {
   }
   this.top = 0;
   this.cmd("SetNull", this.topID, 1);
-  return this.commands;
+  this.markAnimationStep("stack cleared", {
+    tags: ["stack", "clear", "complete"],
+  });
+  return this.finishStackLLAnimation();
 };

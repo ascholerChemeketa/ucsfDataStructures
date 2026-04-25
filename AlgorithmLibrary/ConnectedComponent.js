@@ -127,6 +127,28 @@ ConnectedComponent.prototype.init = function (am, w, h, graphOpts) {
   // Setup called in base class init function
 };
 
+ConnectedComponent.prototype.beginConnectedComponentAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "ConnectedComponent", operation, ...meta });
+};
+
+ConnectedComponent.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "ConnectedComponent",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+ConnectedComponent.prototype.finishConnectedComponentAnimation = function () {
+  return this.finishAnimation();
+};
+
 ConnectedComponent.prototype.setup = function () {
   ConnectedComponent.superclass.setup.call(this);
   this.animationManager.setAllLayers([0, this.currentLayer]);
@@ -205,10 +227,14 @@ ConnectedComponent.prototype.transpose = function () {
 
 ConnectedComponent.prototype.doCC = function (ignored) {
   this.visited = new Array(this.size);
-  this.commands = new Array();
+  this.beginConnectedComponentAnimation("connectedComponents", "compute connected components", {
+    tags: ["search", "connected-components"],
+  });
   this.rebuildEdges();
   this.cmd("SetMessage", "Run first DFS to compute finishing times.");
-  this.cmd("Step");
+  this.markAnimationStep("start first dfs pass", {
+    tags: ["search", "pass1"],
+  });
 
   this.d_timesID_L = new Array(this.size);
   this.f_timesID_L = new Array(this.size);
@@ -229,7 +255,10 @@ ConnectedComponent.prototype.doCC = function (ignored) {
   for (vertex = 0; vertex < this.size; vertex++) {
     if (!this.visited[vertex]) {
       this.cmd("SetMessage", "Start DFS from vertex " + vertex + ".");
-      this.cmd("Step");
+      this.markAnimationStep(`pass 1 root ${vertex}`, {
+        focusNodeId: this.circleID[vertex],
+        tags: ["search", "pass1", "root"],
+      });
       this.cmd(
         "CreateHighlightCircle",
         this.highlightCircleL,
@@ -269,7 +298,9 @@ ConnectedComponent.prototype.doCC = function (ignored) {
   this.clearEdges();
   this.removeAdjList();
   this.cmd("SetMessage", "Transpose graph and run DFS again to identify components.");
-  this.cmd("Step");
+  this.markAnimationStep("transpose graph", {
+    tags: ["search", "transpose"],
+  });
   this.transpose();
   this.buildEdges();
   this.buildAdjList();
@@ -298,7 +329,9 @@ ConnectedComponent.prototype.doCC = function (ignored) {
     sortedVertex[vertex] = vertex;
   }
   this.cmd("SetMessage", "Order vertices by decreasing finishing times.");
-  this.cmd("Step");
+  this.markAnimationStep("sort by finish time", {
+    tags: ["search", "sort"],
+  });
 
   for (let i = 1; i < this.size; i++) {
     var j = i;
@@ -335,10 +368,16 @@ ConnectedComponent.prototype.doCC = function (ignored) {
       // Highlight the current sorted vertex label as we process it
       if (this.sortedLabelsIDs && this.sortedLabelsIDs[i] != null) {
         this.cmd("SetForegroundColor", this.sortedLabelsIDs[i], this.currentComponentColor);
-        this.cmd("Step");
+        this.markAnimationStep(`highlight component root ${vertex}`, {
+          focusNodeId: this.circleID[vertex],
+          tags: ["search", "pass2", "root"],
+        });
       }
       this.cmd("SetMessage", "Connected Component #" + String(ccNum++) + ": start DFS at vertex " + vertex + ".");
-      this.cmd("Step");
+      this.markAnimationStep(`start component at ${vertex}`, {
+        focusNodeId: this.circleID[vertex],
+        tags: ["search", "component", "start"],
+      });
 
       this.cmd(
         "CreateHighlightCircle",
@@ -398,7 +437,7 @@ ConnectedComponent.prototype.doCC = function (ignored) {
   //   }
   // }
 
-  return this.commands;
+  return this.finishConnectedComponentAnimation();
 };
 
 ConnectedComponent.prototype.setup_large = function () {
@@ -441,11 +480,17 @@ ConnectedComponent.prototype.dfsVisit = function (
   this.stackRowCount++;
   if (printCCNum) {
     this.cmd("SetMessage", "Visit vertex " + String(startVertex) + ".");
-    this.cmd("Step");
+    this.markAnimationStep(`visit ${startVertex}`, {
+      focusNodeId: this.circleID[startVertex],
+      tags: ["search", "visit"],
+    });
   }
     // Narration: first visit to this vertex
     this.cmd("SetMessage", "First visit to vertex " + String(startVertex) + ".");
-  this.cmd("Step");
+  this.markAnimationStep(`discover ${startVertex}`, {
+    focusNodeId: this.circleID[startVertex],
+    tags: ["search", "discover"],
+  });
   this.cmd("SetMessage", "DFS(" + String(startVertex) + ")");
 
   this.messageY = this.messageY + 20;
@@ -475,7 +520,10 @@ ConnectedComponent.prototype.dfsVisit = function (
         this.cmd("SetBackgroundColor", this.circleID[startVertex], c);
       }
     }
-    this.cmd("Step");
+    this.markAnimationStep(`stamp discover time for ${startVertex}`, {
+      focusNodeId: this.circleID[startVertex],
+      tags: ["search", "time", "discover"],
+    });
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[startVertex][neighbor] > 0) {
         this.highlightEdge(startVertex, neighbor, 1);
@@ -484,7 +532,10 @@ ConnectedComponent.prototype.dfsVisit = function (
         } else {
             this.cmd("SetMessage", "Visit unvisited neighbor " + String(neighbor) + " from " + String(startVertex) + "; recurse.");
         }
-        this.cmd("Step");
+        this.markAnimationStep(`consider edge ${startVertex} -> ${neighbor}`, {
+          focusNodeId: this.circleID[neighbor],
+          tags: ["search", "edge"],
+        });
         this.highlightEdge(startVertex, neighbor, 0);
 
         if (!this.visited[neighbor]) {
@@ -524,7 +575,10 @@ ConnectedComponent.prototype.dfsVisit = function (
             this.adj_matrix_y_start + neighbor * this.adj_matrix_height,
           );
 
-          this.cmd("Step");
+          this.markAnimationStep(`recurse to ${neighbor}`, {
+            focusNodeId: this.circleID[neighbor],
+            tags: ["search", "recurse"],
+          });
           this.dfsVisit(neighbor, messageX + 10, printCCNum);
           this.cmd("SetMessage", "Return from DFS(" + String(neighbor) + ")");
 
@@ -546,9 +600,15 @@ ConnectedComponent.prototype.dfsVisit = function (
             this.adj_matrix_x_start - this.adj_matrix_width,
             this.adj_matrix_y_start + startVertex * this.adj_matrix_height,
           );
-          this.cmd("Step");
+          this.markAnimationStep(`return to ${startVertex}`, {
+            focusNodeId: this.circleID[startVertex],
+            tags: ["search", "return"],
+          });
         }
-        this.cmd("Step");
+        this.markAnimationStep(`finish edge ${startVertex} -> ${neighbor}`, {
+          focusNodeId: this.circleID[startVertex],
+          tags: ["search", "edge", "finish"],
+        });
       }
     }
     this.f_times[startVertex] = this.currentTime++;
@@ -565,7 +625,10 @@ ConnectedComponent.prototype.dfsVisit = function (
     this.cmd("SetLayer", this.f_timesID_AL[startVertex], 2);
     // Narration: finishing this vertex
     this.cmd("SetMessage", "Finish vertex " + String(startVertex) + ".");
-    this.cmd("Step");
+    this.markAnimationStep(`finish ${startVertex}`, {
+      focusNodeId: this.circleID[startVertex],
+      tags: ["search", "finish"],
+    });
   }
 
   // Pop logical stack depth (keep labels visible until animation completes)

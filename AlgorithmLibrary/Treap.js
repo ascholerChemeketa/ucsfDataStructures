@@ -122,6 +122,29 @@ Treap.prototype.reset = function () {
   this.treeRoot = null;
 };
 
+Treap.prototype.beginTreapAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, {
+    source: "Treap",
+    operation,
+    ...meta,
+  });
+};
+
+Treap.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "Treap",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+Treap.prototype.finishTreapAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 Treap.prototype.insertCallback = function () {
   var insertedValue = this.normalizeNumber(this.inputField.value, 4);
   if (insertedValue != "") {
@@ -171,13 +194,27 @@ function TreapNode(val, prio, id, labelID, initialX, initialY) {
 
 Treap.prototype.insertElement = function (insertedValue) {
   this.commands = [];
+  this.beginTreapAnimation("insert", "insert " + insertedValue, {
+    value: insertedValue,
+    tags: ["insert"],
+  });
   this.cmd("SetMessage", "Insert " + insertedValue);
 
   const prio = Math.floor(Math.random() * 1000);
+  this.markAnimationStep("assign priority " + prio, {
+    value: insertedValue,
+    priority: prio,
+    tags: ["priority"],
+  });
   this.cmd("SetMessage", "Set priority " + prio + " for " + insertedValue);
   this.cmd("Step");
 
   if (this.treeRoot == null) {
+    this.markAnimationStep("create root", {
+      value: insertedValue,
+      priority: prio,
+      tags: ["create", "root"],
+    });
     const nodeID = this.nextIndex++;
     const labelID = this.nextIndex++;
     this.cmd("CreateCircle", nodeID, insertedValue, this.startingX, Treap.STARTING_Y);
@@ -192,6 +229,11 @@ Treap.prototype.insertElement = function (insertedValue) {
 
     this.treeRoot = new TreapNode(insertedValue, prio, nodeID, labelID, this.startingX, Treap.STARTING_Y);
   } else {
+    this.markAnimationStep("create node " + insertedValue, {
+      value: insertedValue,
+      priority: prio,
+      tags: ["create"],
+    });
     const nodeID = this.nextIndex++;
     const labelID = this.nextIndex++;
     this.cmd("CreateCircle", nodeID, insertedValue, this.startingX - 200, Treap.STARTING_Y);
@@ -212,10 +254,15 @@ Treap.prototype.insertElement = function (insertedValue) {
   }
 
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishTreapAnimation();
 };
 
 Treap.prototype.insertBST = function (elem, tree) {
+  this.markAnimationStep("compare " + elem.data + " with " + tree.data, {
+    value: elem.data,
+    node: tree.data,
+    tags: ["compare"],
+  });
   this.cmd("SetHighlight", tree.graphicID, 1);
   this.cmd("SetHighlight", elem.graphicID, 1);
 
@@ -277,6 +324,11 @@ Treap.prototype.singleRotateLeft = function (x) {
   const p = x.parent;
   const xWasLeft = p && p.left === x;
 
+  this.markAnimationStep("rotate left at " + x.data, {
+    pivot: x.data,
+    promoted: y.data,
+    tags: ["rotate", "left"],
+  });
   this.cmd("SetMessage", "Rotate left at " + x.data + " (promote " + y.data + ")");
   this.cmd("SetHighlight", x.graphicID, 1);
   this.cmd("SetHighlight", y.graphicID, 1);
@@ -323,6 +375,11 @@ Treap.prototype.singleRotateRight = function (x) {
   const p = x.parent;
   const xWasLeft = p && p.left === x;
 
+  this.markAnimationStep("rotate right at " + x.data, {
+    pivot: x.data,
+    promoted: y.data,
+    tags: ["rotate", "right"],
+  });
   this.cmd("SetMessage", "Rotate right at " + x.data + " (promote " + y.data + ")");
   this.cmd("SetHighlight", x.graphicID, 1);
   this.cmd("SetHighlight", y.graphicID, 1);
@@ -359,51 +416,84 @@ Treap.prototype.singleRotateRight = function (x) {
 
 Treap.prototype.findElement = function (findValue) {
   this.commands = [];
+  this.beginTreapAnimation("find", "find " + findValue, {
+    value: findValue,
+    tags: ["find", "search"],
+  });
   this.cmd("SetMessage", "Search " + findValue + " from root");
   this.cmd("Step");
-  this.findImpl(this.treeRoot, findValue);
-  return this.commands;
+  const found = this.findImpl(this.treeRoot, findValue);
+  this.beginBlock((found ? "found " : "not found ") + findValue, {
+    source: "Treap",
+    operation: this.currentAnimationOperation,
+    value: findValue,
+    tags: [found ? "found" : "not-found"],
+  });
+  this.cmd("SetMessage", found ? "Found " + findValue : "Hit null: not found");
+  return this.finishTreapAnimation();
 };
 
 Treap.prototype.findImpl = function (tree, value) {
   if (tree != null) {
+    this.markAnimationStep("compare " + value + " with " + tree.data, {
+      value,
+      node: tree.data,
+      tags: ["compare"],
+    });
     this.cmd("SetHighlight", tree.graphicID, 1);
     if (tree.data == value) {
       this.cmd("SetMessage", "Found " + value);
       this.cmd("Step");
       this.cmd("SetHighlight", tree.graphicID, 0);
+      return tree;
     } else if (value < tree.data) {
       this.cmd("SetMessage", value + " < " + tree.data + ": go left");
       if (tree.left) this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 1);
       this.cmd("Step");
       if (tree.left) this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 0);
       this.cmd("SetHighlight", tree.graphicID, 0);
-      this.findImpl(tree.left, value);
+      return this.findImpl(tree.left, value);
     } else {
       this.cmd("SetMessage", value + " > " + tree.data + ": go right");
       if (tree.right) this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 1);
       this.cmd("Step");
       if (tree.right) this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 0);
       this.cmd("SetHighlight", tree.graphicID, 0);
-      this.findImpl(tree.right, value);
+      return this.findImpl(tree.right, value);
     }
   } else {
     this.cmd("SetMessage", "Hit null: not found");
     this.cmd("Step");
+    return null;
   }
 };
 
 Treap.prototype.deleteElement = function (deletedValue) {
   this.commands = [];
+  this.beginTreapAnimation("delete", "delete " + deletedValue, {
+    value: deletedValue,
+    tags: ["delete"],
+  });
   this.cmd("SetMessage", "Remove " + deletedValue);
   this.cmd("Step");
   this.treapDelete(this.treeRoot, deletedValue);
+  this.beginBlock("delete complete", {
+    source: "Treap",
+    operation: this.currentAnimationOperation,
+    value: deletedValue,
+    tags: ["complete"],
+  });
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishTreapAnimation();
 };
 
 Treap.prototype.treapDelete = function (tree, valueToDelete) {
   if (!tree) return;
+  this.markAnimationStep("compare " + valueToDelete + " with " + tree.data, {
+    value: valueToDelete,
+    node: tree.data,
+    tags: ["compare"],
+  });
   this.cmd("SetHighlight", tree.graphicID, 1);
   if (valueToDelete < tree.data) {
     this.cmd("SetMessage", valueToDelete + " < " + tree.data + ": go left");
@@ -421,6 +511,11 @@ Treap.prototype.treapDelete = function (tree, valueToDelete) {
     this.treapDelete(tree.right, valueToDelete);
   } else {
     // Found node to delete
+    this.markAnimationStep("delete node " + tree.data, {
+      value: tree.data,
+      priority: tree.priority,
+      tags: ["delete", "found"],
+    });
     this.cmd("SetMessage", "Found node " + tree.data + " (prio " + tree.priority + ")");
     this.cmd("Step");
     // Rotate down until at most one child
@@ -467,10 +562,19 @@ Treap.prototype.treapDelete = function (tree, valueToDelete) {
 
 Treap.prototype.clearData = function () {
   this.commands = [];
+  this.beginTreapAnimation("clear", "clear treap", {
+    tags: ["clear"],
+  });
   this.clearRec(this.treeRoot);
   this.treeRoot = null;
   this.cmd("SetNull", this.rootIndex, 1);
-  return this.commands;
+  this.beginBlock("treap cleared", {
+    source: "Treap",
+    operation: this.currentAnimationOperation,
+    tags: ["complete"],
+  });
+  this.cmd("SetMessage", "");
+  return this.finishTreapAnimation();
 };
 
 Treap.prototype.clearRec = function (tree) {

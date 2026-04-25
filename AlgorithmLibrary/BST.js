@@ -85,15 +85,16 @@ BST.prototype.init = function (am, w, h) {
   var fn = sc.init;
   fn.call(this, am);
   this.nextIndex = 0;
-  this.commands = [];
+  this.beginAnimation();
   this.rootIndex = 0;
 
   this.valuesList = [];
+  this.beginBlock("initialize tree", { source: "BST", operation: "init" });
   this.cmd("CreateRectangle", this.nextIndex++, "", 50, 25, this.startingX - 70, BST.STARTING_Y - 10);
   this.cmd("SetNull", this.rootIndex, 1);
-	this.cmd("CreateLabel", this.nextIndex++, "root", this.startingX - 120, BST.STARTING_Y - 10);
+ 	this.cmd("CreateLabel", this.nextIndex++, "root", this.startingX - 120, BST.STARTING_Y - 10);
 
-  this.animationManager.StartNewAnimation(this.commands);
+  this.animationManager.StartNewAnimation(this.finishAnimation());
   this.animationManager.skipForward();
   this.animationManager.clearHistory();
 
@@ -142,6 +143,24 @@ BST.prototype.init = function (am, w, h) {
     this.animationManager.clearHistory();
     this.animationManager.animatedObjects.draw();
   };
+};
+
+BST.prototype.beginBSTAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "BST", operation, ...meta });
+};
+
+BST.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = { source: "BST", operation: this.currentAnimationOperation, ...meta };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+BST.prototype.finishBSTAnimation = function () {
+  return this.finishAnimation();
 };
 
 BST.prototype.addControls = function () {
@@ -218,49 +237,53 @@ BST.prototype.findNode = function (tree, value) {
 };
 
 BST.prototype.rotateLeftAtValue = function (value) {
-  this.commands = [];
+  this.beginBSTAnimation("rotateLeft", `rotate left at ${value}`, {
+    tags: ["rotate", "left"],
+  });
 
   if (this.treeRoot == null) {
     this.cmd("SetMessage", "Tree is empty");
-    this.cmd("Step");
+    this.markAnimationStep("tree empty", { tags: ["empty"] });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishBSTAnimation();
   }
 
   var x = this.findNode(this.treeRoot, value);
   if (x == null) {
     this.cmd("SetMessage", "Cannot rotate: " + value + " not found");
-    this.cmd("Step");
+    this.markAnimationStep("value not found", { tags: ["not-found"] });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishBSTAnimation();
   }
 
   this.singleRotateLeft(x);
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishBSTAnimation();
 };
 
 BST.prototype.rotateRightAtValue = function (value) {
-  this.commands = [];
+  this.beginBSTAnimation("rotateRight", `rotate right at ${value}`, {
+    tags: ["rotate", "right"],
+  });
 
   if (this.treeRoot == null) {
     this.cmd("SetMessage", "Tree is empty");
-    this.cmd("Step");
+    this.markAnimationStep("tree empty", { tags: ["empty"] });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishBSTAnimation();
   }
 
   var x = this.findNode(this.treeRoot, value);
   if (x == null) {
     this.cmd("SetMessage", "Cannot rotate: " + value + " not found");
-    this.cmd("Step");
+    this.markAnimationStep("value not found", { tags: ["not-found"] });
     this.cmd("SetMessage", "");
-    return this.commands;
+    return this.finishBSTAnimation();
   }
 
   this.singleRotateRight(x);
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishBSTAnimation();
 };
 
 // Single rotation helpers (adapted to BST's pointer + animation style)
@@ -269,7 +292,10 @@ BST.prototype.singleRotateLeft = function (x) {
   if (y == null) {
     this.cmd("SetMessage", "Cannot rotate left at " + x.data + ": no right child");
     this.cmd("SetHighlight", x.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`cannot rotate left at ${x.data}`, {
+      focusNodeId: x.graphicID,
+      tags: ["rotate", "left", "invalid"],
+    });
     this.cmd("SetHighlight", x.graphicID, 0);
     return;
   }
@@ -281,7 +307,10 @@ BST.prototype.singleRotateLeft = function (x) {
   this.cmd("SetMessage", "Rotate left at " + x.data + ": pull up " + y.data);
   this.cmd("SetHighlight", x.graphicID, 1);
   this.cmd("SetHighlight", y.graphicID, 1);
-  this.cmd("Step");
+  this.markAnimationStep(`highlight ${x.data} and ${y.data}`, {
+    focusNodeId: x.graphicID,
+    tags: ["rotate", "left", "highlight"],
+  });
 
   if (B != null) {
     this.cmd(
@@ -290,7 +319,10 @@ BST.prototype.singleRotateLeft = function (x) {
     );
     this.cmd("SetHighlight", B.graphicID, 1);
     this.cmd("SetEdgeHighlight", y.graphicID, B.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`move subtree ${B.data}`, {
+      focusNodeId: B.graphicID,
+      tags: ["rotate", "left", "subtree"],
+    });
     this.cmd("SetEdgeHighlight", y.graphicID, B.graphicID, 0);
     this.cmd("SetHighlight", B.graphicID, 0);
   }
@@ -343,7 +375,10 @@ BST.prototype.singleRotateRight = function (x) {
   if (y == null) {
     this.cmd("SetMessage", "Cannot rotate right at " + x.data + ": no left child");
     this.cmd("SetHighlight", x.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`cannot rotate right at ${x.data}`, {
+      focusNodeId: x.graphicID,
+      tags: ["rotate", "right", "invalid"],
+    });
     this.cmd("SetHighlight", x.graphicID, 0);
     return;
   }
@@ -355,7 +390,10 @@ BST.prototype.singleRotateRight = function (x) {
   this.cmd("SetMessage", "Rotate right at " + x.data + ": pull up " + y.data);
   this.cmd("SetHighlight", x.graphicID, 1);
   this.cmd("SetHighlight", y.graphicID, 1);
-  this.cmd("Step");
+  this.markAnimationStep(`highlight ${x.data} and ${y.data}`, {
+    focusNodeId: x.graphicID,
+    tags: ["rotate", "right", "highlight"],
+  });
 
   if (B != null) {
     this.cmd(
@@ -364,7 +402,10 @@ BST.prototype.singleRotateRight = function (x) {
     );
     this.cmd("SetHighlight", B.graphicID, 1);
     this.cmd("SetEdgeHighlight", y.graphicID, B.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`move subtree ${B.data}`, {
+      focusNodeId: B.graphicID,
+      tags: ["rotate", "right", "subtree"],
+    });
     this.cmd("SetEdgeHighlight", y.graphicID, B.graphicID, 0);
     this.cmd("SetHighlight", B.graphicID, 0);
   }
@@ -453,7 +494,7 @@ BST.prototype.clearCallback = function (event) {
 BST.prototype.clearData = function () {
   if (this.treeRoot == null)
   return;
-  this.commands = new Array();
+  this.beginBSTAnimation("clear", "clear tree", { tags: ["clear"] });
   
   function clearTree(tree, handler) {
     if (tree != null) {
@@ -471,7 +512,7 @@ BST.prototype.clearData = function () {
   this.treeRoot = null;
   this.cmd("SetNull", this.rootIndex, 1);
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishBSTAnimation();
 };
 
 
@@ -488,48 +529,65 @@ BST.prototype.insertRandomCallback = function (event) {
 
 
 BST.prototype.printTree = function (order) {
-  this.commands = [];
+  this.beginBSTAnimation("print", `print ${order} order`, {
+    tags: ["print", String(order).toLowerCase()],
+  });
   this.printOutput = "";
 
   if (this.treeRoot != null) {
     this.cmd("SetMessage", "Starting from root");
     this.cmd("SetHighlight", this.treeRoot.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep("visit root", {
+      focusNodeId: this.treeRoot.graphicID,
+      tags: ["print", "visit"],
+    });
 
     this.cmd("SetHighlight", this.treeRoot.graphicID, 0);
     this.printTreeRec(this.treeRoot, order);
 
     this.cmd("SetMessage", "Final output: " + this.printOutput);
   }
-  return this.commands;
+  return this.finishBSTAnimation();
 };
 
 BST.prototype.printLeft = function (tree, order) {
   if (tree.left != null) {
     this.cmd("SetMessage", tree.data + " has left child, visit it...");
     this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`${tree.data}: go left`, {
+      focusNodeId: tree.graphicID,
+      tags: ["print", "traverse", "left"],
+    });
     this.cmd("SetHighlight", tree.graphicID, 0);
     this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 0);
     this.printTreeRec(tree.left, order);
     this.cmd("SetHighlight", tree.graphicID, 1);
   } else {
     this.cmd("SetMessage", tree.data + " has no left child");
-    this.cmd("Step");
+    this.markAnimationStep(`${tree.data}: no left child`, {
+      focusNodeId: tree.graphicID,
+      tags: ["print", "leaf-check", "left"],
+    });
   }
 };
 BST.prototype.printRight = function (tree, order) {
   if (tree.right != null) {
     this.cmd("SetMessage", tree.data + " has right child, visit it...");
     this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`${tree.data}: go right`, {
+      focusNodeId: tree.graphicID,
+      tags: ["print", "traverse", "right"],
+    });
     this.cmd("SetHighlight", tree.graphicID, 0);
     this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 0);
     this.printTreeRec(tree.right, order);
     this.cmd("SetHighlight", tree.graphicID, 1);
   } else {
     this.cmd("SetMessage", tree.data + " has no right child");
-    this.cmd("Step");
+    this.markAnimationStep(`${tree.data}: no right child`, {
+      focusNodeId: tree.graphicID,
+      tags: ["print", "leaf-check", "right"],
+    });
   }
 };
 
@@ -542,7 +600,10 @@ BST.prototype.printSelf = function (tree) {
     "SetMessage",
     "Print " + tree.data + "\nCurrent output: " + this.printOutput,
   );
-  this.cmd("Step");
+  this.markAnimationStep(`print ${tree.data}`, {
+    focusNodeId: tree.graphicID,
+    tags: ["print", "output"],
+  });
 };
 
 BST.prototype.printTreeRec = function (tree, order) {
@@ -564,7 +625,10 @@ BST.prototype.printTreeRec = function (tree, order) {
 
   this.cmd("SetHighlight", tree.graphicID, 1);
   this.cmd("SetMessage", "Done with " + tree.data + " return to parent");
-  this.cmd("Step");
+  this.markAnimationStep(`finish ${tree.data}`, {
+    focusNodeId: tree.graphicID,
+    tags: ["print", "return"],
+  });
   this.cmd("SetHighlight", tree.graphicID, 0);
 };
 
@@ -576,15 +640,17 @@ BST.prototype.findCallback = function (event) {
 };
 
 BST.prototype.findElement = function (findValue) {
-  this.commands = [];
+  this.beginBSTAnimation("find", `find ${findValue}`, {
+    tags: ["search", "find"],
+  });
 
   this.highlightID = this.nextIndex++;
 
   this.cmd("SetMessage", "Searching for " + findValue + "\nstarting from root");
-  this.cmd("Step");
+  this.markAnimationStep("start search", { tags: ["search", "start"] });
   this.findImpl(this.treeRoot, findValue);
 
-  return this.commands;
+  return this.finishBSTAnimation();
 };
 
 BST.prototype.findImpl = function (tree, value) {
@@ -601,7 +667,10 @@ BST.prototype.findImpl = function (tree, value) {
           value +
           "\n(Element found!)",
       );
-      this.cmd("Step");
+      this.markAnimationStep(`found ${value}`, {
+        focusNodeId: tree.graphicID,
+        tags: ["search", "found"],
+      });
       this.cmd("SetMessage", "Found:" + value);
       this.cmd("SetHighlight", tree.graphicID, 0);
     } else {
@@ -619,7 +688,10 @@ BST.prototype.findImpl = function (tree, value) {
 
         if(tree.left != null)
         this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 1);
-        this.cmd("Step");
+        this.markAnimationStep(`${tree.data}: search left`, {
+          focusNodeId: tree.graphicID,
+          tags: ["search", "compare", "left"],
+        });
 
         if(tree.left != null)
         this.cmd("SetEdgeHighlight", tree.graphicID, tree.left.graphicID, 0);
@@ -638,7 +710,10 @@ BST.prototype.findImpl = function (tree, value) {
         );
         if(tree.right != null)
         this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 1);
-        this.cmd("Step");
+        this.markAnimationStep(`${tree.data}: search right`, {
+          focusNodeId: tree.graphicID,
+          tags: ["search", "compare", "right"],
+        });
         if(tree.right != null)
         this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 0);
         this.cmd("SetHighlight", tree.graphicID, 0);
@@ -654,7 +729,9 @@ BST.prototype.findImpl = function (tree, value) {
 };
 
 BST.prototype.insertElement = function (insertedValue) {
-  this.commands = new Array();
+  this.beginBSTAnimation("insert", `insert ${insertedValue}`, {
+    tags: ["insert"],
+  });
   this.cmd("SetMessage", "Inserting " + insertedValue);
 
   if (this.treeRoot == null) {
@@ -672,7 +749,10 @@ BST.prototype.insertElement = function (insertedValue) {
       "SetMessage",
       `Root is null. Inserting ${insertedValue} as the root`,
     );
-    this.cmd("Step");
+    this.markAnimationStep("create root", {
+      focusNodeId: this.nextIndex,
+      tags: ["insert", "root"],
+    });
     
     this.cmd("SetNull", this.rootIndex, 0);
 
@@ -696,7 +776,10 @@ BST.prototype.insertElement = function (insertedValue) {
     this.cmd("SetForegroundColor", this.nextIndex, BST.FOREGROUND_COLOR);
     this.cmd("SetBackgroundColor", this.nextIndex, BST.BACKGROUND_COLOR);
     //this.cmd("SetHighlight", this.nextIndex, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`create node ${insertedValue}`, {
+      focusNodeId: this.nextIndex,
+      tags: ["insert", "create"],
+    });
     var insertElem = new BSTNode(insertedValue, this.nextIndex, 50, 100);
 
     this.nextIndex += 1;
@@ -705,7 +788,7 @@ BST.prototype.insertElement = function (insertedValue) {
     this.resizeTree();
   }
   this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishBSTAnimation();
 };
 
 BST.prototype.insert = function (elem, tree) {
@@ -727,7 +810,10 @@ BST.prototype.insert = function (elem, tree) {
     if(tree.right != null)
     this.cmd("SetEdgeHighlight", tree.graphicID, tree.right.graphicID, 1);
   }
-  this.cmd("Step");
+  this.markAnimationStep(`compare ${elem.data} with ${tree.data}`, {
+    focusNodeId: tree.graphicID,
+    tags: ["insert", "compare"],
+  });
   this.cmd("SetHighlight", tree.graphicID, 0);
   this.cmd("SetHighlight", elem.graphicID, 0);
 
@@ -763,14 +849,16 @@ BST.prototype.insert = function (elem, tree) {
 };
 
 BST.prototype.deleteElement = function (deletedValue) {
-  this.commands = [];
+  this.beginBSTAnimation("delete", `delete ${deletedValue}`, {
+    tags: ["delete"],
+  });
   this.cmd("SetMessage", "Deleting " + deletedValue);
-  this.cmd("Step");
+  this.markAnimationStep("start delete", { tags: ["delete", "start"] });
   this.cmd("SetMessage", "");
   this.treeDelete(this.treeRoot, deletedValue);
   this.cmd("SetMessage", "");
   // Do delete
-  return this.commands;
+  return this.finishBSTAnimation();
 };
 
 BST.prototype.treeDelete = function (tree, valueToDelete) {
@@ -800,7 +888,10 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
         valueToDelete + " == " + tree.data + ".  Found node to delete",
       );
     }
-    this.cmd("Step");
+    this.markAnimationStep(`inspect ${tree.data}`, {
+      focusNodeId: tree.graphicID,
+      tags: ["delete", "inspect"],
+    });
 
     if (valueToDelete == tree.data) {
       if (tree.left == null && tree.right == null) {
@@ -816,7 +907,10 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           this.cmd("Disconnect", 0, tree.graphicID);
         }
         this.resizeTree();
-        this.cmd("Step");
+        this.markAnimationStep(`delete leaf ${tree.data}`, {
+          focusNodeId: tree.graphicID,
+          tags: ["delete", "leaf"],
+        });
       } else if (tree.left == null) {
         this.cmd(
           "SetMessage",
@@ -830,7 +924,10 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
             BST.LINK_COLOR,
           );
           this.cmd("Disconnect", tree.parent.graphicID, tree.graphicID);
-          this.cmd("Step");
+          this.markAnimationStep(`replace ${tree.data} with right child`, {
+            focusNodeId: tree.graphicID,
+            tags: ["delete", "replace", "right-child"],
+          });
           this.cmd("Delete", tree.graphicID);
           if (leftchild) {
             tree.parent.left = tree.right;
@@ -857,7 +954,10 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
             BST.LINK_COLOR,
           );
           this.cmd("Disconnect", tree.parent.graphicID, tree.graphicID);
-          this.cmd("Step");
+          this.markAnimationStep(`replace ${tree.data} with left child`, {
+            focusNodeId: tree.graphicID,
+            tags: ["delete", "replace", "left-child"],
+          });
           this.cmd("Delete", tree.graphicID);
           if (leftchild) {
             tree.parent.left = tree.left;
@@ -877,7 +977,10 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           "SetMessage",
           "Node to delete has two childern.  \nFind smallest node in right subtree.",
         );
-        this.cmd("Step");
+        this.markAnimationStep(`find successor for ${tree.data}`, {
+          focusNodeId: tree.graphicID,
+          tags: ["delete", "successor"],
+        });
 
         this.highlightID = this.nextIndex;
         this.nextIndex += 1;
@@ -895,7 +998,10 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           "SetMessage",
           "Go to right subtree.",
         );
-        this.cmd("Step");
+        this.markAnimationStep("move to right subtree", {
+          focusNodeId: tmp.graphicID,
+          tags: ["delete", "successor", "right"],
+        });
         while (tmp.left != null) {
           tmp = tmp.left;
           this.cmd(
@@ -903,13 +1009,19 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
             "Move left to find smallest value.",
           );
           this.cmd("Move", this.highlightID, tmp.x, tmp.y);
-          this.cmd("Step");
+          this.markAnimationStep("walk to leftmost node", {
+            focusNodeId: tmp.graphicID,
+            tags: ["delete", "successor", "left-walk"],
+          });
         }
         this.cmd(
           "SetMessage",
           "No left child found.  Smallest value is " + tmp.data + ".",
         );
-        this.cmd("Step");
+        this.markAnimationStep(`found successor ${tmp.data}`, {
+          focusNodeId: tmp.graphicID,
+          tags: ["delete", "successor", "found"],
+        });
         this.cmd("SetText", tree.graphicID, " ");
         var labelID = this.nextIndex;
         this.nextIndex += 1;
@@ -921,7 +1033,10 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           "Copy smallest value of right subtree over value being removed.",
         );
 
-        this.cmd("Step");
+        this.markAnimationStep(`copy successor ${tmp.data}`, {
+          focusNodeId: tree.graphicID,
+          tags: ["delete", "successor", "copy"],
+        });
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd("Delete", labelID);
         this.cmd("SetText", tree.graphicID, tree.data);
@@ -930,7 +1045,10 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
           "SetMessage",
           "Now remove the value we copied. Call remove with that value on the right subtree.",
         );
-        this.cmd("Step");
+        this.markAnimationStep(`remove successor ${tmp.data}`, {
+          focusNodeId: tmp.graphicID,
+          tags: ["delete", "successor", "remove"],
+        });
 
         // The copied value came from the minimum of the right subtree.
         // Deleting that value from tree.right will remove the duplicate node
@@ -957,6 +1075,7 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
       "SetMessage",
       "Elemet " + valueToDelete + " not found, could not delete",
     );
+    this.markAnimationStep("value not found", { tags: ["delete", "not-found"] });
   }
 };
 
@@ -967,8 +1086,8 @@ BST.prototype.resizeTree = function () {
   this.resizeWidths(this.treeRoot);
   if (this.treeRoot != null) {
     this.setNewPositions(this.treeRoot, startingPoint, BST.STARTING_Y, 0);
+    this.markAnimationStep("resize tree", { tags: ["layout", "resize"] });
     this.animateNewPositions(this.treeRoot);
-    this.cmd("Step");
   }
 };
 

@@ -127,6 +127,28 @@ DetectCycle.prototype.init = function (am, w, h, graphOpts) {
   DetectCycle.superclass.init.call(this, am, w, h, true, false, opts);
 };
 
+DetectCycle.prototype.beginDetectCycleAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "DetectCycle", operation, ...meta });
+};
+
+DetectCycle.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "DetectCycle",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+DetectCycle.prototype.finishDetectCycleAnimation = function () {
+  return this.finishAnimation();
+};
+
 DetectCycle.prototype.setup = function () {
   DetectCycle.superclass.setup.call(this);
 
@@ -226,7 +248,9 @@ DetectCycle.prototype.doDetectCycle = function () {
 };
 
 DetectCycle.prototype.doDetectCycleAction = function () {
-  this.commands = [];
+  this.beginDetectCycleAnimation("detectCycle", "detect directed cycle", {
+    tags: ["search", "cycle"],
+  });
 
   if (this.messageID != null) {
     for (var i = 0; i < this.messageID.length; i++) {
@@ -309,7 +333,10 @@ DetectCycle.prototype.doDetectCycleAction = function () {
         this.adj_matrix_x_start - this.adj_matrix_width,
         this.adj_matrix_y_start + start * this.adj_matrix_height,
       );
-      this.cmd("Step");
+      this.markAnimationStep(`start dfs at ${start}`, {
+        focusNodeId: this.circleID[start],
+        tags: ["search", "start"],
+      });
 
       if (this.dfsDetect(start, STACK_START_X)) {
         this.lastCycleStartRoot = start;
@@ -322,13 +349,22 @@ DetectCycle.prototype.doDetectCycleAction = function () {
   this.cmd("Delete", this.highlightCircleAM);
 
   if (this.foundCycle) {
+    this.beginBlock("cycle detected", {
+      source: "DetectCycle",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "cycle", "found"],
+    });
     this.cmd("SetMessage", "Cycle detected (found an edge to a node currently on the DFS stack).");
   } else {
+    this.beginBlock("no cycle found", {
+      source: "DetectCycle",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "cycle", "not-found"],
+    });
     this.cmd("SetMessage", "No directed cycle found.");
   }
-  this.cmd("Step");
 
-  return this.commands;
+  return this.finishDetectCycleAnimation();
 };
 
 DetectCycle.prototype.objectExists = function (id) {
@@ -406,7 +442,10 @@ DetectCycle.prototype.dfsDetect = function (vertex, messageX) {
   this.cmd("SetText", this.onStackID[vertex], "T");
   this.setCurrentCursor(vertex);
   this.cmd("SetMessage", `Visit ${vertex}; mark as on the stack.`);
-  this.cmd("Step");
+  this.markAnimationStep(`visit ${vertex}`, {
+    focusNodeId: this.circleID[vertex],
+    tags: ["search", "visit"],
+  });
 
   for (var neighbor = 0; neighbor < this.size; neighbor++) {
     if (this.adj_matrix[vertex][neighbor] > 0) {
@@ -419,7 +458,10 @@ DetectCycle.prototype.dfsDetect = function (vertex, messageX) {
         this.setEdgeColor(vertex, neighbor, CYCLE_EDGE_COLOR);
         this.highlightEdge(vertex, neighbor, 1);
         this.cmd("SetMessage", `Edge ${vertex} -> ${neighbor} reaches a node on the stack. Cycle found.`);
-        this.cmd("Step");
+        this.markAnimationStep(`back edge ${vertex} -> ${neighbor}`, {
+          focusNodeId: this.circleID[neighbor],
+          tags: ["search", "cycle", "back-edge"],
+        });
         this.foundCycle = true;
         return true;
       }
@@ -428,7 +470,10 @@ DetectCycle.prototype.dfsDetect = function (vertex, messageX) {
         this.setEdgeColor(vertex, neighbor, TREE_EDGE_COLOR);
         this.highlightEdge(vertex, neighbor, 1);
         this.cmd("SetMessage", `Recurse to ${neighbor}.`);
-        this.cmd("Step");
+        this.markAnimationStep(`recurse to ${neighbor}`, {
+          focusNodeId: this.circleID[neighbor],
+          tags: ["search", "recurse"],
+        });
 
         if (this.dfsDetect(neighbor, messageX + STACK_INDENT)) {
           return true;
@@ -441,12 +486,18 @@ DetectCycle.prototype.dfsDetect = function (vertex, messageX) {
 
         this.setCurrentCursor(vertex);
         this.cmd("SetMessage", `Return to ${vertex} from ${neighbor}.`);
-        this.cmd("Step");
+        this.markAnimationStep(`return to ${vertex}`, {
+          focusNodeId: this.circleID[vertex],
+          tags: ["search", "return"],
+        });
       } else {
         this.setEdgeColor(vertex, neighbor, "#000000");
         this.highlightEdge(vertex, neighbor, 0);
         this.cmd("SetMessage", `${neighbor} already fully processed; continue.`);
-        this.cmd("Step");
+        this.markAnimationStep(`skip processed ${neighbor}`, {
+          focusNodeId: this.circleID[neighbor],
+          tags: ["search", "skip"],
+        });
       }
     }
   }
@@ -455,7 +506,10 @@ DetectCycle.prototype.dfsDetect = function (vertex, messageX) {
   this.cmd("SetText", this.onStackID[vertex], "F");
   this.popStackVisual(vertex);
   this.cmd("SetMessage", `Done at ${vertex}. Mark as not on the stack.`);
-  this.cmd("Step");
+  this.markAnimationStep(`finish ${vertex}`, {
+    focusNodeId: this.circleID[vertex],
+    tags: ["search", "finish"],
+  });
   return false;
 };
 

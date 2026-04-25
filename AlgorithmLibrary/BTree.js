@@ -137,6 +137,28 @@ BTree.prototype.init = function (am, w, h) {
   };
 };
 
+BTree.prototype.beginBTreeAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "BTree", operation, ...meta });
+};
+
+BTree.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "BTree",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+BTree.prototype.finishBTreeAnimation = function () {
+  return this.finishAnimation();
+};
+
 BTree.prototype.addControls = function () {
   addSeparatorToAlgorithmBar();
   this.controls = [];
@@ -307,7 +329,9 @@ BTree.prototype.printCallback = function (event) {
 };
 
 BTree.prototype.printTree = function (unused) {
-  this.commands = new Array();
+  this.beginBTreeAnimation("print", "print tree", {
+    tags: ["print"],
+  });
   this.cmd("SetMessage", "Printing tree");
   var firstLabel = this.nextIndex;
 
@@ -318,14 +342,18 @@ BTree.prototype.printTree = function (unused) {
 
   this.printTreeRec(this.treeRoot);
 
+  this.beginBlock("final print output", {
+    source: "BTree",
+    operation: this.currentAnimationOperation,
+    tags: ["print", "complete"],
+  });
   this.cmd("SetMessage", `At end of root node. Final output:\n${this.printMessage}`);
-  this.cmd("Step");
   // for (var i = firstLabel; i < this.nextIndex; i++) {
   //   this.cmd("Delete", i);
   // }
   // this.nextIndex = firstLabel;
   // this.cmd("SetMessage", "");
-  return this.commands;
+  return this.finishBTreeAnimation();
 };
 
 BTree.prototype.printTreeRec = function (tree) {
@@ -352,13 +380,19 @@ BTree.prototype.printTreeRec = function (tree) {
       // }
     }
     this.cmd("SetMessage", `In leaf. Print all values. Output is:\n${this.printMessage}`);
-    this.cmd("Step");
+    this.markAnimationStep(`print leaf ${tree.graphicID}`, {
+      focusNodeId: tree.graphicID,
+      tags: ["print", "leaf"],
+    });
     this.cmd("SetHighlight", tree.graphicID, 0);
     this.cmd("SetMessage", `Return to parent.`);
   } else {
     this.cmd("SetMessage", `Descend to leftmost child.`);
     this.cmd("SetEdgeHighlight", tree.graphicID, tree.children[0].graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`descend leftmost from ${tree.graphicID}`, {
+      focusNodeId: tree.children[0].graphicID,
+      tags: ["print", "descend"],
+    });
     this.cmd("SetHighlight", tree.graphicID, 0);
     this.cmd("SetEdgeHighlight", tree.graphicID, tree.children[0].graphicID, 0);
     this.printTreeRec(tree.children[0]);
@@ -378,7 +412,10 @@ BTree.prototype.printTreeRec = function (tree) {
       // );
       // this.cmd("SetForegroundColor", nextLabelID, PRINT_COLOR);
       // this.cmd("Move", nextLabelID, this.xPosOfNextLabel, this.yPosOfNextLabel);
-      this.cmd("Step");
+      this.markAnimationStep(`print key ${tree.keys[i]}`, {
+        focusNodeId: tree.graphicID,
+        tags: ["print", "output"],
+      });
       // this.xPosOfNextLabel += PRINT_HORIZONTAL_GAP;
       // if (this.xPosOfNextLabel > PRINT_MAX) {
       //   this.xPosOfNextLabel = FIRST_PRINT_POS_X;
@@ -391,7 +428,10 @@ BTree.prototype.printTreeRec = function (tree) {
         tree.children[i + 1].graphicID,
         1,
       );
-      this.cmd("Step");
+      this.markAnimationStep(`descend child ${i + 1} from ${tree.graphicID}`, {
+        focusNodeId: tree.children[i + 1].graphicID,
+        tags: ["print", "descend"],
+      });
       this.cmd("SetHighlight", tree.graphicID, 0);
       this.cmd(
         "SetEdgeHighlight",
@@ -402,7 +442,10 @@ BTree.prototype.printTreeRec = function (tree) {
       this.printTreeRec(tree.children[i + 1]);
     }
     this.cmd("SetHighlight", tree.graphicID, 1);
-    this.cmd("Step");
+    this.markAnimationStep(`finish node ${tree.graphicID}`, {
+      focusNodeId: tree.graphicID,
+      tags: ["print", "return"],
+    });
     this.cmd("SetHighlight", tree.graphicID, 0);
   }
 };
@@ -457,18 +500,25 @@ BTree.prototype.findCallback = function (event) {
 };
 
 BTree.prototype.findElement = function (findValue) {
-  this.commands = new Array();
+  this.beginBTreeAnimation("find", `find ${findValue}`, {
+    tags: ["search", "find"],
+  });
 
   this.cmd("SetMessage", "Finding " + findValue);
   this.findInTree(this.treeRoot, findValue);
 
-  return this.commands;
+  return this.finishBTreeAnimation();
 };
 
 BTree.prototype.findInTree = function (tree, val) {
   if (tree != null) {
+    this.beginBlock(`inspect node ${tree.graphicID}`, {
+      source: "BTree",
+      operation: this.currentAnimationOperation,
+      focusNodeId: tree.graphicID,
+      tags: ["search", "inspect"],
+    });
     this.cmd("SetHighlight", tree.graphicID, 1);
-    this.cmd("Step");
     var i;
     for (i = 0; i < tree.numKeys && tree.keys[i] < val; i++);
     if (i == tree.numKeys) {
@@ -481,7 +531,10 @@ BTree.prototype.findInTree = function (tree, val) {
           tree.children[tree.numKeys].graphicID,
           1,
         );
-        this.cmd("Step");
+        this.markAnimationStep(`descend right from ${tree.graphicID}`, {
+          focusNodeId: tree.children[tree.numKeys].graphicID,
+          tags: ["search", "descend", "right"],
+        });
         this.cmd("SetMessage", `Search for ${val} in rightmost child.`);
 
         this.cmd("SetHighlight", tree.graphicID, 0);
@@ -493,6 +546,12 @@ BTree.prototype.findInTree = function (tree, val) {
         );
         this.findInTree(tree.children[tree.numKeys], val);
       } else {
+        this.beginBlock(`value ${val} not found`, {
+          source: "BTree",
+          operation: this.currentAnimationOperation,
+          focusNodeId: tree.graphicID,
+          tags: ["search", "not-found"],
+        });
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd("SetMessage",
           "Element " + val + " is not in the tree",
@@ -511,7 +570,10 @@ BTree.prototype.findInTree = function (tree, val) {
           tree.children[i].graphicID,
           1,
         );
-        this.cmd("Step");
+        this.markAnimationStep(`descend child ${i} from ${tree.graphicID}`, {
+          focusNodeId: tree.children[i].graphicID,
+          tags: ["search", "descend", "left"],
+        });
         if(i == 0)
           this.cmd("SetMessage", `Search leftmost child for ${val}`);
         else
@@ -526,21 +588,35 @@ BTree.prototype.findInTree = function (tree, val) {
         );
         this.findInTree(tree.children[i], val);
       } else {
+        this.beginBlock(`value ${val} not found`, {
+          source: "BTree",
+          operation: this.currentAnimationOperation,
+          focusNodeId: tree.graphicID,
+          tags: ["search", "not-found"],
+        });
         this.cmd("SetHighlight", tree.graphicID, 0);
         this.cmd("SetMessage",
           "Element " + val + " is not in the tree",
         );
       }
     } else {
+      this.beginBlock(`found ${val}`, {
+        source: "BTree",
+        operation: this.currentAnimationOperation,
+        focusNodeId: tree.graphicID,
+        tags: ["search", "found"],
+      });
       this.cmd("SetTextColor", tree.graphicID, Colors.HIGHLIGHT, i);
       this.cmd("SetMessage", "Element " + val + " found");
-      this.cmd("Step");
       this.cmd("SetTextColor", tree.graphicID, Colors.BASE, i);
       this.cmd("SetHighlight", tree.graphicID, 0);
-
-      this.cmd("Step");
     }
   } else {
+    this.beginBlock(`value ${val} not found`, {
+      source: "BTree",
+      operation: this.currentAnimationOperation,
+      tags: ["search", "not-found"],
+    });
     this.cmd("SetMessage",
       "Element " + val + " is not in the tree",
     );
@@ -548,10 +624,14 @@ BTree.prototype.findInTree = function (tree, val) {
 };
 
 BTree.prototype.insertElement = function (insertedValue) {
-  this.commands = new Array();
+  this.beginBTreeAnimation("insert", `insert ${insertedValue}`, {
+    tags: ["insert"],
+  });
 
   this.cmd("SetMessage", "Inserting " + insertedValue + ". Start from root.");
-  this.cmd("Step");
+  this.markAnimationStep(`start insert ${insertedValue}`, {
+    tags: ["insert", "start"],
+  });
 
   if (this.treeRoot == null) {
     this.treeRoot = new BTreeNode(
@@ -573,7 +653,10 @@ BTree.prototype.insertElement = function (insertedValue) {
     this.treeRoot.keys[0] = insertedValue;
     this.cmd("SetText", this.treeRoot.graphicID, insertedValue, 0);
     this.cmd("SetMessage", "Root is null, create node and add value.");
-    this.cmd("Step");
+    this.markAnimationStep("create root", {
+      focusNodeId: this.treeRoot.graphicID,
+      tags: ["insert", "root"],
+    });
 
   } else {
     if (this.preemptiveSplit) {
@@ -603,7 +686,7 @@ BTree.prototype.insertElement = function (insertedValue) {
 
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishBTreeAnimation();
 };
 
 BTree.prototype.insertNotFull = function (tree, insertValue) {
@@ -1677,6 +1760,11 @@ BTree.prototype.getLabelX = function (tree, index) {
 };
 
 BTree.prototype.resizeTree = function () {
+  if (this.pendingBlock) {
+    this.markAnimationStep("resize tree", {
+      tags: ["layout", "resize"],
+    });
+  }
   this.resizeWidths(this.treeRoot);
   this.setNewPositions(this.treeRoot, this.starting_x, STARTING_Y);
   this.animateNewPositions(this.treeRoot);

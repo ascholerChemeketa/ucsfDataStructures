@@ -113,6 +113,29 @@ Trie.prototype.reset = function () {
   this.root = null;
 };
 
+Trie.prototype.beginTrieAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, {
+    source: "Trie",
+    operation,
+    ...meta,
+  });
+};
+
+Trie.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "Trie",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+Trie.prototype.finishTrieAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 Trie.prototype.insertCallback = function () {
   var insertedValue = this.inputField.value.toUpperCase();
   insertedValue = insertedValue.replace(/[^a-z]/gi, "");
@@ -146,6 +169,9 @@ Trie.prototype.findCallback = function () {
 
 Trie.prototype.printTree = function (unused) {
   this.commands = [];
+  this.beginTrieAnimation("print", "print trie", {
+    tags: ["print"],
+  });
 
   if (this.root != null) {
     this.highlightID = this.nextIndex++;
@@ -184,7 +210,13 @@ Trie.prototype.printTree = function (unused) {
     }
     this.nextIndex = this.highlightID; /// Reuse objects.  Not necessary.
   }
-  return this.commands;
+  this.beginBlock("finish print", {
+    source: "Trie",
+    operation: this.currentAnimationOperation,
+    tags: ["complete", "print"],
+  });
+  this.cmd("SetMessage", "");
+  return this.finishTrieAnimation();
 };
 
 Trie.prototype.printTreeRec = function (tree, stringSoFar) {
@@ -240,6 +272,10 @@ Trie.prototype.printTreeRec = function (tree, stringSoFar) {
 
 Trie.prototype.findElement = function (word) {
   this.commands = [];
+  this.beginTrieAnimation("find", "find " + word, {
+    value: word,
+    tags: ["find", "search"],
+  });
 
   this.commands = new Array();
   this.cmd("SetMessage", "Finding: '" + word + "' ");
@@ -247,6 +283,12 @@ Trie.prototype.findElement = function (word) {
   this.cmd("Step");
 
   var node = this.doFind(this.root, word);
+  this.beginBlock((node != null ? "found " : "not found ") + word, {
+    source: "Trie",
+    operation: this.currentAnimationOperation,
+    value: word,
+    tags: [node != null ? "found" : "not-found"],
+  });
   if (node != null) {
     this.cmd("SetMessage", 'Found "' + word + '"');
   } else {
@@ -256,7 +298,7 @@ Trie.prototype.findElement = function (word) {
   this.cmd("SetMessage", "");
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishTrieAnimation();
 };
 
 Trie.prototype.doFind = function (tree, s) {
@@ -266,6 +308,9 @@ Trie.prototype.doFind = function (tree, s) {
   this.cmd("SetHighlight", tree.graphicID, 1);
 
   if (s.length == 0) {
+    this.markAnimationStep("check word flag", {
+      tags: ["check"],
+    });
     if (tree.isword == true) {
       this.cmd(
         "SetMessage",
@@ -286,6 +331,10 @@ Trie.prototype.doFind = function (tree, s) {
   } else {
     this.cmd("SetHighlightIndex", 1, 1);
     var index = s.charCodeAt(0) - "A".charCodeAt(0);
+    this.markAnimationStep("descend " + s.charAt(0), {
+      letter: s.charAt(0),
+      tags: ["descend"],
+    });
     if (tree.children[index] == null) {
       this.cmd(
         "SetMessage",
@@ -336,12 +385,20 @@ Trie.prototype.insert = function (elem, tree) {};
 
 Trie.prototype.deleteElement = function (word) {
   this.commands = [];
+  this.beginTrieAnimation("delete", "delete " + word, {
+    value: word,
+    tags: ["delete"],
+  });
   this.cmd("SetMessage", "Deleting: '" + word + "' ");
   this.cmd("AlignRight", 1, 0);
   this.cmd("Step");
 
   var node = this.doFind(this.root, word);
   if (node != null) {
+    this.markAnimationStep("unset word flag for " + word, {
+      value: word,
+      tags: ["delete", "word-flag"],
+    });
     this.cmd("SetHighlight", node.graphicID, 1);
     this.cmd(
       "SetMessage",
@@ -362,7 +419,14 @@ Trie.prototype.deleteElement = function (word) {
   this.cmd("SetMessage", "");
   this.cmd("SetMessage", "");
   this.cmd("SetMessage", "");
-  return this.commands;
+  this.beginBlock("delete complete", {
+    source: "Trie",
+    operation: this.currentAnimationOperation,
+    value: word,
+    tags: ["complete"],
+  });
+  this.cmd("SetMessage", "");
+  return this.finishTrieAnimation();
 };
 
 Trie.prototype.numChildren = function (tree) {
@@ -382,6 +446,10 @@ Trie.prototype.cleanupAfterDelete = function (tree) {
   var children = this.numChildren(tree);
 
   if (children == 0 && !tree.isword) {
+    this.markAnimationStep("cleanup " + (tree.wordRemainder || "root"), {
+      value: tree.wordRemainder,
+      tags: ["cleanup"],
+    });
     this.cmd(
       "SetMessage",
       'Deletion left us with a "False" leaf\nRemoving false leaf',
@@ -417,10 +485,17 @@ Trie.prototype.resizeTree = function () {
 
 Trie.prototype.add = function (word) {
   this.commands = new Array();
+  this.beginTrieAnimation("insert", "insert " + word, {
+    value: word,
+    tags: ["insert"],
+  });
   this.cmd("SetMessage", "Inserting '" + word + "'");
   this.cmd("AlignRight", 1, 0);
   this.cmd("Step");
   if (this.root == null) {
+    this.markAnimationStep("create root", {
+      tags: ["create", "root"],
+    });
     this.cmd(
       "CreateCircle",
       this.nextIndex,
@@ -445,11 +520,17 @@ Trie.prototype.add = function (word) {
     this.nextIndex += 1;
   }
   this.addR(word.toUpperCase(), this.root);
+  this.beginBlock("insert complete", {
+    source: "Trie",
+    operation: this.currentAnimationOperation,
+    value: word,
+    tags: ["complete"],
+  });
   this.cmd("SetMessage", "");
   this.cmd("SetMessage", "");
   this.cmd("SetMessage", "");
 
-  return this.commands;
+  return this.finishTrieAnimation();
 };
 
 Trie.prototype.addR = function (s, tree) {
@@ -470,6 +551,10 @@ Trie.prototype.addR = function (s, tree) {
     this.cmd("SetHighlightIndex", 1, 1);
     var index = s.charCodeAt(0) - "A".charCodeAt(0);
     if (tree.children[index] == null) {
+      this.markAnimationStep("create node " + s.charAt(0), {
+        letter: s.charAt(0),
+        tags: ["create"],
+      });
       this.cmd(
         "CreateCircle",
         this.nextIndex,
@@ -507,6 +592,10 @@ Trie.prototype.addR = function (s, tree) {
       this.nextIndex += 1;
       this.highlightID = this.nextIndex++;
     }
+    this.markAnimationStep("descend " + s.charAt(0), {
+      letter: s.charAt(0),
+      tags: ["descend"],
+    });
     this.cmd(
       "CreateHighlightCircle",
       this.highlightID,

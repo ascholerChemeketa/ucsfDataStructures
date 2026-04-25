@@ -124,6 +124,28 @@ BFS.prototype.init = function (am, w, h, graphOpts) {
   // Setup called in base class constructor
 };
 
+BFS.prototype.beginBFSAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "BFS", operation, ...meta });
+};
+
+BFS.prototype.markAnimationStep = function (label, meta = {}) {
+  const stepMeta = {
+    source: "BFS",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  };
+  if (stepMeta.tags != null) {
+    stepMeta.tags = Array.isArray(stepMeta.tags) ? stepMeta.tags : [stepMeta.tags];
+  }
+  this.step(label, stepMeta);
+};
+
+BFS.prototype.finishBFSAnimation = function () {
+  return this.finishAnimation();
+};
+
 BFS.prototype.setup = function () {
   BFS.superclass.setup.call(this);
   this.messageID = new Array();
@@ -268,7 +290,9 @@ BFS.prototype.clearAdjacencyRepEdgeHighlight = function (i, j) {
 BFS.prototype.doBFS = function (startVetex) {
   this.visited = new Array(this.size);
   this.parent = new Array(this.size);
-  this.commands = new Array();
+  this.beginBFSAnimation("search", `bfs from ${startVetex}`, {
+    tags: ["search", "bfs"],
+  });
   this.queue = new Array(this.size);
   var head = 0;
   var tail = 0;
@@ -341,7 +365,10 @@ BFS.prototype.doBFS = function (startVetex) {
     this.cmd("SetTextColor", queueID[head], BFS_QUEUE_HEAD_COLOR);
 
     this.cmd("SetMessage", `Explore node at front of queue (${vertex}).`);
-    this.cmd("Step");
+    this.markAnimationStep(`explore ${vertex}`, {
+      focusNodeId: this.circleID[vertex],
+      tags: ["search", "queue", "explore"],
+    });
 
     for (var neighbor = 0; neighbor < this.size; neighbor++) {
       if (this.adj_matrix[vertex][neighbor] > 0) {
@@ -352,7 +379,10 @@ BFS.prototype.doBFS = function (startVetex) {
         this.applyEdgeVisualState(vertex, neighbor, EDGE_CHECK_COLOR, false);
         this.cmd("SetHighlight", this.visitedID[neighbor], 1);
         this.cmd("SetMessage", `Explore edge ${vertex} -> ${neighbor} (check whether ${neighbor} is known).`);
-        this.cmd("Step");
+        this.markAnimationStep(`check edge ${vertex} -> ${neighbor}`, {
+          focusNodeId: this.circleID[neighbor],
+          tags: ["search", "edge", "check"],
+        });
 
         // Phase 2: choose either selected (normal highlight) or restore prior state.
         if (!this.visited[neighbor]) {
@@ -392,6 +422,10 @@ BFS.prototype.doBFS = function (startVetex) {
           );
           // Selected edge: restore normal color, but keep highlighted.
           this.applyEdgeVisualState(vertex, neighbor, savedEdgeColor, true);
+          this.markAnimationStep(`discover ${neighbor} from ${vertex}`, {
+            focusNodeId: this.circleID[neighbor],
+            tags: ["search", "discover", "enqueue"],
+          });
         } else {
           this.cmd("SetMessage", `Neighbor ${neighbor} was already visited; ignore this edge.`);
           // Not selected edge: restore whatever visual state it had before consideration.
@@ -401,13 +435,19 @@ BFS.prototype.doBFS = function (startVetex) {
             savedEdgeColor,
             savedEdgeHighlight,
           );
+          this.markAnimationStep(`skip visited ${neighbor}`, {
+            focusNodeId: this.circleID[neighbor],
+            tags: ["search", "skip", "visited"],
+          });
         }
-        this.cmd("Step");
 
         // Keep adjacency-list/matrix highlights temporary per edge check.
         this.clearAdjacencyRepEdgeHighlight(vertex, neighbor);
         this.cmd("SetHighlight", this.visitedID[neighbor], 0);
-        this.cmd("Step");
+        this.markAnimationStep(`finish edge ${vertex} -> ${neighbor}`, {
+          focusNodeId: this.circleID[neighbor],
+          tags: ["search", "edge", "finish"],
+        });
       }
     }
     this.cmd("SetTextColor", queueID[head], "#000000");
@@ -431,19 +471,24 @@ BFS.prototype.doBFS = function (startVetex) {
 
 
     this.cmd("SetMessage", `Done exploring ${vertex}.`);
-    this.cmd("Step");
+    this.markAnimationStep(`finish ${vertex}`, {
+      focusNodeId: this.circleID[vertex],
+      tags: ["search", "queue", "finish"],
+    });
   }
 
+  this.beginBlock("complete bfs", {
+    source: "BFS",
+    operation: this.currentAnimationOperation,
+    tags: ["search", "complete"],
+  });
   this.cmd("SetMessage", "Queue is empty. BFS complete. Search tree highlighted.");
   for (i = 0; i < this.size; i++) {
     if (this.parent[i] >= 0) {
       this.applyEdgeVisualState(this.parent[i], i, SEARCH_TREE_FINAL_COLOR, true);
     }
   }
-  this.cmd("Step");
-
-
-  return this.commands;
+  return this.finishBFSAnimation();
 };
 
 // NEED TO OVERRIDE IN PARENT

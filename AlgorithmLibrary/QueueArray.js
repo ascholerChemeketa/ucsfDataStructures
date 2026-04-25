@@ -225,6 +225,25 @@ QueueArray.prototype.reset = function () {
   this.nextIndex = this.initialIndex;
 };
 
+QueueArray.prototype.beginQueueArrayAnimation = function (operation, label, meta = {}) {
+  this.currentAnimationOperation = operation;
+  this.beginAnimation();
+  this.beginBlock(label, { source: "QueueArray", operation, ...meta });
+};
+
+QueueArray.prototype.markAnimationStep = function (label, meta = {}) {
+  this.step(label, {
+    source: "QueueArray",
+    operation: this.currentAnimationOperation,
+    ...meta,
+  });
+};
+
+QueueArray.prototype.finishQueueArrayAnimation = function () {
+  this.currentAnimationOperation = null;
+  return this.finishAnimation();
+};
+
 QueueArray.prototype.enqueueCallback = function (event) {
   if (this.inputField.value != "") {
     var pushVal = this.inputField.value;
@@ -244,13 +263,19 @@ QueueArray.prototype.clearCallback = function (event) {
 };
 
 QueueArray.prototype.enqueue = function (elemToEnqueue) {
-  this.commands = new Array();
+  this.beginQueueArrayAnimation("enqueue", `enqueue ${elemToEnqueue}`, {
+    tags: ["queue", "enqueue"],
+  });
   
 
   if(this.tail == this.head - 1 || (this.head == 0 && this.tail == SIZE - 1)) {
+    this.beginBlock("queue full", {
+      source: "QueueArray",
+      operation: this.currentAnimationOperation,
+      tags: ["queue", "enqueue", "full"],
+    });
     this.cmd("SetMessage", "End is one less than start. Queue is full. Cannot enqueue.");
-    this.cmd("Step");
-    return this.commands;
+    return this.finishQueueArrayAnimation();
   }
 
   // var labEnqueueID = this.nextIndex++;
@@ -268,7 +293,10 @@ QueueArray.prototype.enqueue = function (elemToEnqueue) {
     QUEUE_ELEMENT_Y,
   );
 
-  this.cmd("Step");
+  this.markAnimationStep(`stage ${elemToEnqueue}`, {
+    tags: ["queue", "enqueue", "stage"],
+    focusNodeId: labEnqueueValID,
+  });
   this.cmd("SetMessage", "End gives next available location.");
   this.cmd(
     "CreateHighlightCircle",
@@ -277,7 +305,9 @@ QueueArray.prototype.enqueue = function (elemToEnqueue) {
     TAIL_POS_X,
     TAIL_POS_Y,
   );
-  this.cmd("Step");
+  this.markAnimationStep(`identify slot ${this.tail}`, {
+    tags: ["queue", "enqueue", "slot"],
+  });
 
   var xpos =
     (this.tail % ARRAY_ELEMS_PER_LINE) * ARRAY_ELEM_WIDTH + ARRAY_START_X;
@@ -286,10 +316,16 @@ QueueArray.prototype.enqueue = function (elemToEnqueue) {
     ARRAY_START_Y;
 
   this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT);
-  this.cmd("Step");
+  this.markAnimationStep(`move to slot ${this.tail}`, {
+    tags: ["queue", "enqueue", "move"],
+    focusNodeId: this.arrayID[this.tail],
+  });
 
   this.cmd("Move", labEnqueueValID, xpos, ypos);
-  this.cmd("Step");
+  this.markAnimationStep(`place ${elemToEnqueue} at ${this.tail}`, {
+    tags: ["queue", "enqueue", "place"],
+    focusNodeId: this.arrayID[this.tail],
+  });
 
   this.cmd("Settext", this.arrayID[this.tail], elemToEnqueue);
   this.cmd("Delete", labEnqueueValID);
@@ -297,28 +333,34 @@ QueueArray.prototype.enqueue = function (elemToEnqueue) {
   this.cmd("Delete", this.highlight1ID);
 
   this.cmd("SetHighlight", this.tailID, 1);
-    this.cmd("SetMessage", "Advance end to next location.");
-  this.cmd("Step");
+  this.cmd("SetMessage", "Advance end to next location.");
+  this.markAnimationStep("advance end pointer", {
+    tags: ["queue", "enqueue", "tail-pointer"],
+  });
   this.tail = (this.tail + 1) % SIZE;
 
   this.cmd("SetText", this.tailID, this.tail);
   if (this.tail == 0 )
     this.cmd("SetMessage", "Advance end to next location. It wraps around to index 0.");
 
-  this.cmd("Step");
+  this.markAnimationStep("enqueue complete", {
+    tags: ["queue", "enqueue", "complete"],
+  });
   this.cmd("SetHighlight", this.tailID, 0);
   this.cmd("SetMessage", "");
   // this.cmd("Delete", labEnqueueID);
-  return this.commands;
+  return this.finishQueueArrayAnimation();
 };
 
 QueueArray.prototype.dequeue = function (ignored) {
-  this.commands = new Array();
+  this.beginQueueArrayAnimation("dequeue", "dequeue", {
+    tags: ["queue", "dequeue"],
+  });
 
   if(this.tail == this.head) {
     this.cmd("SetMessage", "Start == End. Queue is empty.");
-    this.cmd("Step");
-    return this.commands;
+    this.markAnimationStep("queue empty", { tags: ["queue", "dequeue", "empty"] });
+    return this.finishQueueArrayAnimation();
   }
 
   //var labDequeueID = this.nextIndex++;
@@ -343,7 +385,9 @@ QueueArray.prototype.dequeue = function (ignored) {
   );
   
   this.cmd("SetMessage", "Start gives location of first value.");
-  this.cmd("Step");
+  this.markAnimationStep(`identify head ${this.head}`, {
+    tags: ["queue", "dequeue", "head"],
+  });
 
   var xpos =
     (this.head % ARRAY_ELEMS_PER_LINE) * ARRAY_ELEM_WIDTH + ARRAY_START_X;
@@ -352,7 +396,10 @@ QueueArray.prototype.dequeue = function (ignored) {
     ARRAY_START_Y;
 
   this.cmd("Move", this.highlight1ID, xpos, ypos + ARRAY_ELEM_HEIGHT);
-  this.cmd("Step");
+  this.markAnimationStep(`move to head slot ${this.head}`, {
+    tags: ["queue", "dequeue", "move"],
+    focusNodeId: this.arrayID[this.head],
+  });
 
   this.cmd("Delete", this.highlight1ID);
 
@@ -362,18 +409,25 @@ QueueArray.prototype.dequeue = function (ignored) {
   this.cmd("Move", labDequeueValID, QUEUE_ELEMENT_X, QUEUE_ELEMENT_Y);
   
   this.cmd("SetMessage", `Dequeue ${dequeuedVal}`);
-  this.cmd("Step");
+  this.markAnimationStep(`extract ${dequeuedVal}`, {
+    tags: ["queue", "dequeue", "extract"],
+    focusNodeId: this.arrayID[this.head],
+  });
 
   this.cmd("SetHighlight", this.headID, 1);
   this.cmd("SetMessage", "Increment start to next location.");
-  this.cmd("Step");
+  this.markAnimationStep("advance start pointer", {
+    tags: ["queue", "dequeue", "head-pointer"],
+  });
   this.head = (this.head + 1) % SIZE;
   
   if (this.head == 0 )
     this.cmd("SetMessage", "Advance start to next location. It wraps around to index 0.");
 
   this.cmd("SetText", this.headID, this.head);
-  this.cmd("Step");
+  this.markAnimationStep("dequeue complete", {
+    tags: ["queue", "dequeue", "complete"],
+  });
   this.cmd("SetHighlight", this.headID, 0);
 
   this.cmd("SetText", this.leftoverLabelID, "");
@@ -382,11 +436,13 @@ QueueArray.prototype.dequeue = function (ignored) {
   //this.cmd("Delete", labDequeueID);
   this.cmd("Delete", labDequeueValID);
 
-  return this.commands;
+  return this.finishQueueArrayAnimation();
 };
 
 QueueArray.prototype.clearAll = function () {
-  this.commands = new Array();
+  this.beginQueueArrayAnimation("clear", "clear queue", {
+    tags: ["queue", "clear"],
+  });
   this.cmd("SetText", this.leftoverLabelID, "");
 
   for (var i = 0; i < SIZE; i++) {
@@ -396,5 +452,8 @@ QueueArray.prototype.clearAll = function () {
   this.tail = 0;
   this.cmd("SetText", this.headID, "0");
   this.cmd("SetText", this.tailID, "0");
-  return this.commands;
+  this.markAnimationStep("queue cleared", {
+    tags: ["queue", "clear", "complete"],
+  });
+  return this.finishQueueArrayAnimation();
 };
