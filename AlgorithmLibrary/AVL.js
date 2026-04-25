@@ -490,7 +490,8 @@ AVL.prototype.insertElement = function (insertedValue) {
     labelID = this.nextIndex++;
     this.highlightID = this.nextIndex++;
 
-    this.cmd("CreateCircle", treeNodeID, insertedValue, 30, AVL.STARTING_Y);
+    this.cmd("CreateCircle", treeNodeID, insertedValue, 
+      this.startingX - 200, AVL.STARTING_Y);
 
     this.cmd("SetForegroundColor", treeNodeID, AVL.FOREGROUND_COLOR);
     this.cmd("SetBackgroundColor", treeNodeID, AVL.BACKGROUND_COLOR);
