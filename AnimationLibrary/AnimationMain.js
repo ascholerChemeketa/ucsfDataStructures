@@ -431,6 +431,7 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
   scrubSlider.style.marginTop = "6px";
   scrubSlider.style.height = "4px";
   scrubSlider.style.cursor = "pointer";
+  scrubSlider.ariaLabel = "Animation Scrubber";
   controlBar.appendChild(scrubSlider);
 
   // Autoplay control (below step buttons)
@@ -537,17 +538,24 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
     }
   });
   addControlTo(zoomSelect, controlBar, "Zoom");
+  
+  var resetButton = addControlTo(makeInput("Button", "Reset Animation", "Reset Animation", "resetButton"), controlBar);
+  resetButton.onclick = function () {
+    window.location.reload();
+  };
+
+  var msgBoxLabel = document.createElement("label");
+  msgBoxLabel.setAttribute("for", "message");
+  msgBoxLabel.textContent = "Message:";
+  controlBar.appendChild(msgBoxLabel);
 
   var msgBox = document.createElement("textarea");
   msgBox.setAttribute("readonly", "readonly");
   msgBox.setAttribute("id", "message");
+  msgBox.setAttribute("aria-live", "polite");
   msgBox.setAttribute("rows", "4");
   controlBar.appendChild(msgBox);
 
-  var resetButton = addControlTo(makeInput("Button", "Reset", "Reset", "resetButton"), controlBar);
-  resetButton.onclick = function () {
-    window.location.reload();
-  };
 }
 
 function applyAutoZoomForMinVisibleWidth(minVisibleWorldWidth) {
