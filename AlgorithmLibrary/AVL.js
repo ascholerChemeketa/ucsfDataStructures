@@ -374,25 +374,23 @@ AVL.prototype.findElement = function (findValue) {
   });
 
   this.highlightID = this.nextIndex++;
+  this.cmd("SetMessage", "Searching for " + findValue + ". Starting from root.");
+  this.cmd("Step");
+
   this.findHelp(this.treeRoot, findValue);
 
   return this.finishAVLAnimation();
 };
 
 AVL.prototype.findHelp = function (tree, value) {
-  this.cmd("SetMessage", "Searchiing for " + value);
   if (tree != null) {
     this.cmd("SetHighlight", tree.graphicID, 1);
     if (tree.data == value) {
       this.cmd(
         "SetMessage",
-        "Searching for " +
+        "At " +
         value +
-        " : " +
-        value +
-        " = " +
-        value +
-        " (Element found!)",
+        ". Element found!",
       );
       this.cmd("Step");
       this.cmd("SetMessage", "Found:" + value);
@@ -401,13 +399,7 @@ AVL.prototype.findHelp = function (tree, value) {
       if (tree.data > value) {
         this.cmd(
           "SetMessage",
-          "Searching for " +
-          value +
-          " : " +
-          value +
-          " < " +
-          tree.data +
-          " (look to left subtree)",
+          `At ${tree.data}: ${value} < ${tree.data}.  Looking at left subtree`
         );
         this.cmd("Step");
         this.cmd("SetHighlight", tree.graphicID, 0);
@@ -427,13 +419,7 @@ AVL.prototype.findHelp = function (tree, value) {
       } else {
         this.cmd(
           "SetMessage",
-          " Searching for " +
-          value +
-          " : " +
-          value +
-          " > " +
-          tree.data +
-          " (look to right subtree)",
+          `At ${tree.data}: ${value} > ${tree.data}.  Looking at right subtree`
         );
         this.cmd("Step");
         this.cmd("SetHighlight", tree.graphicID, 0);
@@ -455,12 +441,12 @@ AVL.prototype.findHelp = function (tree, value) {
   } else {
     this.cmd(
       "SetMessage",
-      " Searching for " + value + " : " + "< Empty Tree > (Element not found)",
+      `Searching for ${value} : < Empty Tree > (Element not found)`,
     );
     this.cmd("Step");
     this.cmd(
       "SetMessage",
-      " Searching for " + value + " : " + " (Element not found)",
+      `Searching for ${value} : (Element not found)`,
     );
   }
 };
@@ -777,14 +763,10 @@ AVL.prototype.insert = function (elem, tree) {
         tree.left.y,
       );
       this.cmd("Move", this.highlightID, tree.x, tree.y);
-      this.cmd("SetMessage", `Adjusting height in ${tree.data}`);
-      this.cmd("Step");
-      this.cmd("Delete", this.highlightID);
-
       if (tree.height < tree.left.height + 1) {
+        this.cmd("SetMessage", `Adjusting height in ${tree.data}. Was ${tree.height}, now ${tree.left.height + 1}`);
         tree.height = tree.left.height + 1;
         this.cmd("SetText", tree.heightLabelID, tree.height);
-        this.cmd("SetMessage", `Adjusting height after recursive call to ${tree.height}`);
         this.cmd(
           "SetForegroundColor",
           tree.heightLabelID,
@@ -797,9 +779,16 @@ AVL.prototype.insert = function (elem, tree) {
           AVL.HEIGHT_LABEL_COLOR,
         );
       }
+      else {
+        this.cmd("SetMessage", `Adjusting height in ${tree.data}. No change in height.`);
+      }
+
+      this.cmd("Step");
+      this.cmd("Delete", this.highlightID);
+
       var msgHighlight = this.nextIndex++;
       this.cmd("CreateHighlightCircle", msgHighlight, AVL.HIGHLIGHT_COLOR, tree.x, tree.y);
-      this.cmd("SetMessage", `Check balance. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
+      this.cmd("SetMessage", `Check balance at ${tree.data}. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
       this.cmd("Step");
       this.cmd("Delete", msgHighlight);
       if (this.getBalance(tree) > 1) {
@@ -833,14 +822,11 @@ AVL.prototype.insert = function (elem, tree) {
         tree.left.y,
       );
       this.cmd("Move", this.highlightID, tree.x, tree.y);
-      this.cmd("SetMessage", `Adjusting height in ${tree.data}`);
-      this.cmd("Step");
-      this.cmd("Delete", this.highlightID);
 
       if (tree.height < tree.left.height + 1) {
+        this.cmd("SetMessage", `Adjusting height in ${tree.data}. Was ${tree.height}, now ${tree.left.height + 1}`);
         tree.height = tree.left.height + 1;
         this.cmd("SetText", tree.heightLabelID, tree.height);
-        this.cmd("SetMessage", `Adjusting height after recursive call to ${tree.height}`);
         this.cmd(
           "SetForegroundColor",
           tree.heightLabelID,
@@ -853,9 +839,16 @@ AVL.prototype.insert = function (elem, tree) {
           AVL.HEIGHT_LABEL_COLOR,
         );
       }
+      else {
+        this.cmd("SetMessage", `Adjusting height in ${tree.data}. No change in height.`);
+      }
+
+      this.cmd("Step");
+      this.cmd("Delete", this.highlightID);
+
       var msgHighlight = this.nextIndex++;
       this.cmd("CreateHighlightCircle", msgHighlight, AVL.HIGHLIGHT_COLOR, tree.x, tree.y);
-      this.cmd("SetMessage", `Check balance. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
+      this.cmd("SetMessage", `Check balance at ${tree.data}. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
       this.cmd("Step");
       this.cmd("Delete", msgHighlight);
       if (this.getBalance(tree) < -1) {
@@ -903,14 +896,11 @@ AVL.prototype.insert = function (elem, tree) {
         tree.right.y,
       );
       this.cmd("Move", this.highlightID, tree.x, tree.y);
-      this.cmd("SetMessage", `Adjusting height in ${tree.data}`);
-      this.cmd("Step");
-      this.cmd("Delete", this.highlightID);
 
       if (tree.height < tree.right.height + 1) {
+        this.cmd("SetMessage", `Adjusting height in ${tree.data}. Was ${tree.height}, now ${tree.right.height + 1}`);
         tree.height = tree.right.height + 1;
         this.cmd("SetText", tree.heightLabelID, tree.height);
-        this.cmd("SetMessage", `Adjusting height after recursive call to ${tree.height}`);
         this.cmd(
           "SetForegroundColor",
           tree.heightLabelID,
@@ -923,9 +913,16 @@ AVL.prototype.insert = function (elem, tree) {
           AVL.HEIGHT_LABEL_COLOR,
         );
       }
+      else {
+        this.cmd("SetMessage", `Adjusting height in ${tree.data}. No change in height.`);
+      }
+
+      this.cmd("Step");
+      this.cmd("Delete", this.highlightID);
+
       var msgHighlight = this.nextIndex++;
       this.cmd("CreateHighlightCircle", msgHighlight, AVL.HIGHLIGHT_COLOR, tree.x, tree.y);
-      this.cmd("SetMessage", `Check balance. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
+      this.cmd("SetMessage", `Check balance at ${tree.data}. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
       this.cmd("Step");
       this.cmd("Delete", msgHighlight);
     } else {
@@ -947,13 +944,13 @@ AVL.prototype.insert = function (elem, tree) {
         tree.right.x,
         tree.right.y,
       );
+
       this.cmd("Move", this.highlightID, tree.x, tree.y);
-      this.cmd("SetMessage", `Adjusting height in ${tree.data}`);
-      this.cmd("Step");
+
       if (tree.height < tree.right.height + 1) {
+        this.cmd("SetMessage", `Adjusting height in ${tree.data}. Was ${tree.height}, now ${tree.right.height + 1}`);
         tree.height = tree.right.height + 1;
         this.cmd("SetText", tree.heightLabelID, tree.height);
-        this.cmd("SetMessage", `Adjusting height after recursive call to ${tree.height}`);
         this.cmd(
           "SetForegroundColor",
           tree.heightLabelID,
@@ -966,12 +963,17 @@ AVL.prototype.insert = function (elem, tree) {
           AVL.HEIGHT_LABEL_COLOR,
         );
       }
+      else {
+        this.cmd("SetMessage", `Adjusting height in ${tree.data}. No change in height.`);
+      }
+
+      this.cmd("Step");
+      this.cmd("Delete", this.highlightID);
       
       var msgHighlight = this.nextIndex++;
       this.cmd("CreateHighlightCircle", msgHighlight, AVL.HIGHLIGHT_COLOR, tree.x, tree.y);
-      this.cmd("SetMessage", `Check balance. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
+      this.cmd("SetMessage", `Check balance at ${tree.data}. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
       this.cmd("Step");
-      this.cmd("Delete", this.highlightID);
       this.cmd("Delete", msgHighlight);
       if (this.getBalance(tree) < -1) {
         if (elem.data >= tree.right.data) {
@@ -992,7 +994,7 @@ AVL.prototype.deleteElement = function (deletedValue) {
   this.beginAVLAnimation("delete", `delete ${deletedValue}`, {
     tags: ["delete"],
   });
-  this.cmd("SetMessage", "Deleting " + deletedValue);
+  this.cmd("SetMessage", "Deleting " + deletedValue + ". Search for node to delete starting at root.");
   this.markAnimationStep("start delete", { tags: ["delete", "start"] });
   this.cmd("SetMessage", " ");
   this.highlightID = this.nextIndex++;
@@ -1012,17 +1014,17 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
     if (valueToDelete < tree.data) {
       this.cmd(
         "SetMessage",
-        valueToDelete + " < " + tree.data + ".  Looking at left subtree",
+        `At ${tree.data}: ${valueToDelete} < ${tree.data}.  Looking at left subtree`,
       );
     } else if (valueToDelete > tree.data) {
       this.cmd(
         "SetMessage",
-        valueToDelete + " > " + tree.data + ".  Looking at right subtree",
+        `At ${tree.data}: ${valueToDelete} > ${tree.data}.  Looking at right subtree`,
       );
     } else {
       this.cmd(
         "SetMessage",
-        valueToDelete + " == " + tree.data + ".  Found node to delete",
+        `At ${tree.data}: ${valueToDelete} == ${tree.data}.  Found node to delete`,
       );
     }
     this.cmd("Step");
@@ -1106,7 +1108,7 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
       else {
         this.cmd(
           "SetMessage",
-          "Node to delete has two childern.  \nFind smallest node in right subtree.",
+          `Node to delete has two children.  \nFind smallest node in right subtree.`,
         );
 
         this.highlightID = this.nextIndex;
@@ -1208,7 +1210,7 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
           // TODO:  Add extra animation here?
           var msgHighlight = this.nextIndex++;
           this.cmd("CreateHighlightCircle", msgHighlight, AVL.HIGHLIGHT_COLOR, tmp.x, tmp.y);
-          this.cmd("SetMessage", `Check balance. \nleft height: ${this.getHeight(tmp.left)}, right height: ${this.getHeight(tmp.right)}; balance: ${this.getHeight(tmp.left) - this.getHeight(tmp.right)}`);
+          this.cmd("SetMessage", `Check balance at ${tmp.data}. \nleft height: ${this.getHeight(tmp.left)}, right height: ${this.getHeight(tmp.right)}; balance: ${this.getHeight(tmp.left) - this.getHeight(tmp.right)}`);
           this.cmd("Step");
           this.cmd("Delete", msgHighlight);
           if (this.getHeight(tmp.left) - this.getHeight(tmp.right) > 1) {
@@ -1243,23 +1245,14 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
               );
             }
             this.cmd("Move", this.highlightID, tmpPar.x, tmpPar.y);
-            this.cmd("SetMessage", `Adjusting height in ${tmpPar.data}`);
 
+            let newHeight = Math.max(this.getHeight(tmpPar.left), this.getHeight(tmpPar.right)) + 1;
             if (
-              this.getHeight(tmpPar) !=
-              Math.max(
-                this.getHeight(tmpPar.left),
-                this.getHeight(tmpPar.right),
-              ) +
-              1
+              tmpPar.height != newHeight
             ) {
-              tmpPar.height =
-                Math.max(
-                  this.getHeight(tmpPar.left),
-                  this.getHeight(tmpPar.right),
-                ) + 1;
-              this.cmd("SetText", tmpPar.heightLabelID, tree.height);
-              this.cmd("SetMessage", `Adjusting height after recursive call to ${tmpPar.height}`);
+              tmpPar.height = newHeight;
+              this.cmd("SetText", tmpPar.heightLabelID, tmpPar.height);
+              this.cmd("SetMessage", `Adjusting height in ${tmpPar.height}. Was ${tmpPar.height}, now ${newHeight}`);
               this.cmd(
                 "SetForegroundColor",
                 tmpPar.heightLabelID,
@@ -1271,10 +1264,9 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
                 tmpPar.heightLabelID,
                 AVL.HEIGHT_LABEL_COLOR,
               );
+            } else {
+              this.cmd("SetMessage", `Adjusting height in ${tmpPar.data}. No change in height.`);
             }
-
-            //28,15,50,7,22,39,55,10,33,42,63,30 .
-
             this.cmd("Step");
             this.cmd("Delete", this.highlightID);
           }
@@ -1282,7 +1274,7 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
         }
         var msgHighlight = this.nextIndex++;
         this.cmd("CreateHighlightCircle", msgHighlight, AVL.HIGHLIGHT_COLOR, tree.x, tree.y);
-        this.cmd("SetMessage", `Check balance. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
+        this.cmd("SetMessage", `Check balance at ${tree.data}. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
         this.cmd("Step");
         this.cmd("Delete", msgHighlight);
         if (this.getHeight(tree.right) - this.getHeight(tree.left) > 1) {
@@ -1315,7 +1307,6 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
       }
       this.treeDelete(tree.left, valueToDelete);
       if (tree.left != null) {
-        this.cmd("SetMessage", "Unwinding recursion.");
         this.cmd(
           "CreateHighlightCircle",
           this.highlightID,
@@ -1324,13 +1315,13 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
           tree.left.y,
         );
         this.cmd("Move", this.highlightID, tree.x, tree.y);
-        this.cmd("SetMessage", `Adjusting height in ${tree.data}`);
-        this.cmd("Step");
+        this.cmd("SetMessage", `Return to ${tree.data}`);
         this.cmd("Delete", this.highlightID);
+        this.cmd("Step");
       }
       var msgHighlight = this.nextIndex++;
       this.cmd("CreateHighlightCircle", msgHighlight, AVL.HIGHLIGHT_COLOR, tree.x, tree.y);
-      this.cmd("SetMessage", `Check balance. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
+      this.cmd("SetMessage", `Check balance at ${tree.data}. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
       this.cmd("Step");
       this.cmd("Delete", msgHighlight);
       if (this.getHeight(tree.right) - this.getHeight(tree.left) > 1) {
@@ -1346,10 +1337,16 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
         this.getHeight(tree) !=
         Math.max(this.getHeight(tree.left), this.getHeight(tree.right)) + 1
       ) {
+        let oldHeight = tree.height;
         tree.height =
           Math.max(this.getHeight(tree.left), this.getHeight(tree.right)) + 1;
         this.cmd("SetText", tree.heightLabelID, tree.height);
-        this.cmd("SetMessage", `Adjusting height after recursive call to ${tree.height}`);
+        if (oldHeight == tree.height) {
+          this.cmd("SetMessage", `Adjusting height in ${tree.data}. No change in height.`);
+        }
+        else {
+          this.cmd("SetMessage", `Adjusting height in ${tree.data}. Was ${oldHeight}, now ${tree.height}`);
+        }
         this.cmd(
           "SetForegroundColor",
           tree.heightLabelID,
@@ -1378,7 +1375,6 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
       }
       this.treeDelete(tree.right, valueToDelete);
       if (tree.right != null) {
-        this.cmd("SetMessage", `Adjusting height in ${tree.data}`);
         this.cmd(
           "CreateHighlightCircle",
           this.highlightID,
@@ -1387,13 +1383,14 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
           tree.right.y,
         );
         this.cmd("Move", this.highlightID, tree.x, tree.y);
+        this.cmd("SetMessage", `Return to ${tree.data}`);
         this.cmd("Step");
         this.cmd("Delete", this.highlightID);
       }
 
       var msgHighlight = this.nextIndex++;
       this.cmd("CreateHighlightCircle", msgHighlight, AVL.HIGHLIGHT_COLOR, tree.x, tree.y);
-      this.cmd("SetMessage", `Check balance. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
+      this.cmd("SetMessage", `Check balance at ${tree.data}. \nleft height: ${this.getHeight(tree.left)}, right height: ${this.getHeight(tree.right)}; balance: ${this.getHeight(tree.left) - this.getHeight(tree.right)}`);
       this.cmd("Step");
       this.cmd("Delete", msgHighlight);
       if (this.getHeight(tree.left) - this.getHeight(tree.right) > 1) {
@@ -1411,10 +1408,16 @@ AVL.prototype.treeDelete = function (tree, valueToDelete) {
         this.getHeight(tree) !=
         Math.max(this.getHeight(tree.left), this.getHeight(tree.right)) + 1
       ) {
+        let oldHeight = tree.height;
         tree.height =
           Math.max(this.getHeight(tree.left), this.getHeight(tree.right)) + 1;
         this.cmd("SetText", tree.heightLabelID, tree.height);
-        this.cmd("SetMessage", `Adjusting height after recursive call to ${tree.height}`);
+        if (oldHeight == tree.height) {
+          this.cmd("SetMessage", `Adjusting height in ${tree.data}. No change in height.`);
+        }
+        else {
+          this.cmd("SetMessage", `Adjusting height in ${tree.data}. Was ${oldHeight}, now ${tree.height}`);
+        }
         this.cmd(
           "SetForegroundColor",
           tree.heightLabelID,
