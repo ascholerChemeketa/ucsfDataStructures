@@ -123,10 +123,13 @@ class Dragable {
   }
 }
 
-function makeSVG(centered, viewWidth = 800, viewHeight = 400) {
+const DEFAULT_SVG_VIEW_WIDTH = 1200;
+const DEFAULT_SVG_VIEW_HEIGHT = 600;
+
+function makeSVG(centered, viewWidth = DEFAULT_SVG_VIEW_WIDTH, viewHeight = DEFAULT_SVG_VIEW_HEIGHT) {
   let sizeStyle = centered ? "xMidYMin" : "xMinYMin";
   const s = `
-  <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 ${viewWidth} ${viewHeight}" 
+  <svg xmlns="http://www.w3.org/2000/svg" role="img" width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}" 
      preserveAspectRatio="${sizeStyle} slice">
     <defs>
       <marker id="SVGTriangleMarker" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8"
@@ -172,9 +175,11 @@ export function ObjectManager(canvas, centered = false) {
   this.activeLayers[0] = true;
   this.ctx = canvas.getContext("2d");
 
-  const baseViewWidth = Number.isFinite(canvas?.width) && canvas.width > 0 ? canvas.width : 800;
-  const baseViewHeight = Number.isFinite(canvas?.height) && canvas.height > 0 ? canvas.height : 400;
+  const baseViewWidth = DEFAULT_SVG_VIEW_WIDTH;
+  const baseViewHeight = DEFAULT_SVG_VIEW_HEIGHT;
   this.svg = makeSVG(centered, baseViewWidth, baseViewHeight);
+  this.svg.setAttribute("width", String(baseViewWidth));
+  this.svg.setAttribute("height", String(baseViewHeight));
   this.ctx.svg = this.svg;
   this.framenum = 0;
   this.width = 0;
@@ -205,8 +210,8 @@ export function ObjectManager(canvas, centered = false) {
     const zoomDelta = zoomLevel - this.svgZoom;
     this.svgZoom = zoomLevel;
 
-    const nextVbW = this.svgBaseViewWidth * this.svgZoom;
-    const nextVbH = this.svgBaseViewHeight * this.svgZoom;
+    const nextVbW = this.svgBaseViewWidth / this.svgZoom;
+    const nextVbH = this.svgBaseViewHeight / this.svgZoom;
 
     if (
       focusProvided &&

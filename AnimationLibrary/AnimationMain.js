@@ -118,6 +118,29 @@ function deriveZoomCookieName(title, opts = null) {
   return `${BASE_ZOOM_COOKIE_NAME}_${sanitizeCookieToken(scope)}`;
 }
 
+function normalizeZoomValue(rawZoom) {
+  let parsed = parseFloat(rawZoom);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 1;
+  }
+
+  // Backward compatibility: previous zoom values were inverses where 1x = 4.
+  if (parsed > 3) {
+    parsed = 4 / parsed;
+  }
+
+  const allowedZoomValues = [0.25, 0.5, 0.75, 1, 1.5, 2, 3];
+  const isAllowed = allowedZoomValues.some((v) => Math.abs(v - parsed) < 1e-9);
+  if (isAllowed) {
+    return parsed;
+  }
+
+  return allowedZoomValues.reduce(
+    (best, v) => (Math.abs(v - parsed) < Math.abs(best - parsed) ? v : best),
+    allowedZoomValues[0],
+  );
+}
+
 function installZoomHoverTracking(targetEl) {
   if (zoomHoverTrackingInstalled) return;
   zoomHoverTrackingInstalled = true;
@@ -471,38 +494,20 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
     // Backward compatibility: if a legacy global cookie exists, keep honoring it.
     zoom = getCookie(BASE_ZOOM_COOKIE_NAME);
   }
-  {
-    let parsed = parseFloat(zoom);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      parsed = 4;
-    }
-
-    // Keep UI + behavior consistent even if an old/unsupported zoom value is stored.
-    // Displayed "x" scale is inversely proportional to this numeric value (1x uses value 4).
-    const allowedZoomValues = [16, 8, 6, 4, 2.6666666667, 2, 1.3333333333];
-    const isAllowed = allowedZoomValues.some((v) => Math.abs(v - parsed) < 1e-9);
-    if (!isAllowed) {
-      parsed = allowedZoomValues.reduce(
-        (best, v) => (Math.abs(v - parsed) < Math.abs(best - parsed) ? v : best),
-        allowedZoomValues[0],
-      );
-    }
-
-    zoom = parsed;
-  }
+  zoom = normalizeZoomValue(zoom);
   objectManager.setZoom(zoom);
 
   var zoomSelect = document.createElement("select");
   zoomSelect.setAttribute("id", "zoomLevel");
   zoomSelect.setAttribute("name", "zoomLevel");
   zoomSelect.innerHTML = `
-    <option value="16" ${zoom == 16 ? "selected" : ""}>0.25x</option>
-    <option value="8" ${zoom == 8 ? "selected" : ""}>0.5x</option>
-    <option value="6" ${zoom == 6 ? "selected" : ""}>0.75x</option>
-    <option value="4" ${zoom == 4 ? "selected" : ""}>1x</option>
-    <option value="2.6666666667" ${zoom == 2.6666666667 ? "selected" : ""}>1.5x</option>
+    <option value="0.25" ${zoom == 0.25 ? "selected" : ""}>0.25x</option>
+    <option value="0.5" ${zoom == 0.5 ? "selected" : ""}>0.5x</option>
+    <option value="0.75" ${zoom == 0.75 ? "selected" : ""}>0.75x</option>
+    <option value="1" ${zoom == 1 ? "selected" : ""}>1x</option>
+    <option value="1.5" ${zoom == 1.5 ? "selected" : ""}>1.5x</option>
     <option value="2" ${zoom == 2 ? "selected" : ""}>2x</option>
-    <option value="1.3333333333" ${zoom == 1.3333333333 ? "selected" : ""}>3x</option>`;
+    <option value="3" ${zoom == 3 ? "selected" : ""}>3x</option>`;
 
   zoomSelect.addEventListener("change", (e) => {
     setCookie(zoomCookieName, e.target.value);
@@ -777,7 +782,10 @@ export function initCanvas(canvas, targetElement=null, title="", centered = fals
   addGeneralControls(objectManager, targetElement, title, opts);
 
   var controlBar = document.getElementById("algoControlSection");
-  controlBar.after(objectManager.svg);
+  var svgWrapper = document.createElement("div");
+  svgWrapper.id = "animationViewport";
+  svgWrapper.appendChild(objectManager.svg);
+  controlBar.after(svgWrapper);
 
   // After layout, adjust initial zoom so at least 800 logical px are visible.
   // (This primarily helps narrow viewports where preserveAspectRatio="slice" crops width.)
