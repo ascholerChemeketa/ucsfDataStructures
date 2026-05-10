@@ -1,5 +1,5 @@
 // Treap (Cartesian tree) visualization based on BST, with heap priorities.
-// Supports insert/find/remove and insert random values. Priority shown next to node.
+// Supports insert/find/remove and Add Random Values. Priority shown next to node.
 
 import { initAnimationManager } from "../AnimationLibrary/AnimationMain.js";
 import {
@@ -113,7 +113,7 @@ Treap.prototype.addControls = function () {
   this.clearButton = addControlToAlgorithmBar("Button", "Clear");
   this.clearButton.onclick = this.clearCallback.bind(this);
 
-  this.insertRandomButton = addControlToAlgorithmBar("Button", "Insert Random Values");
+  this.insertRandomButton = addControlToAlgorithmBar("Button", "Add Random Values");
   this.insertRandomButton.onclick = this.insertRandomCallback.bind(this);
 };
 

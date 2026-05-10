@@ -106,7 +106,7 @@ SkipList.prototype.addControls = function () {
   this.clearButton = addControlToAlgorithmBar("Button", "Clear");
   this.clearButton.onclick = this.clearCallback.bind(this);
 
-  this.insertRandomButton = addControlToAlgorithmBar("Button", "Insert Random Values");
+  this.insertRandomButton = addControlToAlgorithmBar("Button", "Add Random Values");
   this.insertRandomButton.onclick = this.insertRandomCallback.bind(this);
 };
 
