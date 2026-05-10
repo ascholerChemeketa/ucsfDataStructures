@@ -91,7 +91,7 @@ AVL.prototype.init = function (am, w, h) {
   var fn = sc.init;
 
   fn.call(this, am, w, h);
-  this.startingX = 150; // w / 2;
+  this.startingX = 250; // w / 2;
   this.nextIndex = 0;
   this.beginAnimation();
   this.rootIndex = 0;
