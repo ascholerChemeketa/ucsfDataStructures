@@ -17,7 +17,13 @@ body {
 #algoControlSection {
   background: var(--controlBackground);
   color: #000000;
+  width: 100%;
 }
+
+#algoControlSection * {
+  box-sizing: border-box;
+}
+
 
 canvas {
   /* background: black; */
@@ -47,16 +53,19 @@ canvas {
 #animationSurround {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  align-items: flex-start;
+  min-height:100vh;
 }
 
-#animationSurround > svg {
-  flex: 1;
-  min-height: 150px;
+#animationViewport {
+  flex: 1 1 auto;
+  align-self: flex-start;
+  overflow: hidden;
+  max-height: 60vh;
 }
 
-#animationSurround > canvas {
-  flex: 0;
+#animationViewport > svg {
+  display: block;
 }
 
 #algoControlSection {
@@ -85,14 +94,13 @@ canvas {
 
 svg {
   cursor: move;
-  /* max-width: 800px; */
   min-height: 200px;
 }
 
 #algoControlSection {
   container-name: sidebar;
   container-type: inline-size;
-  min-width: 150px;
+  min-width: 200px;
 }
 
 @media (min-width: 600px) {
@@ -102,9 +110,14 @@ svg {
     width: 200px;
     scrollbar-width: thin;
     order: 0;
+    flex-shrink: 0;
   }
   #animationSurround {
     flex-direction: row;
+    align-items: stretch;
+  }
+  #animationViewport {
+    max-height: unset;
   }
 }
 
