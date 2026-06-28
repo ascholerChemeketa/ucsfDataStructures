@@ -127,6 +127,22 @@ UndoSetWidth.prototype.undoInitialStep = function (world) {
 };
 
 ////////////////////////////////////////////////////////////
+// UndoSetLineDash
+////////////////////////////////////////////////////////////
+
+export function UndoSetLineDash(id, val) {
+  this.objectID = id;
+  this.lineDash = val;
+}
+
+UndoSetLineDash.prototype = new UndoBlock();
+UndoSetLineDash.prototype.constructor = UndoSetLineDash;
+
+UndoSetLineDash.prototype.undoInitialStep = function (world) {
+  world.setLineDash(this.objectID, this.lineDash);
+};
+
+////////////////////////////////////////////////////////////
 // UndoSetNumElements
 ////////////////////////////////////////////////////////////
 export function UndoSetNumElements(obj, newNumElems) {

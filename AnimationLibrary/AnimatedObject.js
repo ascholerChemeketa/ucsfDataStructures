@@ -44,6 +44,7 @@ AnimatedObject.prototype.init = function () {
   this.range = 5;
   this.highlightIndex = -1;
   this.highlightIndexDirty = true;
+  this.lineDash = "";
 };
 
 AnimatedObject.prototype.alwaysOnTop = false;
@@ -97,6 +98,14 @@ AnimatedObject.prototype.centerX = function () {
 
 AnimatedObject.prototype.setWidth = function (newWidth) {
   // TODO:  Do we want to throw here?  Should always override this ...
+};
+
+AnimatedObject.prototype.setLineDash = function (lineDash) {
+  this.lineDash = lineDash || "";
+};
+
+AnimatedObject.prototype.getLineDash = function () {
+  return this.lineDash || "";
 };
 
 AnimatedObject.prototype.centerY = function () {

@@ -247,6 +247,8 @@ function legacyCommandToStep(command, args) {
       };
     case "SETWIDTH":
       return { type: "setWidth", id: args[0], width: args[1] };
+    case "SETLINEDASH":
+      return { type: "setLineDash", id: args[0], lineDash: args[1] };
     case "SETNUMELEMENTS":
       return { type: "setNumElements", id: args[0], count: args[1] };
     case "SETPOSITION":

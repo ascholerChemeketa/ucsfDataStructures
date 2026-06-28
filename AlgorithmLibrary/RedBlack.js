@@ -84,6 +84,11 @@ var PRINT_COLOR = FOREGROUND_COLOR;
 var widthDelta = 50;
 var heightDelta = 60;
 var startingY = 50;
+var GROUP_RED_X_DELTA = 36;
+var GROUP_RED_Y_DELTA = 36;
+var GROUP_HEIGHT_DELTA = 125;
+var GROUP_MIN_WIDTH = 125;
+var GROUP_CHILD_SPACING = 32;
 
 var EXPLANITORY_TEXT_Y = 10;
 
@@ -170,6 +175,10 @@ RedBlack.prototype.addControls = function () {
   this.showNullLeaves = addCheckboxToAlgorithmBar("Show Null Leaves", 'NullLeavesCheck');
   this.showNullLeaves.onclick = this.showNullLeavesCallback.bind(this);
   this.showNullLeaves.checked = false;
+
+  this.show234Groups = addCheckboxToAlgorithmBar("Show 2-3-4 Groups", "Groups234Check");
+  this.show234Groups.onclick = this.show234GroupsCallback.bind(this);
+  this.show234Groups.checked = false;
 };
 
 RedBlack.prototype.reset = function () {
@@ -280,7 +289,55 @@ RedBlack.prototype.insertRandomCallback = function (event) {
 };
 
 
+RedBlack.prototype.show234GroupsEnabled = function () {
+  return this.show234Groups && this.show234Groups.checked;
+};
+
+RedBlack.prototype.isNodeVisible = function (node) {
+  let showNullLeaves = this.showNullLeaves && this.showNullLeaves.checked;
+  return node != null && (showNullLeaves || !node.phantomLeaf);
+};
+
+RedBlack.prototype.isRedNonNullNode = function (node) {
+  return node != null && !node.phantomLeaf && node.blackLevel == 0;
+};
+
+RedBlack.prototype.get234GroupNodes = function (tree) {
+  if (!this.isNodeVisible(tree) || tree.phantomLeaf || tree.blackLevel != 1) {
+    return [];
+  }
+  const group = [tree];
+  if (this.isRedNonNullNode(tree.left)) group.push(tree.left);
+  if (this.isRedNonNullNode(tree.right)) group.push(tree.right);
+  return group;
+};
+
+RedBlack.prototype.get234ChildRoots = function (tree) {
+  if (!this.isNodeVisible(tree)) {
+    return [];
+  }
+  if (tree.blackLevel == 0) {
+    return [tree.left, tree.right].filter((child) => this.isNodeVisible(child));
+  }
+
+  const children = [];
+  if (this.isRedNonNullNode(tree.left)) {
+    children.push(tree.left.left, tree.left.right);
+  } else {
+    children.push(tree.left);
+  }
+  if (this.isRedNonNullNode(tree.right)) {
+    children.push(tree.right.left, tree.right.right);
+  } else {
+    children.push(tree.right);
+  }
+  return children.filter((child) => this.isNodeVisible(child));
+};
+
 RedBlack.prototype.updateGroupingsRec = function (tree, show) {
+  if (!this.isNodeVisible(tree) || tree.phantomLeaf) {
+    return;
+  }
   if (tree.left != null && !tree.left.phantomLeaf) {
     this.updateGroupingsRec(tree.left, show);
   }
@@ -317,9 +374,10 @@ RedBlack.prototype.updateGroupingsRec = function (tree, show) {
       maxY = Math.max(maxY, ly + LABEL_PAD_Y + OUTER_PAD);
     };
 
-    addNodeBounds(tree);
-    if (tree.left && tree.left.blackLevel == 0) addNodeBounds(tree.left);
-    if (tree.right && tree.right.blackLevel == 0) addNodeBounds(tree.right);
+    const groupNodes = this.get234GroupNodes(tree);
+    for (const node of groupNodes) {
+      addNodeBounds(node);
+    }
 
     const width = Math.max(0, maxX - minX);
     const height = Math.max(0, maxY - minY);
@@ -335,6 +393,7 @@ RedBlack.prototype.updateGroupingsRec = function (tree, show) {
       // Make it an outline only, and ensure it's on a visible layer.
       this.cmd("SetBackgroundColor", rectID, "rgba(255, 255, 255, 0)");
       this.cmd("SetForegroundColor", rectID, LINK_COLOR);
+      this.cmd("SetLineDash", rectID, "6 4");
       this.cmd("SetLayer", rectID, 0);
     }
 
@@ -352,13 +411,16 @@ RedBlack.prototype.updateGroupingsRec = function (tree, show) {
 
 RedBlack.prototype.updateGroupings = function (unused) {
   this.commands = [];
-  this.updateGroupingsInternal();
+  if (this.treeRoot) {
+    this.resizeTree();
+  } else {
+    this.updateGroupingsInternal();
+  }
   return this.commands;
 }
 
 RedBlack.prototype.updateGroupingsInternal = function () {
-  // Container boxes disabled (grouping rectangles around black node + red children)
-  // If any exist from a prior run, delete them.
+  const show = this.show234GroupsEnabled();
   const deleteBoxesRec = (tree) => {
     if (tree == null) return;
     if (tree.containerBoxID) {
@@ -369,7 +431,28 @@ RedBlack.prototype.updateGroupingsInternal = function () {
     if (tree.right != null && !tree.right.phantomLeaf) deleteBoxesRec(tree.right);
   };
 
-  if (this.treeRoot) deleteBoxesRec(this.treeRoot);
+  if (!this.treeRoot) {
+    return;
+  }
+  if (show) {
+    this.updateGroupingsRec(this.treeRoot, true);
+  } else {
+    deleteBoxesRec(this.treeRoot);
+  }
+};
+
+RedBlack.prototype.deleteNodeVisuals = function (node) {
+  if (node == null) {
+    return;
+  }
+  if (node.containerBoxID) {
+    this.cmd("Delete", node.containerBoxID);
+    node.containerBoxID = null;
+  }
+  this.cmd("Delete", node.graphicID);
+  if (node.colorLabelID != null) {
+    this.cmd("Delete", node.colorLabelID);
+  }
 };
 
 RedBlack.prototype.setNullLeafLayers = function (tree, layer) {
@@ -386,6 +469,10 @@ RedBlack.prototype.setNullLeafLayers = function (tree, layer) {
 
 RedBlack.prototype.showNullLeavesCallback = function (event) {
   this.implementAction(this.toggleNullLeaves.bind(this), "");
+};
+
+RedBlack.prototype.show234GroupsCallback = function (event) {
+  this.implementAction(this.updateGroupings.bind(this), "");
 };
 
 RedBlack.prototype.deleteNullLeavesRec = function (tree) {
@@ -1414,8 +1501,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
         (tree.right == null || tree.right.phantomLeaf)
       ) {
         this.cmd("SetMessage", "Node to delete is a leaf.  Delete it.");
-        this.cmd("Delete", tree.graphicID);
-        this.cmd("Delete", tree.colorLabelID);
+        this.deleteNodeVisuals(tree);
 
         if (tree.left != null) {
           this.cmd("Delete", tree.left.graphicID);
@@ -1465,8 +1551,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
             LINK_COLOR,
           );
           this.cmd("Step");
-          this.cmd("Delete", tree.graphicID);
-          this.cmd("Delete", tree.colorLabelID);
+          this.deleteNodeVisuals(tree);
           if (leftchild) {
             tree.parent.left = tree.right;
             if (needFix) {
@@ -1492,8 +1577,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
           }
           tree.right.parent = tree.parent;
         } else {
-          this.cmd("Delete", tree.graphicID);
-          this.cmd("Delete", tree.colorLabelID);
+          this.deleteNodeVisuals(tree);
           this.treeRoot = tree.right;
           this.treeRoot.parent = null;
           if (this.treeRoot.blackLevel == 0) {
@@ -1529,8 +1613,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
             LINK_COLOR,
           );
           this.cmd("Step");
-          this.cmd("Delete", tree.graphicID);
-          this.cmd("Delete", tree.colorLabelID);
+          this.deleteNodeVisuals(tree);
           if (leftchild) {
             tree.parent.left = tree.left;
             if (needFix) {
@@ -1562,8 +1645,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
           }
           tree.left.parent = tree.parent;
         } else {
-          this.cmd("Delete", tree.graphicID);
-          this.cmd("Delete", tree.colorLabelID);
+          this.deleteNodeVisuals(tree);
           this.treeRoot = tree.left;
           this.treeRoot.parent = null;
           if (this.treeRoot.blackLevel == 0) {
@@ -1622,8 +1704,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
         needFix = tmp.blackLevel > 0;
 
         if (tmp.right == null) {
-          this.cmd("Delete", tmp.graphicID);
-          this.cmd("Delete", tmp.colorLabelID);
+          this.deleteNodeVisuals(tmp);
           if (tmp.parent != tree) {
             tmp.parent.left = null;
             this.resizeTree();
@@ -1658,8 +1739,7 @@ RedBlack.prototype.treeDelete = function (tree, valueToDelete) {
             LINK_COLOR,
           );
           this.cmd("Step");
-          this.cmd("Delete", tmp.graphicID);
-          this.cmd("Delete", tmp.colorLabelID);
+          this.deleteNodeVisuals(tmp);
 
           if (tmp.parent != tree) {
             tmp.parent.left = tmp.right;
@@ -1793,7 +1873,11 @@ RedBlack.prototype.fixNodeColor = function (tree) {
 
 RedBlack.prototype.resizeTree = function () {
   var startingPoint = this.startingX;
-  this.resizeWidths(this.treeRoot);
+  if (this.show234GroupsEnabled()) {
+    this.resizeWidths234(this.treeRoot);
+  } else {
+    this.resizeWidths(this.treeRoot);
+  }
   if (this.treeRoot != null) {
     if (this.treeRoot.leftWidth > startingPoint) {
       startingPoint = this.treeRoot.leftWidth;
@@ -1803,10 +1887,85 @@ RedBlack.prototype.resizeTree = function () {
         2 * startingPoint - this.treeRoot.rightWidth,
       );
     }
-    this.setNewPositions(this.treeRoot, startingPoint, startingY, 0);
+    if (this.show234GroupsEnabled()) {
+      this.setNewPositions234(this.treeRoot, startingPoint, startingY);
+    } else {
+      this.setNewPositions(this.treeRoot, startingPoint, startingY, 0);
+    }
     this.animateNewPositions(this.treeRoot);
     this.updateGroupingsInternal();
     this.cmd("Step");
+  }
+};
+
+RedBlack.prototype.resizeWidths234 = function (tree) {
+  if (!this.isNodeVisible(tree)) {
+    return 0;
+  }
+
+  if (tree.blackLevel == 0) {
+    tree.leftWidth = Math.max(this.resizeWidths234(tree.left), widthDelta / 2);
+    tree.rightWidth = Math.max(this.resizeWidths234(tree.right), widthDelta / 2);
+    return tree.leftWidth + tree.rightWidth;
+  }
+
+  const childRoots = this.get234ChildRoots(tree);
+  const childWidths = childRoots.map((child) => this.resizeWidths234(child));
+  const childrenWidth =
+    childWidths.reduce((total, width) => total + width, 0) +
+    Math.max(0, childWidths.length - 1) * GROUP_CHILD_SPACING;
+  const groupNodeCount = this.get234GroupNodes(tree).length;
+  const ownWidth = Math.max(GROUP_MIN_WIDTH, NODE_SIZE * 2 + (groupNodeCount - 1) * GROUP_RED_X_DELTA * 2);
+  const totalWidth = Math.max(ownWidth, childrenWidth);
+
+  tree.groupChildRoots = childRoots;
+  tree.groupChildWidths = childWidths;
+  tree.groupOwnWidth = ownWidth;
+  tree.leftWidth = Math.max(totalWidth / 2, widthDelta / 2);
+  tree.rightWidth = Math.max(totalWidth / 2, widthDelta / 2);
+  return totalWidth;
+};
+
+RedBlack.prototype.setNewPositions234 = function (tree, xPosition, yPosition) {
+  if (!this.isNodeVisible(tree)) {
+    return;
+  }
+
+  if (tree.blackLevel == 0) {
+    this.setNewPositions(tree, xPosition, yPosition, 0);
+    return;
+  }
+
+  tree.x = xPosition;
+  tree.y = yPosition;
+  tree.heightLabelX = xPosition - 20;
+  tree.heightLabelY = yPosition - 20;
+
+  if (this.isRedNonNullNode(tree.left)) {
+    tree.left.x = xPosition - GROUP_RED_X_DELTA;
+    tree.left.y = yPosition + GROUP_RED_Y_DELTA;
+    tree.left.heightLabelX = tree.left.x - 20;
+    tree.left.heightLabelY = tree.left.y - 20;
+  }
+  if (this.isRedNonNullNode(tree.right)) {
+    tree.right.x = xPosition + GROUP_RED_X_DELTA;
+    tree.right.y = yPosition + GROUP_RED_Y_DELTA;
+    tree.right.heightLabelX = tree.right.x + 20;
+    tree.right.heightLabelY = tree.right.y - 20;
+  }
+
+  const childRoots = tree.groupChildRoots || this.get234ChildRoots(tree);
+  const childWidths =
+    tree.groupChildWidths || childRoots.map((child) => this.resizeWidths234(child));
+  const childrenWidth =
+    childWidths.reduce((total, width) => total + width, 0) +
+    Math.max(0, childWidths.length - 1) * GROUP_CHILD_SPACING;
+  let nextX = xPosition - childrenWidth / 2;
+
+  for (let i = 0; i < childRoots.length; i++) {
+    const childWidth = childWidths[i];
+    this.setNewPositions234(childRoots[i], nextX + childWidth / 2, yPosition + GROUP_HEIGHT_DELTA);
+    nextX += childWidth + GROUP_CHILD_SPACING;
   }
 };
 

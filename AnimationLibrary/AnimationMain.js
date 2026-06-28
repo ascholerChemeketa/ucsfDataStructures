@@ -1128,6 +1128,10 @@ function AnimationManager(objectManager, canvas) {
       const oldWidth = this.animatedObjects.getWidth(step.id);
       this.animatedObjects.setWidth(step.id, step.width);
       undoBlock.push(new Undo.UndoSetWidth(step.id, oldWidth));
+    } else if (step.type === "setLineDash") {
+      const oldLineDash = this.animatedObjects.getLineDash(step.id);
+      this.animatedObjects.setLineDash(step.id, step.lineDash);
+      undoBlock.push(new Undo.UndoSetLineDash(step.id, oldLineDash));
     } else if (step.type === "setNumElements") {
       const oldElem = this.animatedObjects.getObject(step.id);
       undoBlock.push(new Undo.UndoSetNumElements(oldElem, step.count));

@@ -188,6 +188,9 @@ function replayStep(state, step) {
     case "setWidth":
       mergeObject(state, step.id, { width: step.width });
       break;
+    case "setLineDash":
+      mergeObject(state, step.id, { lineDash: step.lineDash });
+      break;
     case "setLayer":
       mergeObject(state, step.id, { layer: step.layer });
       break;

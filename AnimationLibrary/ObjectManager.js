@@ -592,7 +592,12 @@ export function ObjectManager(canvas, centered = false) {
       }
 
       if (svgElement) {
-        this.svg.getElementById(`layer_${layer}`).appendChild(svgElement);
+        const targetLayer = this.svg.getElementById(`layer_${layer}`);
+        if (this.Nodes[objectID].lineDash) {
+          targetLayer.prepend(svgElement);
+        } else {
+          targetLayer.appendChild(svgElement);
+        }
         if (secondaryTextElement) {
           svgElement.after(secondaryTextElement);
         }
@@ -720,6 +725,13 @@ export function ObjectManager(canvas, centered = false) {
     this.Nodes[nodeID].setWidth(val);
   };
 
+  this.setLineDash = function (nodeID, val) {
+    if (this.Nodes[nodeID] == null || this.Nodes[nodeID] == undefined) {
+      return;
+    }
+    this.Nodes[nodeID].setLineDash(val);
+  };
+
   this.setHeight = function (nodeID, val) {
     if (this.Nodes[nodeID] == null || this.Nodes[nodeID] == undefined) {
       // TODO:  Error here?
@@ -742,6 +754,13 @@ export function ObjectManager(canvas, centered = false) {
       return -1;
     }
     return this.Nodes[nodeID].getWidth();
+  };
+
+  this.getLineDash = function (nodeID) {
+    if (this.Nodes[nodeID] == null || this.Nodes[nodeID] == undefined) {
+      return "";
+    }
+    return this.Nodes[nodeID].getLineDash();
   };
 
   this.backgroundColor = function (objectID) {

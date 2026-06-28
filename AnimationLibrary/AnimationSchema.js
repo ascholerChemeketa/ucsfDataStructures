@@ -327,6 +327,12 @@ function normalizeAnimationStep(rawStep) {
         id: toInt(rawStep.id),
         width: toInt(rawStep.width),
       };
+    case "setlinedash":
+      return {
+        type: "setLineDash",
+        id: toInt(rawStep.id),
+        lineDash: String(rawStep.lineDash ?? rawStep.dash ?? ""),
+      };
     case "setnumelements":
       return {
         type: "setNumElements",

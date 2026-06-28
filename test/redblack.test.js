@@ -32,3 +32,69 @@ test("RedBlack find and delete emit readable outcome blocks", () => {
   const state = replayAnimation([...insert10, ...insert5, ...findAnimation, ...deleteAnimation]);
   assert.equal(state.message.trim(), "");
 });
+
+test("RedBlack 2-3-4 overlay groups red children with their black parent", () => {
+  const tree = createBareRedBlack();
+  const insert10 = tree.insertElement(10);
+  const insert5 = tree.insertElement(5);
+  const insert15 = tree.insertElement(15);
+
+  tree.show234Groups.checked = true;
+  const overlayAnimation = tree.updateGroupings();
+  const state = replayAnimation([...insert10, ...insert5, ...insert15, ...overlayAnimation]);
+
+  const groupBoxes = [...state.objects.values()].filter(
+    (object) =>
+      object.kind === "rectangle" &&
+      object.backgroundColor === "rgba(255, 255, 255, 0)" &&
+      object.foregroundColor === "var(--svgColor)",
+  );
+  assert.equal(groupBoxes.length, 1);
+  assert.equal(groupBoxes[0].lineDash, "6 4");
+
+  const circlesByText = new Map(
+    [...state.objects.values()]
+      .filter((object) => object.kind === "circle")
+      .map((object) => [object.text, object]),
+  );
+  assert.equal(circlesByText.get("5").y - circlesByText.get("10").y, 36);
+  assert.equal(circlesByText.get("15").y - circlesByText.get("10").y, 36);
+});
+
+test("RedBlack 2-3-4 overlay can be turned off", () => {
+  const tree = createBareRedBlack();
+  const insert10 = tree.insertElement(10);
+  const insert5 = tree.insertElement(5);
+
+  tree.show234Groups.checked = true;
+  const overlayOn = tree.updateGroupings();
+  tree.show234Groups.checked = false;
+  const overlayOff = tree.updateGroupings();
+
+  const state = replayAnimation([...insert10, ...insert5, ...overlayOn, ...overlayOff]);
+  const groupBoxes = [...state.objects.values()].filter(
+    (object) =>
+      object.kind === "rectangle" &&
+      object.backgroundColor === "rgba(255, 255, 255, 0)" &&
+      object.foregroundColor === "var(--svgColor)",
+  );
+  assert.equal(groupBoxes.length, 0);
+});
+
+test("RedBlack 2-3-4 overlay cleans up boxes when deleting a black node", () => {
+  const tree = createBareRedBlack();
+  const insert10 = tree.insertElement(10);
+
+  tree.show234Groups.checked = true;
+  const overlayOn = tree.updateGroupings();
+  const delete10 = tree.deleteElement(10);
+
+  const state = replayAnimation([...insert10, ...overlayOn, ...delete10]);
+  const groupBoxes = [...state.objects.values()].filter(
+    (object) =>
+      object.kind === "rectangle" &&
+      object.backgroundColor === "rgba(255, 255, 255, 0)" &&
+      object.foregroundColor === "var(--svgColor)",
+  );
+  assert.equal(groupBoxes.length, 0);
+});

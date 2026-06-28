@@ -106,11 +106,12 @@ AnimatedRectangle.prototype.updateRectangle = function () {
   const bg = this.backgroundColor;
   const fg = this.highlighted ? "var(--svgColor--highlight)" : this.foregroundColor;
   const sw = this.highlighted ? 3 : 1;
+  this.svgRect.setAttributeNS(null, "pointer-events", this.lineDash ? "none" : "visible");
 
   this.svgRect.setAttributeNS(
     null,
     "style",
-    `fill: ${bg}; stroke: ${fg}; stroke-width: ${sw}px;`,
+    `fill: ${bg}; stroke: ${fg}; stroke-width: ${sw}px;${this.lineDash ? ` stroke-dasharray: ${this.lineDash};` : ""}`,
   );
   this.svgRect.setAttributeNS(null, "opacity", this.alpha);
 
@@ -342,6 +343,14 @@ AnimatedRectangle.prototype.draw = function (context) {
 
   context.strokeStyle = this.foregroundColor;
   context.fillStyle = this.backgroundColor;
+  if (this.lineDash && typeof context.setLineDash === "function") {
+    context.setLineDash(
+      this.lineDash
+        .split(/[ ,]+/)
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value)),
+    );
+  }
 
   context.beginPath();
   context.moveTo(startX, startY);
@@ -352,6 +361,9 @@ AnimatedRectangle.prototype.draw = function (context) {
   context.closePath();
   context.stroke();
   context.fill();
+  if (typeof context.setLineDash === "function") {
+    context.setLineDash([]);
+  }
 
   if (this.nullPointer) {
     context.beginPath();
@@ -391,6 +403,7 @@ AnimatedRectangle.prototype.createUndoDelete = function () {
     this.foregroundColor,
     this.highlighted,
     this.layer,
+    this.lineDash,
   );
 };
 
@@ -409,6 +422,11 @@ AnimatedRectangle.prototype.setForegroundColor = function (newColor) {
   this.updateRectangle();
 };
 
+AnimatedRectangle.prototype.setLineDash = function (lineDash) {
+  AnimatedObject.prototype.setLineDash.call(this, lineDash);
+  this.updateRectangle();
+};
+
 function UndoDeleteRectangle(
   id,
   lab,
@@ -422,6 +440,7 @@ function UndoDeleteRectangle(
   fgColor,
   highlight,
   lay,
+  lineDash = "",
 ) {
   this.objectID = id;
   this.posX = x;
@@ -434,6 +453,7 @@ function UndoDeleteRectangle(
   this.foregroundColor = fgColor;
   this.nodeLabel = lab;
   this.layer = lay;
+  this.lineDash = lineDash;
   this.highlighted = highlight;
 }
 
@@ -453,5 +473,6 @@ UndoDeleteRectangle.prototype.undoInitialStep = function (world) {
   );
   world.setNodePosition(this.objectID, this.posX, this.posY);
   world.setLayer(this.objectID, this.layer);
+  world.setLineDash(this.objectID, this.lineDash);
   world.setHighlight(this.objectID, this.highlighted);
 };

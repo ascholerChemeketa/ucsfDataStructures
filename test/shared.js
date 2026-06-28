@@ -819,6 +819,7 @@ function createBareRedBlack() {
   tree.treeRoot = null;
   tree.groupBoxes = {};
   tree.showNullLeaves = { checked: false };
+  tree.show234Groups = { checked: false };
   return tree;
 }
 
