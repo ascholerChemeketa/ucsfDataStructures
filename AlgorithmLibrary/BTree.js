@@ -33,6 +33,10 @@ import {
   addRadioButtonGroupToAlgorithmBar,
   addCheckboxToAlgorithmBar, addSeparatorToAlgorithmBar
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  describeMultiwayTree,
+  describeMultiwayTreeFromState,
+} from "./DescribeHelpers.js";
 
 var FIRST_PRINT_POS_X = 50;
 var PRINT_VERTICAL_GAP = 20;
@@ -95,7 +99,7 @@ BTree.prototype.init = function (am, w, h) {
   BTree.superclass.init.call(this, am, w, h);
   this.nextIndex = 0;
 
-  this.starting_x = 100;
+  this.starting_x = 300;
 
   this.addControls(); 
 
@@ -1757,6 +1761,24 @@ BTree.prototype.getLabelX = function (tree, index) {
     WIDTH_PER_ELEM / 2 +
     index * WIDTH_PER_ELEM
   );
+};
+
+BTree.prototype.describe = function () {
+  return describeMultiwayTree(this.treeRoot, {
+    getKeys(node) {
+      return node.keys.slice(0, node.numKeys);
+    },
+    getChildren(node) {
+      return node.children.slice(0, node.numKeys + 1).filter(Boolean);
+    },
+    isLeaf(node) {
+      return node.isLeaf;
+    },
+  });
+};
+
+BTree.prototype.describeFromState = function (state) {
+  return describeMultiwayTreeFromState(state);
 };
 
 BTree.prototype.resizeTree = function () {

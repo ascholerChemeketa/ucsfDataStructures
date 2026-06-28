@@ -31,6 +31,7 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import { describePrefixTreeFromState } from "./DescribeHelpers.js";
 
 // Visual constants
 Trie.NODE_WIDTH = 30;
@@ -440,6 +441,60 @@ Trie.prototype.numChildren = function (tree) {
     }
   }
   return children;
+};
+
+Trie.prototype.describe = function () {
+  if (this.root == null) {
+    return "Tree is empty.";
+  }
+
+  const sentences = [];
+
+  const childLetters = (node) => {
+    const letters = [];
+    for (let i = 0; i < 26; i++) {
+      if (node.children[i] != null) {
+        letters.push(node.children[i].wordRemainder || String.fromCharCode("A".charCodeAt(0) + i));
+      }
+    }
+    return letters;
+  };
+
+  const visit = (node, isRoot = false) => {
+    if (node == null) {
+      return;
+    }
+
+    const stored = node.wordRemainder === "" ? "an empty prefix" : `prefix ${node.wordRemainder}`;
+    const wordState = node.isword ? "marks a complete word" : "does not mark a complete word";
+    const children = childLetters(node);
+    let childText;
+    if (children.length === 0) {
+      childText = "has no children.";
+    } else if (children.length === 1) {
+      childText = `has child ${children[0]}.`;
+    } else {
+      childText = `has children ${children.slice(0, -1).join(", ")} and ${children[children.length - 1]}.`;
+    }
+
+    const subject = isRoot ? "Root node" : `Node ${node.wordRemainder || "<root>"}`;
+    sentences.push(`${subject} stores ${stored}, ${wordState}, and ${childText}`);
+
+    for (let i = 0; i < 26; i++) {
+      visit(node.children[i], false);
+    }
+  };
+
+  visit(this.root, true);
+  return sentences.join(" ");
+};
+
+Trie.prototype.describeFromState = function (state) {
+  return describePrefixTreeFromState(state, {
+    isWord(object) {
+      return object.backgroundColor === Trie.TRUE_COLOR;
+    },
+  });
 };
 
 Trie.prototype.cleanupAfterDelete = function (tree) {

@@ -29,6 +29,10 @@ import {
   Algorithm,
   addControlToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  describeQueueArray,
+  describeQueueArrayFromState,
+} from "./DescribeHelpers.js";
 
 var ARRAY_START_X = 100;
 var ARRAY_START_Y = 100;
@@ -242,6 +246,14 @@ QueueArray.prototype.markAnimationStep = function (label, meta = {}) {
 QueueArray.prototype.finishQueueArrayAnimation = function () {
   this.currentAnimationOperation = null;
   return this.finishAnimation();
+};
+
+QueueArray.prototype.describe = function () {
+  return describeQueueArray(this.arrayData, this.head, this.tail, SIZE);
+};
+
+QueueArray.prototype.describeFromState = function (state) {
+  return describeQueueArrayFromState(state, this.arrayID, this.headID, this.tailID);
 };
 
 QueueArray.prototype.enqueueCallback = function (event) {

@@ -27,6 +27,11 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  describeDoublyLinkedChain,
+  describeDoublyLinkedChainFromState,
+  getReplayObjectText,
+} from "./DescribeHelpers.js";
 
 var LINKED_LIST_START_X = 100;
 var LINKED_LIST_START_Y = 150;
@@ -166,6 +171,29 @@ DoublyLinkedList.prototype.markAnimationStep = function (label, meta = {}) {
 
 DoublyLinkedList.prototype.finishDoublyLinkedListAnimation = function () {
   return this.finishAnimation();
+};
+
+DoublyLinkedList.prototype.describe = function () {
+  return describeDoublyLinkedChain(this.values.slice(), {
+    emptyText: "List is empty.",
+    headLabel: "Head",
+    tailLabel: "Tail",
+  });
+};
+
+DoublyLinkedList.prototype.describeFromState = function (state) {
+  return describeDoublyLinkedChainFromState(state, this.headID, {
+    emptyText: "List is empty.",
+    headLabel: "Head",
+    nodePredicate(object) {
+      return object && object.kind === "linkedList";
+    },
+    skipNode(object) {
+      const value = getReplayObjectText(object);
+      return value === "H" || value === "T";
+    },
+    tailLabel: "Tail",
+  });
 };
 
 DoublyLinkedList.prototype.addControls = function () {

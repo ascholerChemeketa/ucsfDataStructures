@@ -33,6 +33,10 @@ import {
   addRadioButtonGroupToAlgorithmBar,
 } from "./Algorithm.js";
 import { Hash } from "./Hash.js";
+import {
+  describeClosedHashTable,
+  describeClosedHashTableFromState,
+} from "./DescribeHelpers.js";
 
 export function ClosedHash(canvas) {
   // New-style usage: `new ClosedHash({ ...opts })` (preferred)
@@ -164,6 +168,47 @@ ClosedHash.prototype.markAnimationStep = function (label, meta = {}) {
 
 ClosedHash.prototype.finishClosedHashAnimation = function () {
   return this.finishAnimation();
+};
+
+ClosedHash.prototype.describe = function () {
+  const strategyByName = {
+    linear: "linear probing",
+    quadratic: "quadratic probing",
+    double: "double hashing",
+  };
+  const strategyName =
+    strategyByName[this.currentHashingTypeButtonState?.name] || "linear probing";
+
+  const slots = [];
+  for (let i = 0; i < this.table_size; i++) {
+    if (this.deleted[i]) {
+      slots.push("<deleted>");
+    } else if (this.empty[i]) {
+      slots.push(null);
+    } else {
+      slots.push(this.hashTableValues[i]);
+    }
+  }
+
+  return describeClosedHashTable(slots, {
+    tableSize: this.table_size,
+    collisionStrategy: strategyName,
+  });
+};
+
+ClosedHash.prototype.describeFromState = function (state) {
+  const strategyByName = {
+    linear: "linear probing",
+    quadratic: "quadratic probing",
+    double: "double hashing",
+  };
+  const strategyName =
+    strategyByName[this.currentHashingTypeButtonState?.name] || "linear probing";
+
+  return describeClosedHashTableFromState(state, this.hashTableVisual, {
+    tableSize: this.table_size,
+    collisionStrategy: strategyName,
+  });
 };
 
 ClosedHash.prototype.addControls = function () {

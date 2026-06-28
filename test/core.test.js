@@ -125,3 +125,20 @@ test("Algorithm.cmd remains compatible for legacy producers", () => {
     },
   ]);
 });
+
+test("Algorithm.init registers the current algorithm with the animation manager", () => {
+  const algorithm = new Algorithm();
+  let refreshCalls = 0;
+  const am = {
+    addListener() {},
+    refreshDescribeButton() {
+      refreshCalls += 1;
+    },
+  };
+
+  algorithm.init(am, 800, 400);
+
+  assert.equal(algorithm.animationManager, am);
+  assert.equal(am.currentAlgorithm, algorithm);
+  assert.equal(refreshCalls, 1);
+});

@@ -30,6 +30,11 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  classifySingleReplayChildByValue,
+  compareReplayObjectsByValue,
+  describeBinaryTreeFromState,
+} from "./DescribeHelpers.js";
 
 // var currentAlg;
 
@@ -638,6 +643,59 @@ AVL.prototype.getHeight = function (tree) {
 AVL.prototype.getBalance = function (tree) {
   if (tree == null) return 0;
   return this.getHeight(tree.left) - this.getHeight(tree.right);
+};
+
+AVL.prototype.describe = function () {
+  if (this.treeRoot == null) {
+    return "Tree is empty.";
+  }
+
+  const sentences = [];
+
+  const describeNode = (node, isRoot = false) => {
+    if (node == null) {
+      return;
+    }
+
+    const subject = isRoot
+      ? `Root is ${node.data} (height ${node.height})`
+      : `${node.data} (height ${node.height})`;
+
+    let relationship;
+    if (node.left != null && node.right != null) {
+      relationship = `has a left child ${node.left.data} and right child ${node.right.data}.`;
+    } else if (node.left != null) {
+      relationship = `has a left child ${node.left.data}.`;
+    } else if (node.right != null) {
+      relationship = `has a right child ${node.right.data}.`;
+    } else {
+      relationship = "has no children.";
+    }
+
+    sentences.push(`${subject} ${relationship}`);
+    describeNode(node.left);
+    describeNode(node.right);
+  };
+
+  describeNode(this.treeRoot, true);
+  return sentences.join(" ");
+};
+
+AVL.prototype.describeFromState = function (state) {
+  const computeHeight = (node) => {
+    if (node == null) {
+      return -1;
+    }
+    return 1 + Math.max(computeHeight(node.left), computeHeight(node.right));
+  };
+
+  return describeBinaryTreeFromState(state, this.rootIndex, {
+    classifySingleChild: classifySingleReplayChildByValue,
+    getDetails(node) {
+      return [`height ${computeHeight(node)}`];
+    },
+    sortChildren: compareReplayObjectsByValue,
+  });
 };
 
 AVL.prototype.resetHeight = function (tree) {

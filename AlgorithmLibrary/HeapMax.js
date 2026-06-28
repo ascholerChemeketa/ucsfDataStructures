@@ -29,6 +29,7 @@ import {
   initCanvas,
 } from "../AnimationLibrary/AnimationMain.js";
 import { Algorithm, addControlToAlgorithmBar } from "./Algorithm.js";
+import { describeBinaryHeap, describeBinaryHeapFromState } from "./DescribeHelpers.js";
 
 export function HeapMax(arg) {
   // New-style usage: `new Heap({ ...opts })` (preferred)
@@ -179,6 +180,21 @@ HeapMax.prototype.markAnimationStep = function (label, meta = {}) {
 
 HeapMax.prototype.finishHeapMaxAnimation = function () {
   return this.finishAnimation();
+};
+
+HeapMax.prototype.describe = function () {
+  return describeBinaryHeap(this.arrayData, this.currentHeapSize, {
+    emptyText: "Heap is empty.",
+    heapLabel: "Heap",
+  });
+};
+
+HeapMax.prototype.describeFromState = function (state) {
+  return describeBinaryHeapFromState(state, this.arrayRects, {
+    emptyText: "Heap is empty.",
+    heapLabel: "Heap",
+    activeNodeIds: this.circleObjs,
+  });
 };
 
 HeapMax.prototype.createArray = function () {

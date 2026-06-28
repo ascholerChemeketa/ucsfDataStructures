@@ -241,3 +241,29 @@ test("BST rotateLeftAtValue blocked case emits invalid-rotation metadata", () =>
   assert.equal(state.edges.has("0->2"), true);
   assert.equal(state.edges.has("2->3"), true);
 });
+
+test("BST describe summarizes the current tree structure", () => {
+  const bst = createBareBST();
+  bst.treeRoot = {
+    data: 10,
+    left: { data: 5, left: null, right: null },
+    right: { data: 15, left: null, right: null },
+  };
+
+  assert.equal(
+    bst.describe(),
+    "Root is 10 has a left child 5 and right child 15. 5 has no children. 15 has no children.",
+  );
+});
+
+test("BST describeFromState summarizes the replayed tree state", () => {
+  const bst = createBareBST();
+  const insert10 = bst.insertElement(10);
+  const insert5 = bst.insertElement(5);
+  const state = replayAnimation([...insert10, ...insert5]);
+
+  assert.equal(
+    bst.describeFromState(state),
+    "Root is 10 has a left child 5. 5 has no children.",
+  );
+});

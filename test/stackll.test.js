@@ -18,3 +18,27 @@ test("StackLL push/pop/peek emit pointer-oriented canonical blocks", () => {
   const state = replayAnimation([...pushAnimation, ...popAnimation]);
   assert.equal(state.edges.has(`${stack.topID}->${stack.linkedListElemID[0]}`), false);
 });
+
+test("StackLL describe summarizes top and next chain", () => {
+  const stack = createBareStackLL();
+  stack.arrayData[0] = "10";
+  stack.arrayData[1] = "20";
+  stack.top = 2;
+
+  assert.equal(
+    stack.describe(),
+    "Top points to 20 node. 20 node's next points to 10 node. 10 node's next points to null.",
+  );
+});
+
+test("StackLL describeFromState summarizes the replayed stack chain", () => {
+  const stack = createBareStackLL();
+  const push10 = stack.push("10");
+  const push20 = stack.push("20");
+  const state = replayAnimation([...push10, ...push20]);
+
+  assert.equal(
+    stack.describeFromState(state),
+    "Top points to 20 node. 20 node's next points to 10 node. 10 node's next points to null.",
+  );
+});

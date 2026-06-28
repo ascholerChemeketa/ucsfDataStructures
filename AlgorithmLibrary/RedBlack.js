@@ -31,6 +31,13 @@ import {
   addCheckboxToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  classifySingleReplayChildByValue,
+  compareReplayObjectsByValue,
+  describeBinaryTree,
+  describeBinaryTreeFromState,
+  getReplayObjectText,
+} from "./DescribeHelpers.js";
 
 export function RedBlack(opts = {}) {
   if (!opts.title) opts.title = opts.title || "Red Black Tree";
@@ -1869,6 +1876,39 @@ RedBlack.prototype.fixNodeColor = function (tree) {
       this.cmd("SetBackgroundColor", tree.graphicID, BACKGROUND_BLACK);
     }
   }
+};
+
+RedBlack.prototype.describe = function () {
+  return describeBinaryTree(this.treeRoot, {
+    getDetails(node) {
+      if (node.blackLevel > 1) {
+        return ["double black"];
+      }
+      return [node.blackLevel === 0 ? "red" : "black"];
+    },
+    shouldInclude(node) {
+      return node != null && !node.phantomLeaf;
+    },
+  });
+};
+
+RedBlack.prototype.describeFromState = function (state) {
+  return describeBinaryTreeFromState(state, this.rootIndex, {
+    childPredicate(object) {
+      return object && object.kind === "circle";
+    },
+    classifySingleChild: classifySingleReplayChildByValue,
+    getDetails(node) {
+      if (node.object.backgroundColor === BACKGROUND_DOUBLE_BLACK) {
+        return ["double black"];
+      }
+      return [node.object.backgroundColor === BACKGROUND_RED ? "red" : "black"];
+    },
+    shouldIncludeObject(object) {
+      return getReplayObjectText(object) !== "NULL\nLEAF";
+    },
+    sortChildren: compareReplayObjectsByValue,
+  });
 };
 
 RedBlack.prototype.resizeTree = function () {

@@ -37,3 +37,27 @@ test("LinkedList deleteFront and findElement emit readable outcome blocks", () =
   assert.equal(list.top, 1);
   assert.equal(state.message, "Not found: 10");
 });
+
+test("LinkedList describe summarizes head, tail, and next chain", () => {
+  const list = createBareLinkedList();
+  list.arrayData[0] = "20";
+  list.arrayData[1] = "10";
+  list.top = 2;
+
+  assert.equal(
+    list.describe(),
+    "Head points to 10 node. Tail points to 20 node. 10 node's next points to 20 node. 20 node's next points to null.",
+  );
+});
+
+test("LinkedList describeFromState summarizes the replayed chain", () => {
+  const list = createBareLinkedList();
+  const insert10 = list.insertBack("10");
+  const insert20 = list.insertBack("20");
+  const state = replayAnimation([...insert10, ...insert20]);
+
+  assert.equal(
+    list.describeFromState(state),
+    "Head points to 10 node. Tail points to 20 node. 10 node's next points to 20 node. 20 node's next points to null.",
+  );
+});

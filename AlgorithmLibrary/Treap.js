@@ -7,6 +7,13 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  classifySingleReplayChildByValue,
+  compareReplayObjectsByValue,
+  describeBinaryTree,
+  describeBinaryTreeFromState,
+  getReplayObjectText,
+} from "./DescribeHelpers.js";
 
 export function Treap(opts = {}) {
   if (!opts.title) opts.title = "Treap";
@@ -583,6 +590,52 @@ Treap.prototype.clearRec = function (tree) {
   this.clearRec(tree.right);
   this.cmd("Delete", tree.graphicID);
   this.cmd("Delete", tree.priorityLabelID);
+};
+
+Treap.prototype.describe = function () {
+  return describeBinaryTree(this.treeRoot, {
+    getDetails(node) {
+      return [`priority ${node.priority}`];
+    },
+  });
+};
+
+Treap.prototype.describeFromState = function (state) {
+  const findPriorityText = (nodeObject) => {
+    let bestLabel = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const object of state.objects.values()) {
+      if (
+        object.kind !== "label" ||
+        object.fontSizePercent !== Treap.PRIORITY_FONT_PERCENT
+      ) {
+        continue;
+      }
+      const text = getReplayObjectText(object);
+      if (text == null || text === "") {
+        continue;
+      }
+      const dx = Math.abs((object.x ?? 0) - (nodeObject.x ?? 0));
+      const dy = Math.abs((object.y ?? 0) - (nodeObject.y ?? 0));
+      const distance = dx + dy;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestLabel = text;
+      }
+    }
+
+    return bestLabel;
+  };
+
+  return describeBinaryTreeFromState(state, this.rootIndex, {
+    classifySingleChild: classifySingleReplayChildByValue,
+    getDetails(node) {
+      const priority = findPriorityText(node.object);
+      return priority == null ? [] : [`priority ${priority}`];
+    },
+    sortChildren: compareReplayObjectsByValue,
+  });
 };
 
 Treap.prototype.resizeTree = function () {

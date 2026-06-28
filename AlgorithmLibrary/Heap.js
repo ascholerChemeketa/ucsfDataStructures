@@ -29,6 +29,7 @@ import {
   initCanvas,
 } from "../AnimationLibrary/AnimationMain.js";
 import { Algorithm, addControlToAlgorithmBar } from "./Algorithm.js";
+import { describeBinaryHeap, describeBinaryHeapFromState } from "./DescribeHelpers.js";
 
 export function Heap(arg) {
   // New-style usage: `new Heap({ ...opts })` (preferred)
@@ -175,6 +176,21 @@ Heap.prototype.markAnimationStep = function (label, meta = {}) {
 
 Heap.prototype.finishHeapAnimation = function () {
   return this.finishAnimation();
+};
+
+Heap.prototype.describe = function () {
+  return describeBinaryHeap(this.arrayData, this.currentHeapSize, {
+    emptyText: "Heap is empty.",
+    heapLabel: "Heap",
+  });
+};
+
+Heap.prototype.describeFromState = function (state) {
+  return describeBinaryHeapFromState(state, this.arrayRects, {
+    emptyText: "Heap is empty.",
+    heapLabel: "Heap",
+    activeNodeIds: this.circleObjs,
+  });
 };
 
 Heap.prototype.createArray = function () {

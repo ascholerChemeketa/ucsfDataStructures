@@ -30,6 +30,10 @@ import {
   addControlToAlgorithmBar,
   addRadioButtonGroupToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  describeMultiwayTree,
+  describeMultiwayTreeFromState,
+} from "./DescribeHelpers.js";
 
 var FIRST_PRINT_POS_X = 50;
 var PRINT_VERTICAL_GAP = 20;
@@ -1548,6 +1552,28 @@ BPlusTree.prototype.getLabelX = function (tree, index) {
     WIDTH_PER_ELEM / 2 +
     index * WIDTH_PER_ELEM
   );
+};
+
+BPlusTree.prototype.describe = function () {
+  return describeMultiwayTree(this.treeRoot, {
+    getKeys(node) {
+      return node.keys.slice(0, node.numKeys);
+    },
+    getChildren(node) {
+      return node.children.slice(0, node.numKeys + 1).filter(Boolean);
+    },
+    isLeaf(node) {
+      return node.isLeaf;
+    },
+  });
+};
+
+BPlusTree.prototype.describeFromState = function (state) {
+  return describeMultiwayTreeFromState(state, {
+    edgeFilter(fromObject, toObject) {
+      return (toObject.y ?? 0) > (fromObject.y ?? 0);
+    },
+  });
 };
 
 BPlusTree.prototype.resizeTree = function () {

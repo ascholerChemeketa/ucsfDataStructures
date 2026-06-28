@@ -30,6 +30,10 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  describeSinglyLinkedChain,
+  describeSinglyLinkedChainFromState,
+} from "./DescribeHelpers.js";
 
 var LINKED_LIST_START_X = 100;
 var LINKED_LIST_START_Y = 150;
@@ -221,6 +225,24 @@ StackLL.prototype.markAnimationStep = function (label, meta = {}) {
 StackLL.prototype.finishStackLLAnimation = function () {
   this.currentAnimationOperation = null;
   return this.finishAnimation();
+};
+
+StackLL.prototype.describe = function () {
+  const values = [];
+  for (let i = this.top - 1; i >= 0; i--) {
+    values.push(this.arrayData[i]);
+  }
+  return describeSinglyLinkedChain(values, {
+    emptyText: "Stack is empty.",
+    headLabel: "Top",
+  });
+};
+
+StackLL.prototype.describeFromState = function (state) {
+  return describeSinglyLinkedChainFromState(state, this.topID, {
+    emptyText: "Stack is empty.",
+    headLabel: "Top",
+  });
 };
 
 StackLL.prototype.pushCallback = function (event) {

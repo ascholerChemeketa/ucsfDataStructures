@@ -29,3 +29,23 @@ test("RadixTree find and delete emit outcome blocks", () => {
   assert.equal(tree.root, null);
   assert.equal(state.objects.has(4), false);
 });
+
+test("RadixTree describe summarizes stored prefixes and word markers", () => {
+  const tree = createBareRadixTree();
+  tree.add("CAT");
+
+  assert.equal(
+    tree.describe(),
+    "Root node stores prefix CAT, marks a complete word, and has no children.",
+  );
+});
+
+test("RadixTree describeFromState summarizes the replayed radix tree state", () => {
+  const tree = createBareRadixTree();
+  const state = replayAnimation(tree.add("CAT"));
+
+  assert.equal(
+    tree.describeFromState(state),
+    "Root node stores prefix CAT, marks a complete word, and has no children.",
+  );
+});

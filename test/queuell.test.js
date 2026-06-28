@@ -38,3 +38,27 @@ test("QueueLL dequeue clears head and tail when removing the final node", () => 
   assert.equal(state.edges.has(`${queue.headID}->${queue.linkedListElemID[0]}`), false);
   assert.equal(state.edges.has(`${queue.tailID}->${queue.linkedListElemID[0]}`), false);
 });
+
+test("QueueLL describe summarizes head, tail, and next chain", () => {
+  const queue = createBareQueueLL();
+  queue.arrayData[0] = "20";
+  queue.arrayData[1] = "10";
+  queue.top = 2;
+
+  assert.equal(
+    queue.describe(),
+    "Head points to 10 node. Tail points to 20 node. 10 node's next points to 20 node. 20 node's next points to null.",
+  );
+});
+
+test("QueueLL describeFromState summarizes the replayed queue chain", () => {
+  const queue = createBareQueueLL();
+  const enqueue10 = queue.enqueue("10");
+  const enqueue20 = queue.enqueue("20");
+  const state = replayAnimation([...enqueue10, ...enqueue20]);
+
+  assert.equal(
+    queue.describeFromState(state),
+    "Head points to 10 node. Tail points to 20 node. 10 node's next points to 20 node. 20 node's next points to null.",
+  );
+});

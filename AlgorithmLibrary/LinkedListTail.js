@@ -30,6 +30,10 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  describeSinglyLinkedChain,
+  describeSinglyLinkedChainFromState,
+} from "./DescribeHelpers.js";
 
 // Reuses QueueLL's visualization logic (linked list node objects + head/tail pointers).
 
@@ -181,6 +185,26 @@ LinkedListTail.prototype.markAnimationStep = function (label, meta = {}) {
 
 LinkedListTail.prototype.finishLinkedListTailAnimation = function () {
   return this.finishAnimation();
+};
+
+LinkedListTail.prototype.describe = function () {
+  const values = [];
+  for (let i = this.top - 1; i >= 0; i--) {
+    values.push(this.arrayData[i]);
+  }
+  return describeSinglyLinkedChain(values, {
+    emptyText: "List is empty.",
+    headLabel: "Head",
+    tailLabel: "Tail",
+  });
+};
+
+LinkedListTail.prototype.describeFromState = function (state) {
+  return describeSinglyLinkedChainFromState(state, this.headID, {
+    emptyText: "List is empty.",
+    headLabel: "Head",
+    tailLabel: "Tail",
+  });
 };
 
 LinkedListTail.prototype.recomputeLeftMostX = function () {

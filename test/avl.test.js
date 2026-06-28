@@ -141,3 +141,60 @@ test("AVL deleteElement can trigger right rotation rebalancing", () => {
   assert.equal(state.edges.has(`${avl.treeRoot.graphicID}->${avl.treeRoot.left.graphicID}`), true);
   assert.equal(state.edges.has(`${avl.treeRoot.graphicID}->${avl.treeRoot.right.graphicID}`), true);
 });
+
+test("AVL describe returns a readable preorder text description", () => {
+  const avl = createBareAVL();
+  avl.treeRoot = {
+    data: 100,
+    height: 3,
+    left: {
+      data: 50,
+      height: 2,
+      left: {
+        data: 20,
+        height: 1,
+        left: {
+          data: 10,
+          height: 0,
+          left: null,
+          right: null,
+        },
+        right: null,
+      },
+      right: null,
+    },
+    right: {
+      data: 150,
+      height: 0,
+      left: null,
+      right: null,
+    },
+  };
+
+  assert.equal(
+    avl.describe(),
+    "Root is 100 (height 3) has a left child 50 and right child 150. " +
+      "50 (height 2) has a left child 20. " +
+      "20 (height 1) has a left child 10. " +
+      "10 (height 0) has no children. " +
+      "150 (height 0) has no children.",
+  );
+});
+
+test("AVL describe reports an empty tree", () => {
+  const avl = createBareAVL();
+  assert.equal(avl.describe(), "Tree is empty.");
+});
+
+test("AVL describeFromState summarizes the replayed tree state", () => {
+  const avl = createBareAVL();
+  const insert10 = avl.insertElement(10);
+  const insert5 = avl.insertElement(5);
+  const insert15 = avl.insertElement(15);
+  const state = replayAnimation([...insert10, ...insert5, ...insert15]);
+
+  assert.equal(
+    avl.describeFromState(state),
+    "Root is 10 (height 1) has a left child 5 and right child 15. 5 (height 0) has no children. 15 (height 0) has no children.",
+  );
+});

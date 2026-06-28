@@ -6,6 +6,13 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  classifySingleReplayChildByValue,
+  compareReplayObjectsByValue,
+  describeBinaryTree,
+  describeBinaryTreeFromState,
+  getReplayObjectText,
+} from "./DescribeHelpers.js";
 
 BSTIterator.FOREGROUND_COLOR = "var(--svgColor)";
 BSTIterator.BACKGROUND_COLOR = "var(--svgFillColor)";
@@ -126,6 +133,78 @@ BSTIterator.prototype.markAnimationStep = function (label, meta = {}) {
 
 BSTIterator.prototype.finishBSTIteratorAnimation = function () {
   return this.finishAnimation();
+};
+
+BSTIterator.prototype.describe = function () {
+  const sections = [];
+
+  sections.push(describeBinaryTree(this.treeRoot));
+
+  if (this.iteratorStack.length === 0) {
+    sections.push("IteratorStack is empty.");
+  } else {
+    const stackValues = this.iteratorStack.map((item) => String(item.node.data));
+    sections.push(
+      `IteratorStack from bottom to top is ${stackValues.join(", ")}.`,
+    );
+  }
+
+  if (this.iteratorStack.length > 0) {
+    const highlighted = this.iteratorStack[this.iteratorStack.length - 1].node.data;
+    sections.push(`Highlighted node is ${highlighted}.`);
+  } else {
+    sections.push("No node is highlighted.");
+  }
+
+  if (this.iteratorCurrentNode != null) {
+    sections.push(`Iterator current node is ${this.iteratorCurrentNode.data}.`);
+  }
+
+  return sections.join(" ");
+};
+
+BSTIterator.prototype.describeFromState = function (state) {
+  const sections = [];
+
+  sections.push(
+    describeBinaryTreeFromState(state, this.rootIndex, {
+      classifySingleChild: classifySingleReplayChildByValue,
+      sortChildren: compareReplayObjectsByValue,
+    }),
+  );
+
+  const stackLabels = [...state.objects.values()]
+    .filter((object) =>
+      object.kind === "label" &&
+      object.id !== this.stackTitleID &&
+      object.x === BSTIterator.STACK_X &&
+      (object.y ?? -1) >= BSTIterator.STACK_Y &&
+      object.alpha !== 0 &&
+      (getReplayObjectText(object) ?? "") !== ""
+    )
+    .sort((a, b) => (a.y ?? 0) - (b.y ?? 0));
+
+  if (stackLabels.length === 0) {
+    sections.push("IteratorStack is empty.");
+  } else {
+    sections.push(
+      `IteratorStack from bottom to top is ${stackLabels
+        .map((object) => getReplayObjectText(object))
+        .join(", ")}.`,
+    );
+  }
+
+  const highlighted = [...state.objects.values()]
+    .filter((object) => object.kind === "circle" && object.highlighted)
+    .sort((a, b) => (a.y ?? 0) - (b.y ?? 0) || (a.x ?? 0) - (b.x ?? 0))[0];
+
+  if (highlighted) {
+    sections.push(`Highlighted node is ${getReplayObjectText(highlighted)}.`);
+  } else {
+    sections.push("No node is highlighted.");
+  }
+
+  return sections.join(" ");
 };
 
 BSTIterator.prototype.addControls = function () {

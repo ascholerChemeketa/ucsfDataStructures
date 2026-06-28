@@ -115,3 +115,42 @@ test("BPlusTree insertElement split path emits split and resize metadata and rew
   assert.equal(state.edges.has(`${tree.treeRoot.graphicID}->3`), true);
   assert.equal(state.edges.has(`${tree.treeRoot.graphicID}->4`), true);
 });
+
+test("BPlusTree describe summarizes keys and child counts", () => {
+  const tree = createBareBPlusTree();
+  const leftLeaf = createBPlusNode({ graphicID: 11, keys: ["0005"] });
+  const rightLeaf = createBPlusNode({ graphicID: 12, keys: ["0020"] });
+  tree.treeRoot = createBPlusNode({
+    graphicID: 10,
+    keys: ["0010"],
+    isLeaf: false,
+    children: [leftLeaf, rightLeaf],
+  });
+
+  assert.equal(
+    tree.describe(),
+    "Root node has key 0010 and 2 children. Node with key 0005 has key 0005 and is a leaf. Node with key 0020 has key 0020 and is a leaf.",
+  );
+});
+
+test("BPlusTree describeFromState summarizes the replayed multiway tree state", () => {
+  const tree = createBareBPlusTree();
+  const state = {
+    objects: new Map([
+      [10, { id: 10, kind: "btreeNode", numElements: 1, text: { 0: "0010" }, x: 100, y: 30 }],
+      [11, { id: 11, kind: "btreeNode", numElements: 1, text: { 0: "0005" }, x: 60, y: 80 }],
+      [12, { id: 12, kind: "btreeNode", numElements: 1, text: { 0: "0020" }, x: 140, y: 80 }],
+    ]),
+    edges: new Map([
+      ["10->11", { from: 10, to: 11 }],
+      ["10->12", { from: 10, to: 12 }],
+      ["11->12", { from: 11, to: 12 }],
+    ]),
+    message: "",
+  };
+
+  assert.equal(
+    tree.describeFromState(state),
+    "Root node has key 0010 and 2 children. Node with key 0005 has key 0005 and is a leaf. Node with key 0020 has key 0020 and is a leaf.",
+  );
+});

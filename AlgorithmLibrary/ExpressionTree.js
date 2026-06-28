@@ -31,6 +31,7 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import { getReplayObjectText } from "./DescribeHelpers.js";
 
 ExpressionTree.FOREGROUND_COLOR = "var(--svgColor)";
 ExpressionTree.LINK_COLOR = ExpressionTree.FOREGROUND_COLOR;
@@ -143,6 +144,138 @@ ExpressionTree.prototype.init = function (am, w, h) {
   this.doEvaluate = function () {
     this.implementAction(this.evaluateTree.bind(this), "");
   };
+};
+
+ExpressionTree.prototype.describe = function () {
+  if (!this.treeRoot) {
+    return "Tree is empty.";
+  }
+
+  const sentences = [];
+
+  const formatNode = (node) => String(node.label);
+
+  const visit = (node, isRoot = false) => {
+    if (!node) {
+      return;
+    }
+
+    const children = Array.isArray(node.children) ? node.children.filter(Boolean) : [];
+    const subject = isRoot ? `Root is ${formatNode(node)}` : formatNode(node);
+
+    if (children.length === 0) {
+      sentences.push(`${subject} has no children.`);
+    } else if (children.length === 1) {
+      sentences.push(`${subject} has child ${formatNode(children[0])}.`);
+    } else if (children.length === 2) {
+      sentences.push(
+        `${subject} has left child ${formatNode(children[0])} and right child ${formatNode(children[1])}.`,
+      );
+    } else {
+      sentences.push(
+        `${subject} has children ${children.map(formatNode).join(", ")}.`,
+      );
+    }
+
+    for (const child of children) {
+      visit(child);
+    }
+  };
+
+  visit(this.treeRoot, true);
+  return sentences.join(" ");
+};
+
+ExpressionTree.prototype.describeFromState = function (state) {
+  const rootCandidates = [];
+  const incoming = new Set();
+
+  for (const edge of state.edges.values()) {
+    const fromObject = state.objects.get(edge.from);
+    const toObject = state.objects.get(edge.to);
+    if (fromObject?.kind !== "circle" || toObject?.kind !== "circle") {
+      continue;
+    }
+    incoming.add(edge.to);
+  }
+
+  for (const [id, object] of state.objects.entries()) {
+    if (object.kind !== "circle" || incoming.has(id)) {
+      continue;
+    }
+    rootCandidates.push({ id, object });
+  }
+
+  rootCandidates.sort(
+    (a, b) =>
+      (a.object.y ?? 0) - (b.object.y ?? 0) ||
+      (a.object.x ?? 0) - (b.object.x ?? 0) ||
+      a.id - b.id,
+  );
+
+  const rootId = rootCandidates[0]?.id ?? null;
+  if (rootId == null) {
+    return "Tree is empty.";
+  }
+
+  const sentences = [];
+  const visited = new Set();
+
+  const visit = (id, isRoot = false) => {
+    if (id == null || visited.has(id)) {
+      return;
+    }
+    const object = state.objects.get(id);
+    if (!object || object.kind !== "circle") {
+      return;
+    }
+
+    visited.add(id);
+    const children = [];
+    for (const edge of state.edges.values()) {
+      if (edge.from !== id) {
+        continue;
+      }
+      const childObject = state.objects.get(edge.to);
+      if (childObject?.kind !== "circle") {
+        continue;
+      }
+      children.push({ id: edge.to, object: childObject });
+    }
+    children.sort(
+      (a, b) =>
+        (a.object.x ?? 0) - (b.object.x ?? 0) ||
+        (a.object.y ?? 0) - (b.object.y ?? 0) ||
+        a.id - b.id,
+    );
+
+    const subject = isRoot
+      ? `Root is ${getReplayObjectText(object)}`
+      : getReplayObjectText(object);
+
+    if (children.length === 0) {
+      sentences.push(`${subject} has no children.`);
+    } else if (children.length === 1) {
+      sentences.push(`${subject} has child ${getReplayObjectText(children[0].object)}.`);
+    } else if (children.length === 2) {
+      sentences.push(
+        `${subject} has left child ${getReplayObjectText(children[0].object)} and right child ${getReplayObjectText(children[1].object)}.`,
+      );
+    } else {
+      sentences.push(
+        `${subject} has children ${children
+          .map((child) => getReplayObjectText(child.object))
+          .join(", ")}.`,
+      );
+    }
+
+    for (const child of children) {
+      visit(child.id, false);
+    }
+  };
+
+  visit(rootId, true);
+  return sentences.join(" ");
 };
 
 ExpressionTree.prototype.beginExpressionTreeAnimation = function (

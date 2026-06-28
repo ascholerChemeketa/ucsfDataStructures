@@ -50,3 +50,23 @@ test("ExpressionTree printTree and evaluateTree emit readable traversal/evaluati
   const state = replayAnimation([...buildAnimation, ...printAnimation, ...evaluateAnimation]);
   assert.equal(state.message, "Final result: 23");
 });
+
+test("ExpressionTree describe summarizes the current expression tree", () => {
+  const tree = createBareExpressionTree();
+  tree.treeRoot = sampleExpressionTree();
+
+  assert.equal(
+    tree.describe(),
+    "Root is + has left child 3 and right child *. 3 has no children. * has left child 4 and right child 5. 4 has no children. 5 has no children.",
+  );
+});
+
+test("ExpressionTree describeFromState summarizes the replayed expression tree", () => {
+  const tree = createBareExpressionTree();
+  const state = replayAnimation(tree.buildTree(sampleExpressionTree()));
+
+  assert.equal(
+    tree.describeFromState(state),
+    "Root is + has left child 3 and right child *. 3 has no children. * has left child 4 and right child 5. 4 has no children. 5 has no children.",
+  );
+});

@@ -31,3 +31,32 @@ test("OpenHash findElement and deleteElement emit found/not-found outcomes", () 
   const state = replayAnimation([...insert15, ...insert28, ...findAnimation, ...deleteAnimation]);
   assert.equal(state.message.includes("Element deleted"), true);
 });
+
+test("OpenHash describe summarizes bucket chains", () => {
+  const hash = createBareOpenHash();
+  hash.hashTableValues[2] = {
+    data: "28",
+    next: {
+      data: "15",
+      next: null,
+    },
+  };
+
+  assert.equal(
+    hash.describe(),
+    "Table size is 13. Bucket 0 is empty. Bucket 1 is empty. Bucket 2 contains 28, then 15. Bucket 3 is empty. Bucket 4 is empty. Bucket 5 is empty. Bucket 6 is empty. Bucket 7 is empty. Bucket 8 is empty. Bucket 9 is empty. Bucket 10 is empty. Bucket 11 is empty. Bucket 12 is empty.",
+  );
+});
+
+test("OpenHash describeFromState summarizes the replayed bucket chains", () => {
+  const hash = createBareOpenHash();
+  const state = replayAnimation([
+    ...hash.insertElement("15"),
+    ...hash.insertElement("28"),
+  ]);
+
+  assert.equal(
+    hash.describeFromState(state),
+    "Table size is 13. Bucket 0 is empty. Bucket 1 is empty. Bucket 2 contains 28, then 15. Bucket 3 is empty. Bucket 4 is empty. Bucket 5 is empty. Bucket 6 is empty. Bucket 7 is empty. Bucket 8 is empty. Bucket 9 is empty. Bucket 10 is empty. Bucket 11 is empty. Bucket 12 is empty.",
+  );
+});

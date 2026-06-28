@@ -33,6 +33,46 @@ test("RedBlack find and delete emit readable outcome blocks", () => {
   assert.equal(state.message.trim(), "");
 });
 
+test("RedBlack describe includes node color and ignores phantom leaves", () => {
+  const tree = createBareRedBlack();
+  tree.treeRoot = {
+    data: 10,
+    blackLevel: 1,
+    phantomLeaf: false,
+    left: {
+      data: 5,
+      blackLevel: 0,
+      phantomLeaf: false,
+      left: null,
+      right: null,
+    },
+    right: {
+      data: null,
+      blackLevel: 1,
+      phantomLeaf: true,
+      left: null,
+      right: null,
+    },
+  };
+
+  assert.equal(
+    tree.describe(),
+    "Root is 10 (black) has a left child 5. 5 (red) has no children.",
+  );
+});
+
+test("RedBlack describeFromState summarizes the replayed colored tree state", () => {
+  const tree = createBareRedBlack();
+  const insert10 = tree.insertElement(10);
+  const insert5 = tree.insertElement(5);
+  const state = replayAnimation([...insert10, ...insert5]);
+
+  assert.equal(
+    tree.describeFromState(state),
+    "Root is 10 (black) has a left child 5. 5 (red) has no children.",
+  );
+});
+
 test("RedBlack 2-3-4 overlay groups red children with their black parent", () => {
   const tree = createBareRedBlack();
   const insert10 = tree.insertElement(10);

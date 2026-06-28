@@ -29,6 +29,10 @@ import {
   addControlToAlgorithmBar,
   addRadioButtonGroupToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  describeIndexedArray,
+  describeIndexedArrayFromState,
+} from "./DescribeHelpers.js";
 
 Search.CODE_START_X = 10;
 Search.CODE_START_Y = 10;
@@ -222,6 +226,20 @@ Search.prototype.markAnimationStep = function (label, meta = {}) {
 Search.prototype.finishSearchAnimation = function () {
   this.currentAnimationOperation = null;
   return this.finishAnimation();
+};
+
+Search.prototype.describe = function () {
+  return describeIndexedArray(this.arrayData, {
+    emptyText: "Array is empty.",
+    label: "Array",
+  });
+};
+
+Search.prototype.describeFromState = function (state) {
+  return describeIndexedArrayFromState(state, this.arrayID, {
+    emptyText: "Array is empty.",
+    label: "Array",
+  });
 };
 
 Search.prototype.getIndexX = function (index) {

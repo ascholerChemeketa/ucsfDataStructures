@@ -43,3 +43,30 @@ test("ClosedHash growTable emits grow phases and replayed reinsertion state", ()
   assert.equal(state.objects.get(hash.hashTableVisual[10]).text[0], "10");
   assert.equal(state.objects.get(hash.hashTableVisual[2]).text[0], "18");
 });
+
+test("ClosedHash describe summarizes slots and tombstones", () => {
+  const hash = createBareClosedHash();
+  hash.empty[2] = false;
+  hash.hashTableValues[2] = 10;
+  hash.empty[3] = false;
+  hash.deleted[3] = true;
+
+  assert.equal(
+    hash.describe(),
+    "Table size is 8. Collision strategy is linear probing. Index 0 is empty. Index 1 is empty. Index 2 stores 10. Index 3 is deleted. Index 4 is empty. Index 5 is empty. Index 6 is empty. Index 7 is empty.",
+  );
+});
+
+test("ClosedHash describeFromState summarizes the replayed table state", () => {
+  const hash = createBareClosedHash();
+  const state = replayAnimation([
+    ...hash.insertElement(10),
+    ...hash.insertElement(18),
+    ...hash.deleteElement(18),
+  ]);
+
+  assert.equal(
+    hash.describeFromState(state),
+    "Table size is 8. Collision strategy is linear probing. Index 0 is empty. Index 1 is empty. Index 2 stores 10. Index 3 is deleted. Index 4 is empty. Index 5 is empty. Index 6 is empty. Index 7 is empty.",
+  );
+});

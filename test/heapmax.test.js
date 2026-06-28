@@ -36,3 +36,29 @@ test("HeapMax removeLargest emits max-removal flow and updates heap state", () =
   assert.equal(heap.currentHeapSize, 2);
   assert.equal(state.objects.has(302), false);
 });
+
+test("HeapMax describe summarizes the heap structure", () => {
+  const heap = createBareHeapMax();
+  heap.arrayData[0] = "40";
+  heap.arrayData[1] = "10";
+  heap.arrayData[2] = "7";
+  heap.currentHeapSize = 3;
+
+  assert.equal(
+    heap.describe(),
+    "Heap has 3 values. Root is 40. Index 0 stores 40 with left child 10 and right child 7. Index 1 stores 10 with no children. Index 2 stores 7 with no children.",
+  );
+});
+
+test("HeapMax describeFromState summarizes the replayed heap state", () => {
+  const heap = createBareHeapMax();
+  const state = replayAnimation([
+    ...heap.insertElement("10"),
+    ...heap.insertElement("40"),
+  ]);
+
+  assert.equal(
+    heap.describeFromState(state),
+    "Heap has 2 values. Root is 40. Index 0 stores 40 with left child 10. Index 1 stores 10 with no children.",
+  );
+});

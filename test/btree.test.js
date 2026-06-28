@@ -74,3 +74,41 @@ test("BTree printTree emits traversal and final output metadata", () => {
   const state = replayAnimation(animation);
   assert.equal(state.message, "At end of root node. Final output:\n0005 0010 0020 ");
 });
+
+test("BTree describe summarizes keys and child counts", () => {
+  const tree = createBareBTree();
+  const leftLeaf = createBTreeNode({ graphicID: 11, keys: ["0005"] });
+  const rightLeaf = createBTreeNode({ graphicID: 12, keys: ["0020"] });
+  tree.treeRoot = createBTreeNode({
+    graphicID: 10,
+    keys: ["0010"],
+    isLeaf: false,
+    children: [leftLeaf, rightLeaf],
+  });
+
+  assert.equal(
+    tree.describe(),
+    "Root node has key 0010 and 2 children. Node with key 0005 has key 0005 and is a leaf. Node with key 0020 has key 0020 and is a leaf.",
+  );
+});
+
+test("BTree describeFromState summarizes the replayed multiway tree state", () => {
+  const tree = createBareBTree();
+  const state = {
+    objects: new Map([
+      [10, { id: 10, kind: "btreeNode", numElements: 1, text: { 0: "0010" }, x: 100, y: 30 }],
+      [11, { id: 11, kind: "btreeNode", numElements: 1, text: { 0: "0005" }, x: 60, y: 80 }],
+      [12, { id: 12, kind: "btreeNode", numElements: 1, text: { 0: "0020" }, x: 140, y: 80 }],
+    ]),
+    edges: new Map([
+      ["10->11", { from: 10, to: 11 }],
+      ["10->12", { from: 10, to: 12 }],
+    ]),
+    message: "",
+  };
+
+  assert.equal(
+    tree.describeFromState(state),
+    "Root node has key 0010 and 2 children. Node with key 0005 has key 0005 and is a leaf. Node with key 0020 has key 0020 and is a leaf.",
+  );
+});

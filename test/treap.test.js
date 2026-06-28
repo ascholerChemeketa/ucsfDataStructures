@@ -54,3 +54,32 @@ test("Treap find and delete emit outcome blocks", () => {
   assert.equal(deleteLabels.at(-1), "delete complete");
   assert.equal(tree.treeRoot.data, 10);
 });
+
+test("Treap describe includes priorities in the summary", () => {
+  const tree = createBareTreap();
+  tree.treeRoot = {
+    data: 10,
+    priority: 500,
+    left: { data: 5, priority: 800, left: null, right: null },
+    right: { data: 15, priority: 200, left: null, right: null },
+  };
+
+  assert.equal(
+    tree.describe(),
+    "Root is 10 (priority 500) has a left child 5 and right child 15. 5 (priority 800) has no children. 15 (priority 200) has no children.",
+  );
+});
+
+test("Treap describeFromState summarizes the replayed tree state", () => {
+  const tree = createBareTreap();
+  const animations = withRandomSequence([0.2, 0.8], () => [
+    tree.insertElement(10),
+    tree.insertElement(5),
+  ]);
+  const state = replayAnimation(animations.flat());
+
+  assert.equal(
+    tree.describeFromState(state),
+    "Root is 5 (priority 800) has a right child 10. 10 (priority 200) has no children.",
+  );
+});

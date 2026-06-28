@@ -37,3 +37,27 @@ test("LinkedListSimple current-pointer flow emits pointer blocks", () => {
   assert.equal(list.currentNodeID, list.linkedListElemID[0]);
   assert.equal(state.message, "");
 });
+
+test("LinkedListSimple describe summarizes the head and next chain", () => {
+  const list = createBareLinkedListSimple();
+  list.arrayData[0] = "20";
+  list.arrayData[1] = "10";
+  list.top = 2;
+
+  assert.equal(
+    list.describe(),
+    "Head points to 10 node. 10 node's next points to 20 node. 20 node's next points to null.",
+  );
+});
+
+test("LinkedListSimple describeFromState summarizes the replayed chain", () => {
+  const list = createBareLinkedListSimple();
+  const insert10 = list.insertFront("10");
+  const insert20 = list.insertFront("20");
+  const state = replayAnimation([...insert10, ...insert20]);
+
+  assert.equal(
+    list.describeFromState(state),
+    "Head points to 20 node. 20 node's next points to 10 node. 10 node's next points to null.",
+  );
+});

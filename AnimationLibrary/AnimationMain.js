@@ -33,6 +33,7 @@ import { EventListener } from "./CustomEvents.js";
 import { ObjectManager } from "./ObjectManager.js";
 import { UndoConnect } from "./Line.js";
 import { normalizeAnimation, toBool, toColor } from "./AnimationSchema.js";
+import { snapshotObjectManagerState } from "./AnimationState.js";
 import { controlKey } from "../AlgorithmLibrary/Algorithm.js";
 import * as Undo from "./UndoFunctions.js"; 
 
@@ -78,6 +79,7 @@ var skipBackButton;
 var stepBackButton;
 var stepForwardButton;
 var skipForwardButton;
+var describeButton;
 var scrubSlider;
 
 var keyboardStepListenerInstalled = false;
@@ -299,6 +301,28 @@ function doSkipBack() {
 
 function doStepBack() {
   animationManager.stepBack();
+}
+
+function describeCurrentStructure() {
+  if (!animationManager || !animationManager.currentAlgorithm) {
+    console.warn("Current animation does not provide a describe() method.");
+    return;
+  }
+
+  const algorithm = animationManager.currentAlgorithm;
+  let description = null;
+
+  if (typeof algorithm.describeFromState === "function") {
+    const state = animationManager.getPlaybackAnimationState();
+    description = algorithm.describeFromState(state, animationManager);
+  } else if (typeof algorithm.describe === "function") {
+    description = algorithm.describe();
+  } else {
+    console.warn("Current animation does not provide a describe() method.");
+    return;
+  }
+
+  console.log(description);
 }
 
 export function doPlayPause() {
@@ -538,6 +562,13 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
     }
   });
   addControlTo(zoomSelect, controlBar, "Zoom");
+
+  describeButton = addControlTo(
+    makeInput("Button", "Describe", "Describe Current Structure", "describeButton"),
+    controlBar,
+  );
+  describeButton.onclick = describeCurrentStructure;
+  describeButton.disabled = true;
   
   var resetButton = addControlTo(makeInput("Button", "Reset Animation", "Reset Animation", "resetButton"), controlBar);
   resetButton.onclick = function () {
@@ -926,6 +957,21 @@ function AnimationManager(objectManager, canvas) {
       }
     }
   }
+
+  this.refreshDescribeButton = function () {
+    if (!describeButton) return;
+    describeButton.disabled = !(
+      this.currentAlgorithm &&
+      (
+        typeof this.currentAlgorithm.describeFromState === "function" ||
+        typeof this.currentAlgorithm.describe === "function"
+      )
+    );
+  };
+
+  this.getPlaybackAnimationState = function () {
+    return snapshotObjectManagerState(this.animatedObjects);
+  };
 
   this.shift = function (deltaX = 0, deltaY = 0) {
     this.animatedObjects.shiftView(deltaX, deltaY);

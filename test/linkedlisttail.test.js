@@ -39,3 +39,27 @@ test("LinkedListTail insertFront and current-pointer flow emit readable blocks",
   assert.equal(list.currentNodeID, list.LinkedListTailElemID[0]);
   assert.equal(state.objects.get(1).text[0], "2");
 });
+
+test("LinkedListTail describe summarizes head, tail, and next chain", () => {
+  const list = createBareLinkedListTail();
+  list.arrayData[0] = "20";
+  list.arrayData[1] = "10";
+  list.top = 2;
+
+  assert.equal(
+    list.describe(),
+    "Head points to 10 node. Tail points to 20 node. 10 node's next points to 20 node. 20 node's next points to null.",
+  );
+});
+
+test("LinkedListTail describeFromState summarizes the replayed chain", () => {
+  const list = createBareLinkedListTail();
+  const insert10 = list.insertBack("10");
+  const insert20 = list.insertBack("20");
+  const state = replayAnimation([...insert10, ...insert20]);
+
+  assert.equal(
+    list.describeFromState(state),
+    "Head points to 10 node. Tail points to 20 node. 10 node's next points to 20 node. 20 node's next points to null.",
+  );
+});

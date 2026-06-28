@@ -36,3 +36,29 @@ test("Heap removeSmallest emits root-removal flow and leaves smallest removed", 
   assert.equal(heap.currentHeapSize, 2);
   assert.equal(state.objects.has(302), false);
 });
+
+test("Heap describe summarizes the heap structure", () => {
+  const heap = createBareHeap();
+  heap.arrayData[0] = "4";
+  heap.arrayData[1] = "10";
+  heap.arrayData[2] = "7";
+  heap.currentHeapSize = 3;
+
+  assert.equal(
+    heap.describe(),
+    "Heap has 3 values. Root is 4. Index 0 stores 4 with left child 10 and right child 7. Index 1 stores 10 with no children. Index 2 stores 7 with no children.",
+  );
+});
+
+test("Heap describeFromState summarizes the replayed heap state", () => {
+  const heap = createBareHeap();
+  const state = replayAnimation([
+    ...heap.insertElement("10"),
+    ...heap.insertElement("4"),
+  ]);
+
+  assert.equal(
+    heap.describeFromState(state),
+    "Heap has 2 values. Root is 4. Index 0 stores 4 with left child 10. Index 1 stores 10 with no children.",
+  );
+});

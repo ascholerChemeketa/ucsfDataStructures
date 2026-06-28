@@ -29,6 +29,10 @@ import {
   Algorithm,
   addControlToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  describeStackArray,
+  describeStackArrayFromState,
+} from "./DescribeHelpers.js";
 
 var ARRAY_START_X = 100;
 var ARRAY_START_Y = 100;
@@ -227,6 +231,14 @@ StackArray.prototype.markAnimationStep = function (label, meta = {}) {
 StackArray.prototype.finishStackArrayAnimation = function () {
   this.currentAnimationOperation = null;
   return this.finishAnimation();
+};
+
+StackArray.prototype.describe = function () {
+  return describeStackArray(this.arrayData, this.top);
+};
+
+StackArray.prototype.describeFromState = function (state) {
+  return describeStackArrayFromState(state, this.arrayID, this.topID);
 };
 
 StackArray.prototype.pushCallback = function (event) {

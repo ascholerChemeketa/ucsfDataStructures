@@ -4,6 +4,7 @@
 import { initAnimationManager } from "../AnimationLibrary/AnimationMain.js";
 import { Hash } from "./Hash.js";
 import { Algorithm, addControlToAlgorithmBar, addSeparatorToAlgorithmBar } from "./Algorithm.js";
+import { getReplayObjectText } from "./DescribeHelpers.js";
 
 export function StringHash(opts = {}) {
   if (!opts.title) opts.title = "String Hash";
@@ -90,6 +91,77 @@ StringHash.prototype.markAnimationStep = function (label, meta = {}) {
 StringHash.prototype.finishStringHashAnimation = function () {
   this.currentAnimationOperation = null;
   return this.finishAnimation();
+};
+
+StringHash.prototype.describe = function () {
+  const sentences = [`Table size is ${this.table_size}.`, "Mode is string hashing."];
+  if (Number.isFinite(this.currHash)) {
+    sentences.push(`Last computed hash value is ${this.currHash}.`);
+    sentences.push(`Last computed bucket is ${this.currHash % this.table_size}.`);
+  }
+  return sentences.join(" ");
+};
+
+StringHash.prototype.describeFromState = function (state) {
+  let hashValue = null;
+  let bucketValue = null;
+
+  const tryParseHash = (text) => {
+    if (typeof text !== "string") {
+      return;
+    }
+
+    let match = text.match(/hash\(".*?"\)\s*=\s*(\d+)/);
+    if (match) {
+      hashValue = Number(match[1]);
+    }
+
+    match = text.match(/Result is\s+(\d+)/);
+    if (match) {
+      hashValue = Number(match[1]);
+    }
+
+    match = text.match(/Computed hash\(".*?"\)\s*=\s*(\d+)/);
+    if (match) {
+      hashValue = Number(match[1]);
+    }
+
+    match = text.match(/^\s*=\s*(\d+)\s*$/);
+    if (match) {
+      hashValue = Number(match[1]);
+    }
+
+    match = text.match(/(\d+)\s*%\s*(\d+)\s*=\s*(\d+)/);
+    if (match) {
+      hashValue = Number(match[1]);
+      bucketValue = Number(match[3]);
+    }
+  };
+
+  for (const object of state?.objects?.values?.() ?? []) {
+    if (object.kind !== "label") {
+      continue;
+    }
+    tryParseHash(getReplayObjectText(object));
+  }
+
+  tryParseHash(state?.message ?? "");
+
+  const sentences = [`Table size is ${this.table_size}.`, "Mode is string hashing."];
+  if (Number.isFinite(hashValue)) {
+    sentences.push(`Last computed hash value is ${hashValue}.`);
+    if (!Number.isFinite(bucketValue)) {
+      bucketValue = hashValue % this.table_size;
+    }
+  } else if (Number.isFinite(this.currHash)) {
+    hashValue = this.currHash;
+    bucketValue = this.currHash % this.table_size;
+    sentences.push(`Last computed hash value is ${hashValue}.`);
+  }
+  if (Number.isFinite(bucketValue)) {
+    sentences.push(`Last computed bucket is ${bucketValue}.`);
+  }
+  return sentences.join(" ");
 };
 
 StringHash.prototype.hashCallback = function () {

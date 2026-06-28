@@ -6,6 +6,12 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  classifySingleReplayChildByValue,
+  compareReplayObjectsByValue,
+  describeBinaryTree,
+  describeBinaryTreeFromState,
+} from "./DescribeHelpers.js";
 
 BSTCopy.FOREGROUND_COLOR = "var(--svgColor)";
 BSTCopy.BACKGROUND_COLOR = "var(--svgFillColor)";
@@ -133,6 +139,17 @@ BSTCopy.prototype.markAnimationStep = function (label, meta = {}) {
 
 BSTCopy.prototype.finishBSTCopyAnimation = function () {
   return this.finishAnimation();
+};
+
+BSTCopy.prototype.describe = function () {
+  return describeBinaryTree(this.treeRoot);
+};
+
+BSTCopy.prototype.describeFromState = function (state) {
+  return describeBinaryTreeFromState(state, this.rootIndex, {
+    classifySingleChild: classifySingleReplayChildByValue,
+    sortChildren: compareReplayObjectsByValue,
+  });
 };
 
 BSTCopy.prototype.addControls = function () {

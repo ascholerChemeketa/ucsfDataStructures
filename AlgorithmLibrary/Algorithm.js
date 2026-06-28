@@ -311,6 +311,10 @@ Algorithm.prototype.addCodeToCanvasBase = function (
 
 Algorithm.prototype.init = function (am, w, h) {
   this.animationManager = am;
+  am.currentAlgorithm = this;
+  if (typeof am.refreshDescribeButton === "function") {
+    am.refreshDescribeButton();
+  }
   am.addListener("AnimationStarted", this, this.disableUI);
   am.addListener("AnimationEnded", this, this.enableUI);
   am.addListener("AnimationUndo", this, this.undo);

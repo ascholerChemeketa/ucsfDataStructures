@@ -29,6 +29,13 @@ import {
   initCanvas,
 } from "../AnimationLibrary/AnimationMain.js";
 import { Algorithm, addControlToAlgorithmBar } from "./Algorithm.js";
+import {
+  describeBinaryHeap,
+  describeBinaryHeapFromState,
+  describeIndexedArray,
+  describeIndexedArrayFromState,
+  getReplayObjectText,
+} from "./DescribeHelpers.js";
 
 export function HeapSort(arg) {
   // New-style usage: `new HeapSort({ ...opts })` (preferred)
@@ -173,6 +180,57 @@ HeapSort.prototype.markAnimationStep = function (label, meta = {}) {
 
 HeapSort.prototype.finishHeapSortAnimation = function () {
   return this.finishAnimation();
+};
+
+HeapSort.prototype.describe = function () {
+  if (this.currentHeapSize > 0) {
+    const heapValues = this.arrayData.slice(0, this.currentHeapSize);
+    const description = describeBinaryHeap(heapValues, this.currentHeapSize, {
+      emptyText: "Array is empty.",
+      heapLabel: "Active heap",
+    });
+    if (this.currentHeapSize < this.arrayData.length) {
+      const suffix = this.arrayData.slice(this.currentHeapSize);
+      return `${description} Sorted suffix has ${suffix.length} value${suffix.length === 1 ? "" : "s"}. ${suffix.map((value, index) => `Index ${this.currentHeapSize + index} stores ${value}.`).join(" ")}`;
+    }
+    return description;
+  }
+
+  return describeIndexedArray(this.arrayData, {
+    emptyText: "Array is empty.",
+    label: "Array",
+  });
+};
+
+HeapSort.prototype.describeFromState = function (state) {
+  const activeHeapSize = this.circleObjs.filter((id) => {
+    const object = state.objects.get(id);
+    const text = getReplayObjectText(object);
+    return object != null && text != null && text !== "";
+  }).length;
+
+  if (activeHeapSize > 0) {
+    const description = describeBinaryHeapFromState(state, this.arrayRects, {
+      emptyText: "Array is empty.",
+      heapLabel: "Active heap",
+      size: activeHeapSize,
+      activeNodeIds: this.circleObjs,
+    });
+    if (activeHeapSize < this.arrayRects.length) {
+      const suffix = this.arrayRects
+        .slice(activeHeapSize)
+        .map((id) => getReplayObjectText(state.objects.get(id)));
+      return `${description} Sorted suffix has ${suffix.length} value${suffix.length === 1 ? "" : "s"}. ${suffix
+        .map((value, index) => `Index ${activeHeapSize + index} stores ${value}.`)
+        .join(" ")}`;
+    }
+    return description;
+  }
+
+  return describeIndexedArrayFromState(state, this.arrayRects, {
+    emptyText: "Array is empty.",
+    label: "Array",
+  });
 };
 
 HeapSort.prototype.createArray = function () {

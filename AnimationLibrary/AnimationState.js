@@ -1,4 +1,10 @@
 import { normalizeAnimation } from "./AnimationSchema.js";
+import { AnimatedLabel } from "./AnimatedLabel.js";
+import { AnimatedCircle } from "./AnimatedCircle.js";
+import { AnimatedRectangle } from "./AnimatedRectangle.js";
+import { AnimatedLinkedList } from "./AnimatedLinkedList.js";
+import { AnimatedBTreeNode } from "./AnimatedBTreeNode.js";
+import { HighlightCircle } from "./HighlightCircle.js";
 
 function edgeKey(from, to) {
   return `${from}->${to}`;
@@ -22,6 +28,118 @@ function replayAnimation(rawAnimation, options = {}) {
 
   for (let i = 0; i < animation.length && i <= upToBlockIndex; i++) {
     replayBlock(state, animation[i]);
+  }
+
+  return state;
+}
+
+function snapshotObjectManagerState(objectManager) {
+  const state = createEmptyAnimationState();
+  if (!objectManager) {
+    return state;
+  }
+
+  for (const node of objectManager.Nodes) {
+    if (!node || node.addedToScene === false) {
+      continue;
+    }
+
+    const snapshot = {
+      id: node.objectID,
+      x: node.x,
+      y: node.y,
+      foregroundColor: node.foregroundColor,
+      backgroundColor: node.backgroundColor,
+      highlighted: !!node.highlighted,
+      alpha: node.alpha,
+      layer: node.layer,
+    };
+    if (node.lineDash) {
+      snapshot.lineDash = node.lineDash;
+    }
+
+    if (typeof node.highlightIndex === "number" && node.highlightIndex !== -1) {
+      snapshot.highlightIndex = node.highlightIndex;
+    }
+
+    if (node instanceof AnimatedCircle) {
+      snapshot.kind = "circle";
+      snapshot.text = node.getText(0);
+    } else if (node instanceof AnimatedRectangle) {
+      snapshot.kind = "rectangle";
+      snapshot.text = node.getText(0);
+      snapshot.width = node.getWidth();
+      snapshot.height = node.getHeight();
+      snapshot.nullFlags = { 0: node.getNull(0) };
+    } else if (node instanceof AnimatedLabel) {
+      snapshot.kind = "label";
+      snapshot.text = node.getText(0);
+      snapshot.centered = node.centering;
+      snapshot.fontSizePercent = node.fontSizePercent;
+    } else if (node instanceof AnimatedLinkedList) {
+      snapshot.kind = "linkedList";
+      snapshot.width = node.getWidth();
+      snapshot.height = node.getHeight();
+      snapshot.linkPercent = node.linkPercent;
+      snapshot.vertical = node.vertical;
+      snapshot.linkAtEnd = node.linkPositionEnd;
+      snapshot.numLabels = node.numLabels;
+      snapshot.numLinks = node.numLinks;
+      snapshot.text = {};
+      snapshot.nullFlags = {};
+      for (let i = 0; i < node.numLabels; i++) {
+        snapshot.text[i] = node.getText(i);
+      }
+      for (let i = 0; i < node.numLinks; i++) {
+        snapshot.nullFlags[i] = node.getNull(i);
+      }
+    } else if (node instanceof AnimatedBTreeNode) {
+      snapshot.kind = "btreeNode";
+      snapshot.widthPerElement = node.widthPerElement;
+      snapshot.height = node.getHeight();
+      snapshot.numElements = node.getNumElements();
+      snapshot.text = {};
+      for (let i = 0; i < node.getNumElements(); i++) {
+        snapshot.text[i] = node.getText(i);
+      }
+    } else if (node instanceof HighlightCircle) {
+      snapshot.kind = "highlightCircle";
+      snapshot.color = node.foregroundColor;
+      snapshot.radius = node.radius;
+    } else {
+      snapshot.kind = "unknown";
+      snapshot.text = typeof node.getText === "function" ? node.getText(0) : "";
+    }
+
+    state.objects.set(snapshot.id, snapshot);
+  }
+
+  for (const [from, targets] of objectManager.Edges) {
+    for (const [to, edge] of targets) {
+      if (!edge || edge.addedToScene === false) {
+        continue;
+      }
+
+      state.edges.set(edgeKey(from, to), {
+        from,
+        to,
+        color: typeof edge.color === "function" ? edge.color() : edge.edgeColor,
+        curve: edge.curve,
+        directed: edge.directed,
+        label: edge.edgeLabel,
+        connectionPoint: edge.anchorPoint,
+        type: "connect",
+        ...(edge.alpha !== undefined ? { alpha: edge.alpha } : {}),
+        ...(edge.highlighted ? { highlighted: edge.highlighted } : {}),
+      });
+    }
+  }
+
+  if (typeof document !== "undefined") {
+    const messageEl = document.getElementById("message");
+    if (messageEl) {
+      state.message = messageEl.value || "";
+    }
   }
 
   return state;
@@ -250,4 +368,5 @@ export {
   replayAnimation,
   replayBlock,
   replayStep,
+  snapshotObjectManagerState,
 };

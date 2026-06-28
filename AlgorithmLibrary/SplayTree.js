@@ -30,6 +30,12 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  classifySingleReplayChildByValue,
+  compareReplayObjectsByValue,
+  describeBinaryTree,
+  describeBinaryTreeFromState,
+} from "./DescribeHelpers.js";
 
 // Constants.
 
@@ -1090,6 +1096,17 @@ SPLAYTREE.prototype.animateNewPositions = function (tree) {
     this.animateNewPositions(tree.left);
     this.animateNewPositions(tree.right);
   }
+};
+
+SPLAYTREE.prototype.describe = function () {
+  return describeBinaryTree(this.treeRoot);
+};
+
+SPLAYTREE.prototype.describeFromState = function (state) {
+  return describeBinaryTreeFromState(state, null, {
+    classifySingleChild: classifySingleReplayChildByValue,
+    sortChildren: compareReplayObjectsByValue,
+  });
 };
 
 SPLAYTREE.prototype.resizeWidths = function (tree) {

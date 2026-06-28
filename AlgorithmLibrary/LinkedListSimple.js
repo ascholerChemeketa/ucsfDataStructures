@@ -30,6 +30,10 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  describeSinglyLinkedChain,
+  describeSinglyLinkedChainFromState,
+} from "./DescribeHelpers.js";
 
 // Based on LinkedListTail.js, but without a tail pointer and without Insert Back.
 
@@ -182,6 +186,24 @@ LinkedListSimple.prototype.markAnimationStep = function (label, meta = {}) {
 
 LinkedListSimple.prototype.finishLinkedListSimpleAnimation = function () {
   return this.finishAnimation();
+};
+
+LinkedListSimple.prototype.describe = function () {
+  const values = [];
+  for (let i = this.top - 1; i >= 0; i--) {
+    values.push(this.arrayData[i]);
+  }
+  return describeSinglyLinkedChain(values, {
+    emptyText: "List is empty.",
+    headLabel: "Head",
+  });
+};
+
+LinkedListSimple.prototype.describeFromState = function (state) {
+  return describeSinglyLinkedChainFromState(state, this.headID, {
+    emptyText: "List is empty.",
+    headLabel: "Head",
+  });
 };
 
 LinkedListSimple.prototype.recomputeLeftMostX = function () {

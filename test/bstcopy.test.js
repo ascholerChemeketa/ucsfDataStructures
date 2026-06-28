@@ -55,3 +55,29 @@ test("BSTCopy copyTree reports empty source trees with explicit metadata", () =>
   assert.equal(state.message, "");
   assert.equal(state.edges.has("2->"), false);
 });
+
+test("BSTCopy describe summarizes the source tree like BST", () => {
+  const bst = createBareBSTCopy();
+  bst.treeRoot = {
+    data: 10,
+    left: { data: 5, left: null, right: null },
+    right: { data: 15, left: null, right: null },
+  };
+
+  assert.equal(
+    bst.describe(),
+    "Root is 10 has a left child 5 and right child 15. 5 has no children. 15 has no children.",
+  );
+});
+
+test("BSTCopy describeFromState summarizes the replayed source tree state", () => {
+  const bst = createBareBSTCopy();
+  const insert10 = bst.insertElement(10);
+  const insert5 = bst.insertElement(5);
+  const state = replayAnimation([...insert10, ...insert5]);
+
+  assert.equal(
+    bst.describeFromState(state),
+    "Root is 10 has a left child 5. 5 has no children.",
+  );
+});

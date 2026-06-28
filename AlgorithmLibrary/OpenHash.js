@@ -30,6 +30,10 @@ import {
 } from "../AnimationLibrary/AnimationMain.js";
 import { Algorithm, addRadioButtonGroupToAlgorithmBar, addControlToAlgorithmBar} from "./Algorithm.js";
 import { Hash } from "./Hash.js";
+import {
+  describeOpenHashTable,
+  describeOpenHashTableFromState,
+} from "./DescribeHelpers.js";
 
 export function OpenHash(canvas) {
   // New-style usage: `new OpenHash({ ...opts })` (preferred)
@@ -149,6 +153,29 @@ OpenHash.prototype.markAnimationStep = function (label, meta = {}) {
 
 OpenHash.prototype.finishOpenHashAnimation = function () {
   return this.finishAnimation();
+};
+
+OpenHash.prototype.describe = function () {
+  const buckets = [];
+  for (let i = 0; i < this.table_size; i++) {
+    const values = [];
+    let node = this.hashTableValues[i];
+    while (node != null) {
+      values.push(String(node.data));
+      node = node.next;
+    }
+    buckets.push(values);
+  }
+
+  return describeOpenHashTable(buckets, {
+    tableSize: this.table_size,
+  });
+};
+
+OpenHash.prototype.describeFromState = function (state) {
+  return describeOpenHashTableFromState(state, this.hashTableVisual, {
+    tableSize: this.table_size,
+  });
 };
 
 OpenHash.prototype.insertElement = function (elem) {

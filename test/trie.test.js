@@ -38,3 +38,23 @@ test("Trie find and delete emit outcome and cleanup blocks", () => {
   const state = replayAnimation([...insertAnimation, ...findAnimation, ...deleteAnimation]);
   assert.equal(state.message, "");
 });
+
+test("Trie describe summarizes prefixes, word markers, and children", () => {
+  const trie = createBareTrie();
+  trie.add("CAT");
+
+  assert.equal(
+    trie.describe(),
+    "Root node stores an empty prefix, does not mark a complete word, and has child C. Node C stores prefix C, does not mark a complete word, and has child A. Node A stores prefix A, does not mark a complete word, and has child T. Node T stores prefix T, marks a complete word, and has no children.",
+  );
+});
+
+test("Trie describeFromState summarizes the replayed trie state", () => {
+  const trie = createBareTrie();
+  const state = replayAnimation(trie.add("CAT"));
+
+  assert.equal(
+    trie.describeFromState(state),
+    "Root node stores an empty prefix, does not mark a complete word, and has child C. Node C stores prefix C, does not mark a complete word, and has child A. Node A stores prefix A, does not mark a complete word, and has child T. Node T stores prefix T, marks a complete word, and has no children.",
+  );
+});

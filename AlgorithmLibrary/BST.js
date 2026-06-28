@@ -31,6 +31,12 @@ import {
   addControlToAlgorithmBar,
   addSeparatorToAlgorithmBar,
 } from "../AlgorithmLibrary/Algorithm.js";
+import {
+  classifySingleReplayChildByValue,
+  compareReplayObjectsByValue,
+  describeBinaryTree,
+  describeBinaryTreeFromState,
+} from "./DescribeHelpers.js";
 
 // BST.LINK_COLOR = "#007700";
 // BST.HIGHLIGHT_CIRCLE_COLOR = "#007700";
@@ -1077,6 +1083,17 @@ BST.prototype.treeDelete = function (tree, valueToDelete) {
     );
     this.markAnimationStep("value not found", { tags: ["delete", "not-found"] });
   }
+};
+
+BST.prototype.describe = function () {
+  return describeBinaryTree(this.treeRoot);
+};
+
+BST.prototype.describeFromState = function (state) {
+  return describeBinaryTreeFromState(state, this.rootIndex, {
+    classifySingleChild: classifySingleReplayChildByValue,
+    sortChildren: compareReplayObjectsByValue,
+  });
 };
 
 BST.prototype.resizeTree = function () {
