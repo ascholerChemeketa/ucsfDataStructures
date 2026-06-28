@@ -84,6 +84,9 @@ class Dragable {
   }
 
   dragStart(e) {
+    if (typeof this.el.focus === "function") {
+      this.el.focus({ preventScroll: true });
+    }
     this.dragging = true;
     this.startDragCoords = this.getMousePosition(e);
     //Update offset in case zoom changed it
@@ -123,13 +126,52 @@ class Dragable {
   }
 }
 
+function panSvgViewBox(svg, deltaX, deltaY) {
+  const viewBox = svg.getAttribute("viewBox").split(" ").map(parseFloat);
+  if (viewBox.length < 4 || viewBox.some((value) => !Number.isFinite(value))) {
+    return;
+  }
+
+  viewBox[0] += deltaX;
+  viewBox[1] += deltaY;
+  svg.setAttribute("viewBox", viewBox.join(" "));
+}
+
+function installKeyboardPan(svg) {
+  svg.addEventListener("keydown", (e) => {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) {
+      return;
+    }
+
+    const step = e.shiftKey ? 120 : 40;
+    let deltaX = 0;
+    let deltaY = 0;
+
+    if (e.key === "ArrowLeft") {
+      deltaX = -step;
+    } else if (e.key === "ArrowRight") {
+      deltaX = step;
+    } else if (e.key === "ArrowUp") {
+      deltaY = -step;
+    } else if (e.key === "ArrowDown") {
+      deltaY = step;
+    } else {
+      return;
+    }
+
+    panSvgViewBox(svg, deltaX, deltaY);
+    e.preventDefault();
+    e.stopPropagation();
+  });
+}
+
 const DEFAULT_SVG_VIEW_WIDTH = 1200;
 const DEFAULT_SVG_VIEW_HEIGHT = 600;
 
 function makeSVG(centered, viewWidth = DEFAULT_SVG_VIEW_WIDTH, viewHeight = DEFAULT_SVG_VIEW_HEIGHT) {
   let sizeStyle = centered ? "xMidYMin" : "xMinYMin";
   const s = `
-  <svg xmlns="http://www.w3.org/2000/svg" role="img" width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}" 
+  <svg xmlns="http://www.w3.org/2000/svg" role="img" tabindex="0" aria-label="Interactive visualization" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}" 
      preserveAspectRatio="${sizeStyle} slice">
     <defs>
       <marker id="SVGTriangleMarker" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8"
@@ -164,6 +206,7 @@ function makeSVG(centered, viewWidth = DEFAULT_SVG_VIEW_WIDTH, viewHeight = DEFA
   </svg>`;
   let svg = new DOMParser().parseFromString(s, "text/xml").documentElement;
   new Dragable(svg);
+  installKeyboardPan(svg);
   return svg;
 }
 

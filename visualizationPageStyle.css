@@ -97,6 +97,11 @@ svg {
   min-height: 200px;
 }
 
+svg:focus-visible {
+  outline: 3px solid var(--svgColor--althighlight);
+  outline-offset: -3px;
+}
+
 #algoControlSection {
   container-name: sidebar;
   container-type: inline-size;
