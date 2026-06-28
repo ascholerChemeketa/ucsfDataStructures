@@ -303,21 +303,39 @@ function doStepBack() {
   animationManager.stepBack();
 }
 
+function getStructureDescription(manager) {
+  if (!manager || !manager.currentAlgorithm) {
+    return null;
+  }
+
+  const algorithm = manager.currentAlgorithm;
+
+  try {
+    if (
+      typeof algorithm.describeFromState === "function" &&
+      typeof manager.getPlaybackAnimationState === "function"
+    ) {
+      const state = manager.getPlaybackAnimationState();
+      return algorithm.describeFromState(state, manager);
+    }
+    if (typeof algorithm.describe === "function") {
+      return algorithm.describe();
+    }
+  } catch (e) {
+    console.warn("Unable to describe current animation state.", e);
+  }
+
+  return null;
+}
+
 function describeCurrentStructure() {
   if (!animationManager || !animationManager.currentAlgorithm) {
     console.warn("Current animation does not provide a describe() method.");
     return;
   }
 
-  const algorithm = animationManager.currentAlgorithm;
-  let description = null;
-
-  if (typeof algorithm.describeFromState === "function") {
-    const state = animationManager.getPlaybackAnimationState();
-    description = algorithm.describeFromState(state, animationManager);
-  } else if (typeof algorithm.describe === "function") {
-    description = algorithm.describe();
-  } else {
+  const description = getStructureDescription(animationManager);
+  if (description == null) {
     console.warn("Current animation does not provide a describe() method.");
     return;
   }
@@ -818,6 +836,8 @@ export function initCanvas(canvas, targetElement=null, title="", centered = fals
   objectManager = new ObjectManager(canvas, centered);
   
   animationManager = new AnimationManager(objectManager, canvas);
+  animationManager.accessibleTitle = title || "Interactive visualization";
+  objectManager.setAccessibleText(animationManager.accessibleTitle);
   addGeneralControls(objectManager, targetElement, title, opts);
 
   var controlBar = document.getElementById("algoControlSection");
@@ -966,6 +986,18 @@ function AnimationManager(objectManager, canvas) {
         typeof this.currentAlgorithm.describeFromState === "function" ||
         typeof this.currentAlgorithm.describe === "function"
       )
+    );
+    this.refreshAccessibleDescription();
+  };
+
+  this.refreshAccessibleDescription = function () {
+    if (!this.animatedObjects || typeof this.animatedObjects.setAccessibleText !== "function") {
+      return;
+    }
+
+    this.animatedObjects.setAccessibleText(
+      this.accessibleTitle,
+      getStructureDescription(this),
     );
   };
 
@@ -1254,6 +1286,7 @@ function AnimationManager(objectManager, canvas) {
       // Update scrub slider at end
       this.currentBlockIndex = this.totalBlocks;
       this.updateScrubUI();
+      this.refreshAccessibleDescription();
       return;
     }
     this.undoAnimationStepIndices.push(this.currentAnimation);
@@ -1291,6 +1324,7 @@ function AnimationManager(objectManager, canvas) {
     // Advance scrub slider to next block
     this.currentBlockIndex = Math.min(this.currentBlockIndex + 1, this.totalBlocks);
     this.updateScrubUI();
+    this.refreshAccessibleDescription();
   };
 
   //  Start a new animation. The input can be legacy flat commands or canonical blocks.
@@ -1369,6 +1403,7 @@ function AnimationManager(objectManager, canvas) {
     clearTimeout(timer);
     this.animatedObjects.update();
     this.animatedObjects.draw();
+    this.refreshAccessibleDescription();
       document.getElementById("message").value = "";
   };
 
@@ -1416,6 +1451,7 @@ function AnimationManager(objectManager, canvas) {
       }
       this.currentBlockIndex = 0;
       this.updateScrubUI();
+      this.refreshAccessibleDescription();
     }
   };
 
@@ -1474,6 +1510,7 @@ function AnimationManager(objectManager, canvas) {
       this.animatedObjects.draw();
       this.currentBlockIndex = this.totalBlocks;
       this.updateScrubUI();
+      this.refreshAccessibleDescription();
     }
   };
 
@@ -1509,8 +1546,10 @@ function AnimationManager(objectManager, canvas) {
       // After full undo, reset scrub slider
       this.currentBlockIndex = 0;
       this.updateScrubUI();
+      this.refreshAccessibleDescription();
       return false;
     }
+    this.refreshAccessibleDescription();
     return true;
   };
 
@@ -1681,6 +1720,7 @@ function AnimationManager(objectManager, canvas) {
     if (targetBlockIndex === this.currentBlockIndex) {
       this.awaitingStep = targetBlockIndex < this.totalBlocks;
       this.updateScrubUI();
+      this.refreshAccessibleDescription();
       this.fireEvent(this.awaitingStep ? "AnimationWaiting" : "AnimationEnded", "NoData");
       return;
     }
@@ -1713,6 +1753,7 @@ function AnimationManager(objectManager, canvas) {
       this.currentlyAnimating = false;
       this.doingUndo = false;
       this.awaitingStep = targetBlockIndex < this.totalBlocks;
+      this.refreshAccessibleDescription();
       this.fireEvent(this.awaitingStep ? "AnimationWaiting" : "AnimationEnded", "NoData");
       return;
     }
@@ -1730,6 +1771,7 @@ function AnimationManager(objectManager, canvas) {
     this.currentlyAnimating = false;
     this.doingUndo = false;
     this.awaitingStep = targetBlockIndex < this.totalBlocks;
+    this.refreshAccessibleDescription();
     this.fireEvent(this.awaitingStep ? "AnimationWaiting" : "AnimationEnded", "NoData");
   };
 }

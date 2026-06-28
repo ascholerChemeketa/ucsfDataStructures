@@ -165,14 +165,20 @@ function installKeyboardPan(svg) {
   });
 }
 
+const DEFAULT_SVG_TITLE = "Interactive visualization";
+const DEFAULT_SVG_DESCRIPTION =
+  "Use the animation controls to step through the visualization. When this graphic has focus, use arrow keys to pan the view.";
+
 const DEFAULT_SVG_VIEW_WIDTH = 1200;
 const DEFAULT_SVG_VIEW_HEIGHT = 600;
 
 function makeSVG(centered, viewWidth = DEFAULT_SVG_VIEW_WIDTH, viewHeight = DEFAULT_SVG_VIEW_HEIGHT) {
   let sizeStyle = centered ? "xMidYMin" : "xMinYMin";
   const s = `
-  <svg xmlns="http://www.w3.org/2000/svg" role="img" tabindex="0" aria-label="Interactive visualization" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}" 
+  <svg xmlns="http://www.w3.org/2000/svg" role="img" tabindex="0" aria-labelledby="visualizationTitle" aria-describedby="visualizationDescription" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}" 
      preserveAspectRatio="${sizeStyle} slice">
+    <title id="visualizationTitle">${DEFAULT_SVG_TITLE}</title>
+    <desc id="visualizationDescription">${DEFAULT_SVG_DESCRIPTION}</desc>
     <defs>
       <marker id="SVGTriangleMarker" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8"
         markerHeight="8" orient="auto-start-reverse">
@@ -293,6 +299,23 @@ export function ObjectManager(canvas, centered = false) {
     vb[2] = nextVbW;
     vb[3] = nextVbH;
     this.svg.setAttribute("viewBox", vb.join(" "));
+  };
+
+  this.setAccessibleText = function (title, description) {
+    const titleEl = this.svg.querySelector("#visualizationTitle");
+    const descEl = this.svg.querySelector("#visualizationDescription");
+    if (titleEl) {
+      titleEl.textContent =
+        typeof title === "string" && title.trim() !== ""
+          ? title.trim()
+          : DEFAULT_SVG_TITLE;
+    }
+    if (descEl) {
+      descEl.textContent =
+        typeof description === "string" && description.trim() !== ""
+          ? description.trim()
+          : DEFAULT_SVG_DESCRIPTION;
+    }
   };
 
   this.shiftView = function (deltaX = 0, deltaY = 0) {
