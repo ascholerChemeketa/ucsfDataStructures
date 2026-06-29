@@ -79,8 +79,8 @@ var skipBackButton;
 var stepBackButton;
 var stepForwardButton;
 var skipForwardButton;
-var describeButton;
 var scrubSlider;
+var describeStatusRegion;
 
 var keyboardStepListenerInstalled = false;
 var ctrlWheelZoomListenerInstalled = false;
@@ -339,8 +339,14 @@ function describeCurrentStructure() {
     console.warn("Current animation does not provide a describe() method.");
     return;
   }
+  console.log("Current structure description:", description);
 
-  console.log(description);
+  if (!describeStatusRegion) return;
+
+  describeStatusRegion.textContent = "";
+  requestAnimationFrame(() => {
+    describeStatusRegion.textContent = description;
+  });
 }
 
 export function doPlayPause() {
@@ -454,6 +460,25 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
   }
 
   let animationDiv = makeDiv("animationSurround", "", targetElement);
+  animationDiv.setAttribute("aria-keyshortcuts", "Control+D");
+  animationDiv.addEventListener("keydown", (e) => {
+    if (
+      e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey &&
+      String(e.key).toLowerCase() === "d"
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      describeCurrentStructure();
+    }
+  });
+
+  describeStatusRegion = makeDiv("visualizationStatus", "visually-hidden", animationDiv);
+  describeStatusRegion.setAttribute("role", "status");
+  describeStatusRegion.setAttribute("aria-live", "polite");
+  describeStatusRegion.setAttribute("aria-atomic", "true");
+
   let algoControlSection = makeDiv("algoControlSection", "", animationDiv);
 
   var controlBar = makeDiv("generalAnimationControls", "", algoControlSection);
@@ -600,13 +625,6 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
     }
   });
   addControlTo(zoomSelect, controlBar, "Zoom");
-
-  describeButton = addControlTo(
-    makeInput("Button", "Describe", "Describe Current Structure", "describeButton"),
-    controlBar,
-  );
-  describeButton.onclick = describeCurrentStructure;
-  describeButton.disabled = true;
   
   var resetButton = addControlTo(makeInput("Button", "Reset Animation", "Reset Animation", "resetButton"), controlBar);
   resetButton.onclick = function () {
@@ -1001,14 +1019,6 @@ function AnimationManager(objectManager, canvas) {
   }
 
   this.refreshDescribeButton = function () {
-    if (!describeButton) return;
-    describeButton.disabled = !(
-      this.currentAlgorithm &&
-      (
-        typeof this.currentAlgorithm.describeFromState === "function" ||
-        typeof this.currentAlgorithm.describe === "function"
-      )
-    );
     this.refreshAccessibleDescription();
   };
 

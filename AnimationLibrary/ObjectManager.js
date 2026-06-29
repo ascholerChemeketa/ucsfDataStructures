@@ -398,7 +398,7 @@ const DEFAULT_SVG_VIEW_HEIGHT = 600;
 function makeSVG(centered, viewWidth = DEFAULT_SVG_VIEW_WIDTH, viewHeight = DEFAULT_SVG_VIEW_HEIGHT) {
   let sizeStyle = centered ? "xMidYMin" : "xMinYMin";
   const s = `
-  <svg xmlns="http://www.w3.org/2000/svg" role="img" tabindex="0" aria-labelledby="visualizationTitle" aria-describedby="visualizationDescription" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Control+S" width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}" 
+  <svg xmlns="http://www.w3.org/2000/svg" role="img" tabindex="0" aria-labelledby="visualizationTitle" aria-describedby="visualizationDescription" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Control+S Control+D" width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}" 
      preserveAspectRatio="${sizeStyle} slice">
     <title id="visualizationTitle">${DEFAULT_SVG_TITLE}</title>
     <desc id="visualizationDescription">${DEFAULT_SVG_DESCRIPTION}</desc>
