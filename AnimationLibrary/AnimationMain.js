@@ -415,13 +415,24 @@ function normalizeSpeedLabel(raw) {
   return null;
 }
 
+function prefersReducedMotion(opts = null) {
+  if (opts && typeof opts.reducedMotion === "boolean") {
+    return opts.reducedMotion;
+  }
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function speedChange(speed) {
   const label = normalizeSpeedLabel(speed) ?? "Off";
   const mapped = SPEED_LABEL_TO_VALUE[label] ?? "step";
+  const reducedMotion = prefersReducedMotion(animationManager?.opts);
 
   if (mapped === "step") {
     animationManager.SetPaused(true);
-    animationManager.SetSpeed(1);
+    animationManager.SetSpeed(reducedMotion ? 0 : 1);
   } else {
     animationManager.SetPaused(false);
     animationManager.SetSpeed(mapped);
@@ -528,6 +539,15 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
   speedSelect.addEventListener("change", (e) => {
     speedChange(e.target.value);
   });
+
+  if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+    const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    reducedMotionQuery.addEventListener?.("change", () => {
+      if (speedSelect.value === "Off") {
+        speedChange(speedSelect.value);
+      }
+    });
+  }
   addControlTo(speedSelect, controlBar, "Auto Step Speed");
 
   zoomCookieName = deriveZoomCookieName(title, opts);
@@ -836,6 +856,7 @@ export function initCanvas(canvas, targetElement=null, title="", centered = fals
   objectManager = new ObjectManager(canvas, centered);
   
   animationManager = new AnimationManager(objectManager, canvas);
+  animationManager.opts = opts || {};
   animationManager.accessibleTitle = title || "Interactive visualization";
   objectManager.setAccessibleText(animationManager.accessibleTitle);
   addGeneralControls(objectManager, targetElement, title, opts);
@@ -892,6 +913,7 @@ function AnimationManager(objectManager, canvas) {
   // this container
   this.animatedObjects = objectManager;
   this.canvas = canvas;
+  this.opts = null;
 
   // Control variables for stopping / starting animation
 
