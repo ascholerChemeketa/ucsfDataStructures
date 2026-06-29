@@ -10,7 +10,7 @@ Algorithms that have not been updated to use the new animation system have been 
 
 Below are links to animations that are updated and (mostly) working.
 
-## Use
+## Use in your own project
 
 The [Github pages](https://ascholerchemeketa.github.io/ucsfDataStructures/) version of this repository is only intended for demonstration purposes.
 
@@ -73,6 +73,13 @@ If you are viewing this on Github, switch to Github pages to see the animations 
 - [Treap.html](Treap.html)
 - [Trie.html](Trie.html)
 - [TST.html](TST.html)
+
+### Animation tips
+
+#### Hotkeys
+
+* Ctrl-S while the animation (SVG) is focused will save the current animation as an SVG file.
+* Ctrl-D while any of the controls are focused will describe the current data structure in the console and to the `aria-describedby` region for screen readers.
 
 ```text
 // Copyright 2011 David Galles, University of San Francisco. All rights reserved.
