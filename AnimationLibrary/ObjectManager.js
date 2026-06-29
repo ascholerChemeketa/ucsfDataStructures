@@ -137,8 +137,231 @@ function panSvgViewBox(svg, deltaX, deltaY) {
   svg.setAttribute("viewBox", viewBox.join(" "));
 }
 
+function svgDownloadFilename(svg) {
+  const title = svg.querySelector("title")?.textContent || "visualization";
+  const safeTitle = title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${safeTitle || "visualization"}.svg`;
+}
+
+function svgCssVariableNames() {
+  const names = new Set();
+
+  function collectFromStyle(style) {
+    for (let i = 0; i < style.length; i++) {
+      const name = style.item(i);
+      if (name.startsWith("--svg")) {
+        names.add(name);
+      }
+    }
+  }
+
+  function collectFromRules(rules) {
+    for (const rule of rules) {
+      if (rule.style) {
+        collectFromStyle(rule.style);
+      }
+      if (rule.cssRules) {
+        collectFromRules(rule.cssRules);
+      }
+    }
+  }
+
+  for (const sheet of document.styleSheets) {
+    try {
+      collectFromRules(sheet.cssRules);
+    } catch (error) {
+      // Ignore stylesheets the browser will not expose, such as cross-origin CSS.
+    }
+  }
+
+  document.querySelectorAll("[style]").forEach((element) => {
+    collectFromStyle(element.style);
+  });
+
+  return names;
+}
+
+function applySvgCssVariables(sourceSvg, exportSvg) {
+  const computedStyle = getComputedStyle(sourceSvg);
+  const exportedVariables = {};
+
+  for (const name of svgCssVariableNames()) {
+    const value = computedStyle.getPropertyValue(name).trim();
+    if (value) {
+      exportSvg.style.setProperty(name, value);
+      exportedVariables[name] = value;
+    }
+  }
+
+  return exportedVariables;
+}
+
+function applySvgFontStyles(sourceSvg, exportSvg) {
+  const computedStyle = getComputedStyle(sourceSvg);
+  const fontProperties = [
+    "font-family",
+    "font-size",
+    "font-style",
+    "font-variant",
+    "font-weight",
+    "font-stretch",
+    "line-height",
+  ];
+  const exportedFontStyles = {};
+
+  for (const property of fontProperties) {
+    const value = computedStyle.getPropertyValue(property).trim();
+    if (value) {
+      exportSvg.style.setProperty(property, value);
+      exportedFontStyles[property] = value;
+    }
+  }
+
+  return exportedFontStyles;
+}
+
+function parseViewBox(svg) {
+  const viewBox = svg.getAttribute("viewBox")?.split(/\s+/).map(parseFloat) || [];
+  if (viewBox.length < 4 || viewBox.some((value) => !Number.isFinite(value))) {
+    return null;
+  }
+  return viewBox;
+}
+
+function preserveAspectRatioParts(svg) {
+  const value = svg.getAttribute("preserveAspectRatio") || "xMidYMid meet";
+  const [align = "xMidYMid", mode = "meet"] = value.trim().split(/\s+/);
+  return { align, mode };
+}
+
+function alignmentOffset(align, axis, available) {
+  if (axis === "x") {
+    if (align.includes("xMid")) return available / 2;
+    if (align.includes("xMax")) return available;
+    return 0;
+  }
+
+  if (align.includes("YMid")) return available / 2;
+  if (align.includes("YMax")) return available;
+  return 0;
+}
+
+function visibleSvgViewBox(svg) {
+  const viewBox = parseViewBox(svg);
+  if (!viewBox) return null;
+
+  const [minX, minY, width, height] = viewBox;
+  const rect = svg.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0 || width <= 0 || height <= 0) {
+    return viewBox;
+  }
+
+  const { align, mode } = preserveAspectRatioParts(svg);
+  const visibleLeft = Math.max(rect.left, 0);
+  const visibleTop = Math.max(rect.top, 0);
+  const visibleRight = Math.min(rect.right, window.innerWidth);
+  const visibleBottom = Math.min(rect.bottom, window.innerHeight);
+  const visibleWidthPx = visibleRight - visibleLeft;
+  const visibleHeightPx = visibleBottom - visibleTop;
+
+  if (visibleWidthPx <= 0 || visibleHeightPx <= 0) {
+    return viewBox;
+  }
+
+  if (align === "none") {
+    const scaleX = rect.width / width;
+    const scaleY = rect.height / height;
+    return [
+      minX + (visibleLeft - rect.left) / scaleX,
+      minY + (visibleTop - rect.top) / scaleY,
+      visibleWidthPx / scaleX,
+      visibleHeightPx / scaleY,
+    ];
+  }
+
+  const scale = mode === "slice"
+    ? Math.max(rect.width / width, rect.height / height)
+    : Math.min(rect.width / width, rect.height / height);
+  const renderedWidth = width * scale;
+  const renderedHeight = height * scale;
+  const renderedX = rect.left + alignmentOffset(align, "x", rect.width - renderedWidth);
+  const renderedY = rect.top + alignmentOffset(align, "y", rect.height - renderedHeight);
+  const rawMinX = minX + (visibleLeft - renderedX) / scale;
+  const rawMinY = minY + (visibleTop - renderedY) / scale;
+  const rawMaxX = minX + (visibleRight - renderedX) / scale;
+  const rawMaxY = minY + (visibleBottom - renderedY) / scale;
+  const clippedMinX = Math.max(minX, rawMinX);
+  const clippedMinY = Math.max(minY, rawMinY);
+  const clippedMaxX = Math.min(minX + width, rawMaxX);
+  const clippedMaxY = Math.min(minY + height, rawMaxY);
+
+  return [
+    clippedMinX,
+    clippedMinY,
+    clippedMaxX - clippedMinX,
+    clippedMaxY - clippedMinY,
+  ];
+}
+
+function svgForDownload(svg) {
+  const clone = svg.cloneNode(true);
+  const visibleViewBox = visibleSvgViewBox(svg);
+  if (visibleViewBox) {
+    clone.setAttribute("viewBox", visibleViewBox.join(" "));
+  }
+
+  const rect = svg.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0) {
+    clone.setAttribute("width", String(Math.round(rect.width)));
+    clone.setAttribute("height", String(Math.round(rect.height)));
+  }
+
+  return {
+    svg: clone,
+    cssVariables: applySvgCssVariables(svg, clone),
+    fontStyles: applySvgFontStyles(svg, clone),
+  };
+}
+
+function downloadSvg(svg) {
+  const filename = svgDownloadFilename(svg);
+  const { svg: exportSvg, cssVariables, fontStyles } = svgForDownload(svg);
+  const source = new XMLSerializer().serializeToString(exportSvg);
+  svg.dataset.lastDownloadFilename = filename;
+  svg.dataset.lastDownloadViewBox = exportSvg.getAttribute("viewBox") || "";
+  svg.dataset.lastDownloadCssVariables = JSON.stringify(cssVariables);
+  svg.dataset.lastDownloadFontStyles = JSON.stringify(fontStyles);
+  const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function installKeyboardPan(svg) {
   svg.addEventListener("keydown", (e) => {
+    if (
+      !e.defaultPrevented &&
+      e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey &&
+      String(e.key).toLowerCase() === "s"
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      downloadSvg(svg);
+      return;
+    }
+
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) {
       return;
     }
@@ -175,7 +398,7 @@ const DEFAULT_SVG_VIEW_HEIGHT = 600;
 function makeSVG(centered, viewWidth = DEFAULT_SVG_VIEW_WIDTH, viewHeight = DEFAULT_SVG_VIEW_HEIGHT) {
   let sizeStyle = centered ? "xMidYMin" : "xMinYMin";
   const s = `
-  <svg xmlns="http://www.w3.org/2000/svg" role="img" tabindex="0" aria-labelledby="visualizationTitle" aria-describedby="visualizationDescription" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}" 
+  <svg xmlns="http://www.w3.org/2000/svg" role="img" tabindex="0" aria-labelledby="visualizationTitle" aria-describedby="visualizationDescription" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Control+S" width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}" 
      preserveAspectRatio="${sizeStyle} slice">
     <title id="visualizationTitle">${DEFAULT_SVG_TITLE}</title>
     <desc id="visualizationDescription">${DEFAULT_SVG_DESCRIPTION}</desc>
