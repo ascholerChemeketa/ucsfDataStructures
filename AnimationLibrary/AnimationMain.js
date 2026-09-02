@@ -365,6 +365,21 @@ function makeInput(type, value, title, id) {
   return element;
 }
 
+export function makeNavigationButton(symbol, title, id, accessibleName) {
+  const element = document.createElement("button");
+  element.setAttribute("type", "button");
+  element.setAttribute("title", title);
+  element.setAttribute("aria-label", accessibleName);
+  element.id = id;
+
+  const visualSymbol = document.createElement("span");
+  visualSymbol.setAttribute("aria-hidden", "true");
+  visualSymbol.textContent = symbol;
+  element.appendChild(visualSymbol);
+
+  return element;
+}
+
 function addControlTo(element, parent, label) {
   let trueParent = parent;
   if (label) {
@@ -492,10 +507,42 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
   var stepButtons = document.createElement("div");
   stepButtons.classList.add("stepButtons");
   controlBar.appendChild(stepButtons);
-  skipBackButton = addControlTo(makeInput("Button", "<<", "Skip Back", "skipBackButton"), stepButtons);
-  stepBackButton = addControlTo(makeInput("Button", "<", "Step Back", "stepBackButton"), stepButtons);
-  stepForwardButton = addControlTo(makeInput("Button", ">", "Step Forward", "stepForwardButton"), stepButtons);
-  skipForwardButton = addControlTo(makeInput("Button", ">>", "Skip Forward", "skipForwardButton"), stepButtons);
+  skipBackButton = addControlTo(
+    makeNavigationButton(
+      "<<",
+      "Skip Back",
+      "skipBackButton",
+      "Skip to beginning of animation",
+    ),
+    stepButtons,
+  );
+  stepBackButton = addControlTo(
+    makeNavigationButton(
+      "<",
+      "Step Back",
+      "stepBackButton",
+      "Previous animation step",
+    ),
+    stepButtons,
+  );
+  stepForwardButton = addControlTo(
+    makeNavigationButton(
+      ">",
+      "Step Forward",
+      "stepForwardButton",
+      "Next animation step",
+    ),
+    stepButtons,
+  );
+  skipForwardButton = addControlTo(
+    makeNavigationButton(
+      ">>",
+      "Skip Forward",
+      "skipForwardButton",
+      "Skip to end of animation",
+    ),
+    stepButtons,
+  );
 
   // Thin scrub slider under step buttons
   scrubSlider = document.createElement("input");
