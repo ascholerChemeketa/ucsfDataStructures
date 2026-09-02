@@ -82,6 +82,8 @@ var stepForwardButton;
 var skipForwardButton;
 var scrubSlider;
 var describeStatusRegion;
+var pendingPlaybackFocus = null;
+var playbackFocusScheduled = false;
 
 var keyboardStepListenerInstalled = false;
 var ctrlWheelZoomListenerInstalled = false;
@@ -235,6 +237,7 @@ function animWaiting() {
   if (skipBackButton.disabled == false) {
     stepBackButton.disabled = false;
   }
+  schedulePlaybackFocus();
   //reporter.innerHTML = "Animation Paused";
   // objectManager.statusReport.setText("Animation Paused");
   // objectManager.statusReport.setForegroundColor("#FF0000");
@@ -245,12 +248,17 @@ function animReady() {
   skipBackButton.disabled = true;
   stepForwardButton.disabled = false;
   stepBackButton.disabled = true;
+  schedulePlaybackFocus();
   //reporter.innerHTML = "Animation Running";
   // objectManager.statusReport.setText("Animation Running");
   // objectManager.statusReport.setForegroundColor("#009900");
 }
 
 function animStarted() {
+  const algorithmControls = document.getElementById("AlgorithmSpecificControls");
+  if (isAnimationActionControl(document.activeElement, algorithmControls)) {
+    pendingPlaybackFocus = "stepForward";
+  }
   skipForwardButton.disabled = false;
   skipBackButton.disabled = false;
   stepForwardButton.disabled = true;
@@ -266,6 +274,7 @@ function animEnded() {
   if (skipBackButton.disabled == false && paused) {
     stepBackButton.disabled = false;
   }
+  schedulePlaybackFocus();
   //reporter.innerHTML = "";
   //objectManager.statusReport.setText("");
   //objectManager.statusReport.setForegroundColor("#000000");
@@ -274,10 +283,12 @@ function animEnded() {
 function animUndoUnavailable() {
   skipBackButton.disabled = true;
   stepBackButton.disabled = true;
+  schedulePlaybackFocus();
 }
 function animAdvanceUnavailable() {
   skipForwardButton.disabled = true;
   stepForwardButton.disabled = true;
+  schedulePlaybackFocus();
 }
 
 function timeoutFn() {
@@ -353,6 +364,49 @@ function describeCurrentStructure() {
 export function doPlayPause() {
   paused = !paused;
   animationManager.SetPaused(paused);
+}
+
+export function isAnimationActionControl(element, container) {
+  if (!element || !container || !container.contains(element)) return false;
+
+  const tagName = String(element.tagName || "").toLowerCase();
+  const type = String(element.type || "").toLowerCase();
+  return tagName === "button" ||
+    (tagName === "input" && (type === "button" || type === "submit"));
+}
+
+export function focusEnabledControl(element) {
+  if (!element || element.disabled || typeof element.focus !== "function") {
+    return false;
+  }
+  element.focus();
+  return true;
+}
+
+export function focusFirstEnabledControl(elements) {
+  for (const element of elements) {
+    if (focusEnabledControl(element)) return true;
+  }
+  return false;
+}
+
+function playbackFocusOrder(intent) {
+  if (intent === "stepBack" || intent === "skipForward") {
+    return [stepBackButton, skipBackButton, stepForwardButton, skipForwardButton];
+  }
+  return [stepForwardButton, skipForwardButton, stepBackButton, skipBackButton];
+}
+
+function schedulePlaybackFocus() {
+  if (!pendingPlaybackFocus || playbackFocusScheduled) return;
+
+  playbackFocusScheduled = true;
+  queueMicrotask(() => {
+    playbackFocusScheduled = false;
+    const intent = pendingPlaybackFocus;
+    pendingPlaybackFocus = null;
+    focusFirstEnabledControl(playbackFocusOrder(intent));
+  });
 }
 
 function makeInput(type, value, title, id) {
@@ -960,11 +1014,22 @@ export function initCanvas(canvas, targetElement=null, title="", centered = fals
     animAdvanceUnavailable,
   );
 
-  skipBackButton.onclick = animationManager.skipBack.bind(animationManager);
-  stepBackButton.onclick = animationManager.stepBack.bind(animationManager);
-  stepForwardButton.onclick = animationManager.step.bind(animationManager);
-  skipForwardButton.onclick =
-    animationManager.skipForward.bind(animationManager);
+  skipBackButton.onclick = () => {
+    pendingPlaybackFocus = "skipBack";
+    animationManager.skipBack();
+  };
+  stepBackButton.onclick = () => {
+    pendingPlaybackFocus = "stepBack";
+    animationManager.stepBack();
+  };
+  stepForwardButton.onclick = () => {
+    pendingPlaybackFocus = "stepForward";
+    animationManager.step();
+  };
+  skipForwardButton.onclick = () => {
+    pendingPlaybackFocus = "skipForward";
+    animationManager.skipForward();
+  };
 
   // Attach slider to manager and enable scrubbing
   animationManager.attachScrubSlider(scrubSlider);

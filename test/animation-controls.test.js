@@ -1,5 +1,10 @@
 import { assert, test } from "./harness.js";
-import { makeNavigationButton } from "../AnimationLibrary/AnimationMain.js";
+import {
+  focusEnabledControl,
+  focusFirstEnabledControl,
+  isAnimationActionControl,
+  makeNavigationButton,
+} from "../AnimationLibrary/AnimationMain.js";
 
 test("animation navigation buttons hide their symbolic values from accessible names", () => {
   const originalCreateElement = document.createElement;
@@ -38,4 +43,41 @@ test("animation navigation buttons hide their symbolic values from accessible na
       delete document.createElement;
     }
   }
+});
+
+test("focus moves only from animation action buttons to an enabled step control", () => {
+  const actionButton = { tagName: "INPUT", type: "button" };
+  const textInput = { tagName: "INPUT", type: "text" };
+  const controls = { contains: (element) => element === actionButton || element === textInput };
+
+  assert.equal(isAnimationActionControl(actionButton, controls), true);
+  assert.equal(isAnimationActionControl(textInput, controls), false);
+  assert.equal(isAnimationActionControl({ tagName: "BUTTON" }, controls), false);
+
+  let focusCalls = 0;
+  const stepButton = {
+    disabled: false,
+    focus() {
+      focusCalls += 1;
+    },
+  };
+
+  assert.equal(focusEnabledControl(stepButton), true);
+  assert.equal(focusCalls, 1);
+
+  stepButton.disabled = true;
+  assert.equal(focusEnabledControl(stepButton), false);
+  assert.equal(focusCalls, 1);
+});
+
+test("focus fallback skips disabled playback controls", () => {
+  let focused = "";
+  const disabledPreferredControl = { disabled: true, focus() { focused = "disabled"; } };
+  const enabledFallbackControl = { disabled: false, focus() { focused = "fallback"; } };
+
+  assert.equal(
+    focusFirstEnabledControl([disabledPreferredControl, enabledFallbackControl]),
+    true,
+  );
+  assert.equal(focused, "fallback");
 });
