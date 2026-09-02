@@ -25,6 +25,7 @@
 // or implied, of the University of San Francisco
 
 import { SingleAnimation } from "./AnimationMain.js";
+import { setAnimationMessage } from "./Message.js";
 
 // Base "class": UndoBlock
 
@@ -280,7 +281,7 @@ export function UndoSetMessage(str) {
 UndoSetMessage.prototype = new UndoBlock();
 UndoSetMessage.prototype.constructor = UndoSetMessage;
 UndoSetMessage.prototype.undoInitialStep = function (world) {
-  document.getElementById("message").value = this.message;
+  setAnimationMessage(this.message);
 };
 
 ////////////////////////////////////////////////////////////

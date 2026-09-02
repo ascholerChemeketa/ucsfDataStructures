@@ -34,6 +34,7 @@ import { ObjectManager } from "./ObjectManager.js";
 import { UndoConnect } from "./Line.js";
 import { normalizeAnimation, toBool, toColor } from "./AnimationSchema.js";
 import { snapshotObjectManagerState } from "./AnimationState.js";
+import { setAnimationMessage } from "./Message.js";
 import { controlKey } from "../AlgorithmLibrary/Algorithm.js";
 import * as Undo from "./UndoFunctions.js"; 
 
@@ -639,9 +640,17 @@ function addGeneralControls(objectManager, targetElement, title, opts = null) {
   var msgBox = document.createElement("textarea");
   msgBox.setAttribute("readonly", "readonly");
   msgBox.setAttribute("id", "message");
-  msgBox.setAttribute("aria-live", "polite");
   msgBox.setAttribute("rows", "4");
   controlBar.appendChild(msgBox);
+
+  // Form controls do not reliably expose value changes as live-region text;
+  // some screen readers announce only the associated "Message:" label.
+  // Mirror the value into a dedicated status region so the message itself is
+  // announced while the visible, labeled textarea remains available to users.
+  var msgBoxStatus = makeDiv("messageStatus", "visually-hidden", controlBar);
+  msgBoxStatus.setAttribute("role", "status");
+  msgBoxStatus.setAttribute("aria-live", "polite");
+  msgBoxStatus.setAttribute("aria-atomic", "true");
 
 }
 
@@ -1146,7 +1155,7 @@ function AnimationManager(objectManager, canvas) {
       undoBlock.push(new Undo.UndoSetAlpha(step.id, oldAlpha));
     } else if (step.type === "setMessage") {
       const oldText = document.getElementById("message").value;
-      document.getElementById("message").value = step.message;
+      setAnimationMessage(step.message);
       if (oldText != undefined) {
         undoBlock.push(new Undo.UndoSetMessage(oldText));
       }
@@ -1154,7 +1163,7 @@ function AnimationManager(objectManager, canvas) {
       const oldText = this.animatedObjects.getText(step.id, step.index);
       this.animatedObjects.setText(step.id, step.text, step.index);
       if (step.id === 0) {
-        document.getElementById("message").value = step.text;
+        setAnimationMessage(step.text);
       }
       if (oldText != undefined) {
         undoBlock.push(new Undo.UndoSetText(step.id, oldText, step.index));
@@ -1436,7 +1445,7 @@ function AnimationManager(objectManager, canvas) {
     this.animatedObjects.update();
     this.animatedObjects.draw();
     this.refreshAccessibleDescription();
-      document.getElementById("message").value = "";
+    setAnimationMessage("");
   };
 
   this.skipBack = function () {

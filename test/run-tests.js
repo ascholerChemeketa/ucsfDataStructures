@@ -1,4 +1,5 @@
 import "./core.test.js";
+import "./message-accessibility.test.js";
 import "./bst.test.js";
 import "./bstcopy.test.js";
 import "./bstiterator.test.js";
