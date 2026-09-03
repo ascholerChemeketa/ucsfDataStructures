@@ -112,7 +112,7 @@ RedBlack.prototype.init = function (am, w, h) {
   this.commands = [];
   this.groupBoxes = {};
   this.rootIndex = 0;
-  this.startingX = 100;  // w / 2;
+  this.startingX = 150;  // w / 2;
   this.print_max = w - PRINT_HORIZONTAL_GAP;
   this.first_print_pos_y = h - 2 * PRINT_VERTICAL_GAP;
   
